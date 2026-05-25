@@ -34,7 +34,7 @@ export function DatasetSelector({ value, onChange, disabled }: DatasetSelectorPr
         ) : (
           datasets.map((dataset) => (
             <SelectItem key={dataset.id} value={dataset.id}>
-              {dataset.name} -- {dataset.stats.item_count} items
+              {dataset.name} -- {dataset.item_count} items
             </SelectItem>
           ))
         )}

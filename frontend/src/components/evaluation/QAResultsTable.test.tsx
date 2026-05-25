@@ -53,30 +53,35 @@ const mockDatasetItems: DatasetItem[] = [
     question: 'How do you restart the SSH service on RHEL?',
     expected_answer: 'systemctl restart sshd',
     metadata: {},
+    order_index: 0,
   },
   {
     id: 'item-2',
     question: 'How do you configure a static IP on RHEL 9?',
     expected_answer: 'Use nmcli or edit /etc/NetworkManager/system-connections/',
     metadata: {},
+    order_index: 1,
   },
   {
     id: 'item-3',
     question: 'How do you open port 443 on RHEL?',
     expected_answer: 'firewall-cmd --add-port=443/tcp --permanent && firewall-cmd --reload',
     metadata: {},
+    order_index: 2,
   },
   {
     id: 'item-4',
     question: 'How do you change the SSH port on RHEL with SELinux enabled?',
     expected_answer: 'Edit sshd_config, run semanage port, restart sshd',
     metadata: {},
+    order_index: 3,
   },
   {
     id: 'item-5',
     question: 'Explain LVM volume creation on Linux.',
     expected_answer: 'Create PV with pvcreate, VG with vgcreate, LV with lvcreate, then mkfs',
     metadata: {},
+    order_index: 4,
   },
 ];
 
