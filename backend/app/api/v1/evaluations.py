@@ -144,7 +144,7 @@ async def run_evaluation(
         async with async_session_factory() as bg_session:
             await run_qa_evaluation(evaluation_id, bg_session)
 
-    asyncio.create_task(_run_in_background())
+    _task = asyncio.create_task(_run_in_background())  # noqa: RUF006
 
     return EvaluationResponse.model_validate(evaluation)
 
@@ -181,6 +181,6 @@ async def rerun_evaluation(
         async with async_session_factory() as bg_session:
             await run_qa_evaluation(evaluation_id, bg_session)
 
-    asyncio.create_task(_run_in_background())
+    _task = asyncio.create_task(_run_in_background())  # noqa: RUF006
 
     return EvaluationResponse.model_validate(evaluation)

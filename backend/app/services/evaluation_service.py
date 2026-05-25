@@ -65,9 +65,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         # 4. Load judge config
         judge_config = None
         if evaluation.judge_config_id:
-            jc_result = await db.execute(
-                select(JudgeConfig).where(JudgeConfig.id == evaluation.judge_config_id)
-            )
+            jc_result = await db.execute(select(JudgeConfig).where(JudgeConfig.id == evaluation.judge_config_id))
             judge_config = jc_result.scalar_one_or_none()
             if not judge_config:
                 logger.error("JudgeConfig %s not found for evaluation %s", evaluation.judge_config_id, evaluation_id)
