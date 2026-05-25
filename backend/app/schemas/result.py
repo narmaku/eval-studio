@@ -19,3 +19,23 @@ class ResultResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class EvaluationComparisonItem(BaseModel):
+    """Summary of one evaluation's results for comparison."""
+
+    evaluation_id: str
+    evaluation_name: str
+    total_items: int
+    passed_count: int
+    failed_count: int
+    average_score: float
+    min_score: float | None
+    max_score: float | None
+    results: list[ResultResponse]
+
+
+class ComparisonResponse(BaseModel):
+    """Response for comparing results across evaluations."""
+
+    evaluations: list[EvaluationComparisonItem]
