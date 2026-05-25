@@ -159,7 +159,7 @@ describe('datasetStore', () => {
 
       const state = useDatasetStore.getState();
       expect(state.datasets).toHaveLength(1);
-      expect(state.datasets[0].id).toBe('ds-2');
+      expect(state.datasets[0]?.id).toBe('ds-2');
     });
 
     it('clears currentDataset if it matches the removed id', async () => {

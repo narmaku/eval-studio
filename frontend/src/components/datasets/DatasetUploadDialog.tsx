@@ -101,7 +101,8 @@ function parseCsv(text: string): DatasetItemCreate[] {
   if (lines.length < 2) {
     throw new Error('CSV must have a header row and at least one data row');
   }
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const headerLine = lines[0]!;
+  const headers = headerLine.split(',').map((h) => h.trim().toLowerCase());
   const questionIdx = headers.indexOf('question');
   const answerIdx = headers.indexOf('expected_answer');
   if (questionIdx === -1) {
@@ -109,8 +110,12 @@ function parseCsv(text: string): DatasetItemCreate[] {
   }
   return lines.slice(1).map((line) => {
     const values = line.split(',').map((v) => v.trim());
+    const question = values[questionIdx];
+    if (!question) {
+      throw new Error('Missing question value in CSV row');
+    }
     return {
-      question: values[questionIdx],
+      question,
       expected_answer: answerIdx !== -1 ? values[answerIdx] : undefined,
     };
   });
