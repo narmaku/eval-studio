@@ -11,6 +11,7 @@ const RAGEvaluation = lazy(() => import('@/pages/RAGEvaluation'));
 const ArenaComparison = lazy(() => import('@/pages/ArenaComparison'));
 const Datasets = lazy(() => import('@/pages/Datasets'));
 const Results = lazy(() => import('@/pages/Results'));
+const ResultDetail = lazy(() => import('@/pages/ResultDetail'));
 const Environments = lazy(() => import('@/pages/Environments'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
@@ -87,14 +88,24 @@ export default function App() {
                 </Suspense>
               }
             />
-            <Route
-              path="results"
-              element={
-                <Suspense fallback={<Loading />}>
-                  <Results />
-                </Suspense>
-              }
-            />
+            <Route path="results">
+              <Route
+                index
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <Results />
+                  </Suspense>
+                }
+              />
+              <Route
+                path=":resultId"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <ResultDetail />
+                  </Suspense>
+                }
+              />
+            </Route>
             <Route
               path="environments"
               element={
