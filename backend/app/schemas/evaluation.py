@@ -42,6 +42,7 @@ class EvaluationResponse(BaseModel):
     environment_id: str | None
     judge_config_id: str | None
     config: dict[str, Any]
+    result_count: int | None = None
     created_at: datetime
     updated_at: datetime
 

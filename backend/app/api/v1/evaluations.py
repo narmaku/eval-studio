@@ -1,13 +1,15 @@
+import asyncio
 import math
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.exceptions import NotFoundException, NotImplementedException
+from app.core.database import async_session_factory, get_db
+from app.core.exceptions import ConflictException, NotFoundException, NotImplementedException
 from app.models.dataset import Dataset
 from app.models.evaluation import Evaluation
+from app.models.result import Result
 from app.schemas.common import PaginatedResponse
 from app.schemas.evaluation import (
     EvaluationCreate,
@@ -15,6 +17,7 @@ from app.schemas.evaluation import (
     EvaluationResponse,
     EvaluationStatus,
 )
+from app.services.evaluation_service import run_qa_evaluation
 
 router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 
@@ -85,10 +88,99 @@ async def get_evaluation(evaluation_id: str, db: AsyncSession = Depends(get_db))
     evaluation = result.scalar_one_or_none()
     if not evaluation:
         raise NotFoundException("Evaluation", evaluation_id)
+
+    # Count results
+    count_result = await db.execute(select(func.count(Result.id)).where(Result.evaluation_id == evaluation_id))
+    result_count = count_result.scalar_one()
+
+    response = EvaluationResponse.model_validate(evaluation)
+    response.result_count = result_count
+    return response
+
+
+@router.delete("/{evaluation_id}", status_code=204)
+async def delete_evaluation(evaluation_id: str, db: AsyncSession = Depends(get_db)) -> Response:
+    """Delete an evaluation and all its results."""
+    result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
+    evaluation = result.scalar_one_or_none()
+    if not evaluation:
+        raise NotFoundException("Evaluation", evaluation_id)
+
+    if evaluation.status == "running":
+        raise ConflictException("Cannot delete a running evaluation.")
+
+    await db.delete(evaluation)
+    await db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/{evaluation_id}/run", response_model=EvaluationResponse)
+async def run_evaluation(
+    evaluation_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EvaluationResponse:
+    """Trigger an evaluation run as a background task."""
+    result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
+    evaluation = result.scalar_one_or_none()
+    if not evaluation:
+        raise NotFoundException("Evaluation", evaluation_id)
+
+    if evaluation.status not in ("pending", "failed"):
+        raise ConflictException(
+            f"Evaluation is '{evaluation.status}' and cannot be started. "
+            "Only 'pending' or 'failed' evaluations can be run."
+        )
+
+    if evaluation.mode != "qa":
+        raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
+
+    # Reset status to pending before launching background task
+    evaluation.status = "pending"
+    await db.commit()
+    await db.refresh(evaluation)
+
+    # Launch background task with its own database session
+    async def _run_in_background() -> None:
+        async with async_session_factory() as bg_session:
+            await run_qa_evaluation(evaluation_id, bg_session)
+
+    asyncio.create_task(_run_in_background())
+
     return EvaluationResponse.model_validate(evaluation)
 
 
-@router.delete("/{evaluation_id}")
-async def delete_evaluation(evaluation_id: str) -> None:
-    """Delete an evaluation (not yet implemented)."""
-    raise NotImplementedException("Evaluation deletion")
+@router.post("/{evaluation_id}/rerun", response_model=EvaluationResponse)
+async def rerun_evaluation(
+    evaluation_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EvaluationResponse:
+    """Re-run a completed or failed evaluation, clearing old results."""
+    result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
+    evaluation = result.scalar_one_or_none()
+    if not evaluation:
+        raise NotFoundException("Evaluation", evaluation_id)
+
+    if evaluation.status == "running":
+        raise ConflictException("Evaluation is currently running.")
+
+    if evaluation.mode != "qa":
+        raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
+
+    # Delete existing results for this evaluation
+    existing_results = await db.execute(select(Result).where(Result.evaluation_id == evaluation_id))
+    for r in existing_results.scalars().all():
+        await db.delete(r)
+
+    # Reset status
+    evaluation.status = "pending"
+    await db.commit()
+    await db.refresh(evaluation)
+
+    # Launch background task
+    async def _run_in_background() -> None:
+        async with async_session_factory() as bg_session:
+            await run_qa_evaluation(evaluation_id, bg_session)
+
+    asyncio.create_task(_run_in_background())
+
+    return EvaluationResponse.model_validate(evaluation)

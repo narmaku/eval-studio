@@ -22,7 +22,9 @@ class Evaluation(Base):
     judge_config_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
-    results: Mapped[list["Result"]] = relationship("Result", back_populates="evaluation", lazy="selectin")
+    results: Mapped[list["Result"]] = relationship(
+        "Result", back_populates="evaluation", cascade="all, delete-orphan", lazy="selectin"
+    )
     sessions: Mapped[list["Session"]] = relationship("Session", back_populates="evaluation", lazy="selectin")
 
 

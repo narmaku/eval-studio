@@ -1,23 +1,96 @@
-from fastapi import APIRouter
+import math
 
-from app.core.exceptions import NotImplementedException
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.core.exceptions import NotFoundException
+from app.models.evaluation import Evaluation
+from app.models.result import Result
+from app.schemas.common import PaginatedResponse
+from app.schemas.result import ComparisonResponse, EvaluationComparisonItem, ResultResponse
 
 router = APIRouter(prefix="/results", tags=["results"])
 
 
-@router.get("")
-async def list_results() -> None:
-    """List results (not yet implemented)."""
-    raise NotImplementedException("Results")
+@router.get("", response_model=PaginatedResponse[ResultResponse])
+async def list_results(
+    page: int = 1,
+    page_size: int = 20,
+    evaluation_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> PaginatedResponse[ResultResponse]:
+    """List results with pagination and optional evaluation filter."""
+    query = select(Result)
+    count_query = select(func.count(Result.id))
+
+    if evaluation_id:
+        query = query.where(Result.evaluation_id == evaluation_id)
+        count_query = count_query.where(Result.evaluation_id == evaluation_id)
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar_one()
+
+    query = query.offset((page - 1) * page_size).limit(page_size).order_by(Result.created_at.desc())
+    result = await db.execute(query)
+    results = result.scalars().all()
+
+    return PaginatedResponse[ResultResponse](
+        items=[ResultResponse.model_validate(r) for r in results],
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=max(1, math.ceil(total / page_size)),
+    )
 
 
-@router.get("/compare")
-async def compare_results() -> None:
-    """Compare results across evaluations (not yet implemented)."""
-    raise NotImplementedException("Results")
+@router.get("/compare", response_model=ComparisonResponse)
+async def compare_results(
+    evaluation_ids: list[str] = Query(..., alias="evaluation_id"),
+    db: AsyncSession = Depends(get_db),
+) -> ComparisonResponse:
+    """Compare results across evaluations."""
+    comparisons: list[EvaluationComparisonItem] = []
+
+    for eval_id in evaluation_ids:
+        eval_result = await db.execute(select(Evaluation).where(Evaluation.id == eval_id))
+        evaluation = eval_result.scalar_one_or_none()
+        if not evaluation:
+            raise NotFoundException("Evaluation", eval_id)
+
+        results_result = await db.execute(select(Result).where(Result.evaluation_id == eval_id))
+        results = results_result.scalars().all()
+
+        scores = [r.score for r in results if r.score is not None]
+        passed_count = sum(1 for r in results if r.passed is True)
+        failed_count = sum(1 for r in results if r.passed is False)
+
+        comparisons.append(
+            EvaluationComparisonItem(
+                evaluation_id=eval_id,
+                evaluation_name=evaluation.name,
+                total_items=len(results),
+                passed_count=passed_count,
+                failed_count=failed_count,
+                average_score=sum(scores) / len(scores) if scores else 0.0,
+                min_score=min(scores) if scores else None,
+                max_score=max(scores) if scores else None,
+                results=[ResultResponse.model_validate(r) for r in results],
+            )
+        )
+
+    return ComparisonResponse(evaluations=comparisons)
 
 
-@router.get("/{result_id}")
-async def get_result(result_id: str) -> None:
-    """Get a result by ID (not yet implemented)."""
-    raise NotImplementedException("Results")
+@router.get("/{result_id}", response_model=ResultResponse)
+async def get_result(
+    result_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ResultResponse:
+    """Get a result by ID."""
+    result = await db.execute(select(Result).where(Result.id == result_id))
+    result_obj = result.scalar_one_or_none()
+    if not result_obj:
+        raise NotFoundException("Result", result_id)
+    return ResultResponse.model_validate(result_obj)
