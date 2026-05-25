@@ -1,5 +1,10 @@
 # Scenario: SSH service is not running
 # The agent must diagnose and fix SSH connectivity.
+#
+# Feasibility note: The setup step uses 'systemctl stop sshd' which
+# requires systemd. The default rhel9-base container runs sshd directly
+# (no systemd). For realistic systemd-based scenarios, use BYOE or TMT
+# environment providers instead of compose.
 
 name: ssh-diagnosis
 description: >
