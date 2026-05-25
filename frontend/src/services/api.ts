@@ -4,6 +4,7 @@ import type {
   Evaluation,
   CreateEvaluationRequest,
   Dataset,
+  DatasetDetail,
   CreateDatasetRequest,
   Result,
   ResultComparison,
@@ -108,7 +109,7 @@ export const api = {
     const qs = query.toString();
     return request<PaginatedResponse<Dataset>>(`/api/v1/datasets${qs ? `?${qs}` : ''}`);
   },
-  getDataset: (id: string) => request<Dataset>(`/api/v1/datasets/${id}`),
+  getDataset: (id: string) => request<DatasetDetail>(`/api/v1/datasets/${id}`),
   createDataset: (data: CreateDatasetRequest) =>
     request<Dataset>('/api/v1/datasets', { method: 'POST', body: JSON.stringify(data) }),
   updateDataset: (id: string, data: Partial<CreateDatasetRequest>) =>

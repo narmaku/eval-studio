@@ -1,22 +1,77 @@
+import asyncio
+import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# In-memory tracking of active WebSocket connections per evaluation
+_connections: dict[str, set[WebSocket]] = {}
+_lock = asyncio.Lock()
+
+
+async def _add_connection(evaluation_id: str, ws: WebSocket) -> None:
+    async with _lock:
+        if evaluation_id not in _connections:
+            _connections[evaluation_id] = set()
+        _connections[evaluation_id].add(ws)
+
+
+async def _remove_connection(evaluation_id: str, ws: WebSocket) -> None:
+    async with _lock:
+        if evaluation_id in _connections:
+            _connections[evaluation_id].discard(ws)
+            if not _connections[evaluation_id]:
+                del _connections[evaluation_id]
+
+
+async def broadcast_progress(
+    evaluation_id: str,
+    completed: int,
+    total: int,
+    current_item: str,
+) -> None:
+    """Send progress update to all WebSocket clients watching this evaluation."""
+    async with _lock:
+        websockets = _connections.get(evaluation_id, set()).copy()
+
+    message = {
+        "type": "progress",
+        "evaluation_id": evaluation_id,
+        "completed": completed,
+        "total": total,
+        "current_item": current_item,
+    }
+
+    dead_connections: list[WebSocket] = []
+    for ws in websockets:
+        try:
+            await ws.send_json(message)
+        except Exception:
+            dead_connections.append(ws)
+
+    # Clean up dead connections
+    if dead_connections:
+        async with _lock:
+            conns = _connections.get(evaluation_id, set())
+            for ws in dead_connections:
+                conns.discard(ws)
 
 
 @router.websocket("/ws/progress/{evaluation_id}")
-async def progress_websocket(websocket: WebSocket, evaluation_id: str) -> None:
-    """WebSocket for evaluation progress updates. Currently echo-only stub."""
+async def progress_websocket(
+    websocket: WebSocket,
+    evaluation_id: str,
+) -> None:
+    """WebSocket for evaluation progress updates."""
     await websocket.accept()
+    await _add_connection(evaluation_id, websocket)
     try:
         while True:
-            data = await websocket.receive_json()
-            await websocket.send_json(
-                {
-                    "type": "echo",
-                    "evaluation_id": evaluation_id,
-                    "data": data,
-                    "message": "WebSocket progress endpoint is a stub. Echo mode only.",
-                }
-            )
+            # Keep connection alive; client can send pings
+            await websocket.receive_text()
     except WebSocketDisconnect:
         pass
+    finally:
+        await _remove_connection(evaluation_id, websocket)

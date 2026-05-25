@@ -16,7 +16,7 @@ interface EvaluationStore {
   setError: (error: string | null) => void;
   clearError: () => void;
 
-  fetchEvaluations: () => Promise<void>;
+  fetchEvaluations: (params?: { mode?: string; status?: string }) => Promise<void>;
   createAndRunEvaluation: (request: CreateEvaluationRequest) => Promise<Evaluation>;
   pollEvaluation: (id: string, onComplete: () => void) => () => void;
 }
@@ -33,10 +33,17 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),
 
-  fetchEvaluations: async () => {
+  fetchEvaluations: async (params?: { mode?: string; status?: string }) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.listEvaluations();
+      const queryParams: { mode?: string; status?: string } = {};
+      if (params?.mode) {
+        queryParams.mode = params.mode;
+      }
+      if (params?.status) {
+        queryParams.status = params.status;
+      }
+      const response = await api.listEvaluations(queryParams);
       set({ evaluations: response.items, isLoading: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch evaluations';
