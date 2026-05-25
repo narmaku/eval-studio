@@ -89,8 +89,12 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         # 7. Process each dataset item
         items = sorted(dataset.items, key=lambda i: i.order_index)
         total = len(items)
+        completed_counter = 0
+        counter_lock = asyncio.Lock()
 
         async def process_item(idx: int, item: DatasetItem) -> Result:
+            nonlocal completed_counter
+
             # Step A: Call the model under test
             response = await litellm.acompletion(
                 model=model_under_test,
@@ -107,7 +111,8 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 judge_config=judge_params,
             )
 
-            # Step C: Create Result record
+            # Step C: Build Result record (do NOT add to session here;
+            # the session is shared and not safe for concurrent mutations)
             result = Result(
                 evaluation_id=evaluation_id,
                 dataset_item_id=item.id,
@@ -117,12 +122,14 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 judge_reasoning=score.reasoning,
                 scores_breakdown=score.breakdown,
             )
-            db.add(result)
 
-            # Step D: Broadcast progress
+            # Step D: Broadcast progress with accurate counter
+            async with counter_lock:
+                completed_counter += 1
+                current_completed = completed_counter
             await broadcast_progress(
                 evaluation_id=evaluation_id,
-                completed=idx + 1,
+                completed=current_completed,
                 total=total,
                 current_item=item.question[:100],
             )
@@ -141,7 +148,8 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             return_exceptions=True,
         )
 
-        # 8. Handle per-item errors
+        # 8. Collect results into the session sequentially (session is not
+        # safe for concurrent mutations from multiple coroutines).
         error_count = 0
         for i, r in enumerate(results):
             if isinstance(r, Exception):
@@ -156,6 +164,8 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                     judge_reasoning=str(r),
                 )
                 db.add(error_result)
+            else:
+                db.add(r)
 
         # 9. Update evaluation status
         if error_count == total:

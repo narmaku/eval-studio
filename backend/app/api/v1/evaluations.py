@@ -21,6 +21,10 @@ from app.services.evaluation_service import run_qa_evaluation
 
 router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 
+# Keep strong references to background evaluation tasks so they are
+# not garbage-collected while still running.
+_background_tasks: set[asyncio.Task] = set()
+
 
 @router.post("", response_model=EvaluationResponse, status_code=201)
 async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depends(get_db)) -> EvaluationResponse:
@@ -144,7 +148,9 @@ async def run_evaluation(
         async with async_session_factory() as bg_session:
             await run_qa_evaluation(evaluation_id, bg_session)
 
-    _task = asyncio.create_task(_run_in_background())  # noqa: RUF006
+    task = asyncio.create_task(_run_in_background())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return EvaluationResponse.model_validate(evaluation)
 
@@ -181,6 +187,8 @@ async def rerun_evaluation(
         async with async_session_factory() as bg_session:
             await run_qa_evaluation(evaluation_id, bg_session)
 
-    _task = asyncio.create_task(_run_in_background())  # noqa: RUF006
+    task = asyncio.create_task(_run_in_background())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return EvaluationResponse.model_validate(evaluation)
