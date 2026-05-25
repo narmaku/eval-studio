@@ -1,0 +1,5 @@
+{"question": "How do you check the status of a systemd service?", "expected_answer": "Use the command 'systemctl status <service-name>'. For example, 'systemctl status sshd' shows whether the SSH daemon is active, its PID, and recent log entries."}
+{"question": "How do you list all listening TCP ports on a Linux system?", "expected_answer": "Use 'ss -tlnp' to list all TCP sockets in LISTEN state with numeric addresses and process information."}
+{"question": "What command restarts the firewalld service?", "expected_answer": "Run 'systemctl restart firewalld'. To verify it restarted successfully, check with 'systemctl status firewalld'."}
+{"question": "How do you check disk space usage on all mounted filesystems?", "expected_answer": "Use 'df -h' to display disk space usage in human-readable format for all mounted filesystems."}
+{"question": "How do you view the last 50 lines of the system journal?", "expected_answer": "Use 'journalctl -n 50' to view the last 50 entries from the systemd journal. Add '-f' flag to follow new entries in real time."}

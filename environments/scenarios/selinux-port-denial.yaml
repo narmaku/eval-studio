@@ -1,0 +1,47 @@
+# Scenario: SELinux blocking a non-standard port
+# The agent must diagnose an SELinux denial and fix port labeling.
+#
+# Feasibility note: SELinux enforcement requires a real RHEL/Fedora
+# host (not a container). This scenario is best used with BYOE or
+# TMT environment providers.
+
+name: selinux-port-denial
+description: >
+  A web server has been configured to listen on port 8090,
+  but SELinux is blocking it because the port is not labeled
+  for HTTP traffic. The agent must diagnose the SELinux denial
+  and apply the correct port label.
+category: security
+difficulty: intermediate
+
+environment:
+  type: byoe
+  # SELinux scenarios require a real host with enforcing mode.
+  # Docker containers do not enforce SELinux policies internally.
+
+setup:
+  description: Configure httpd on non-standard port, SELinux blocks it
+  steps:
+    - command: "semanage port -d -t http_port_t -p tcp 8090 2>/dev/null; true"
+      description: "Ensure port 8090 is not labeled for HTTP"
+    - command: "sed -i 's/^Listen .*/Listen 8090/' /etc/httpd/conf/httpd.conf"
+      description: "Configure httpd to listen on 8090"
+    - command: "systemctl restart httpd"
+      description: "Attempt to restart httpd (will fail due to SELinux)"
+
+success_criteria:
+  - description: "Port 8090 is labeled for HTTP"
+    check: "semanage port -l | grep -w 8090"
+    expected_contains: "http_port_t"
+  - description: "httpd is running and listening on 8090"
+    check: "systemctl is-active httpd"
+    expected: "active"
+
+max_turns: 15
+timeout_seconds: 600
+
+tags:
+  - selinux
+  - security
+  - httpd
+  - intermediate

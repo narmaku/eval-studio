@@ -1,0 +1,15 @@
+# Simple UBI9 container for basic evaluation scenarios.
+# This provides a minimal RHEL-like environment without
+# a subscription, suitable for testing commands and tools.
+#
+# Usage: docker compose up -d
+# Connect: docker compose exec target-host bash
+
+services:
+  target-host:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    hostname: target-host
+    tty: true
+    stdin_open: true

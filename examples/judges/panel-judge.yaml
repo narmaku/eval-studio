@@ -1,0 +1,48 @@
+# Panel judge configuration
+# Three judges with majority vote aggregation.
+# Higher reliability but higher cost and latency.
+
+name: Panel Judge (Rigorous)
+description: >
+  Panel of three diverse LLM judges with majority vote aggregation.
+  Use for high-stakes evaluations where reliability matters more
+  than speed or cost.
+
+aggregation: majority_vote
+
+panel:
+  - model: gpt-4.1
+    temperature: 0.0
+    weight: 1.0
+  - model: claude-sonnet-4-6
+    temperature: 0.0
+    weight: 1.0
+  - model: gemini-2.5-flash
+    temperature: 0.0
+    weight: 0.5
+
+prompt_template: |
+  You are evaluating the quality of an AI assistant's response
+  to a technical question about Linux system administration.
+
+  Question: {question}
+  Expected Answer: {expected_answer}
+  Actual Answer: {actual_answer}
+
+  Score the response on a scale of 0.0 to 1.0 for each dimension:
+  - correctness: Does the answer contain accurate, factual information?
+  - completeness: Does it address all key points from the expected answer?
+  - helpfulness: Would an experienced sysadmin find this actionable?
+
+  Respond with JSON only:
+  {{"correctness": 0.0, "completeness": 0.0, "helpfulness": 0.0}}
+
+pass_threshold: 0.7
+
+dimensions:
+  - name: correctness
+    weight: 0.5
+  - name: completeness
+    weight: 0.3
+  - name: helpfulness
+    weight: 0.2
