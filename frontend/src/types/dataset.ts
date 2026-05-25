@@ -1,33 +1,18 @@
-// TODO: Consider generating these types from the FastAPI OpenAPI spec
-// using openapi-typescript once the backend is implemented.
+// Types aligned with backend DatasetResponse / DatasetDetailResponse schemas.
 
-export type DatasetFormat = 'qa_pairs' | 'jsonl' | 'csv' | 'huggingface';
-export type DatasetSourceType = 'upload' | 'git' | 's3' | 'url' | 'huggingface';
+export type DatasetFormat = 'qa_pairs' | 'jsonl' | 'csv';
 
 export interface Dataset {
   id: string;
   name: string;
-  description: string;
-  format: DatasetFormat;
+  description: string | null;
+  format: string;
   version: string;
   tags: string[];
-  source: DatasetSource;
-  stats: DatasetStats;
+  source_type: string;
+  item_count: number;
   created_at: string;
   updated_at: string;
-}
-
-export interface DatasetSource {
-  type: DatasetSourceType;
-  original_format: string;
-  imported_at: string;
-}
-
-export interface DatasetStats {
-  item_count: number;
-  categories: string[];
-  avg_question_length: number;
-  avg_answer_length: number;
 }
 
 export interface DatasetItem {
@@ -37,9 +22,21 @@ export interface DatasetItem {
   metadata: Record<string, unknown>;
 }
 
+export interface DatasetDetail extends Dataset {
+  items: DatasetItem[];
+}
+
+export interface DatasetItemCreate {
+  question: string;
+  expected_answer?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface CreateDatasetRequest {
   name: string;
   description?: string;
   format: DatasetFormat;
+  version?: string;
   tags?: string[];
+  items?: DatasetItemCreate[];
 }
