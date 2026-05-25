@@ -1,0 +1,52 @@
+# docker-compose.yml -- Development environment
+# Usage: docker compose up -d
+# With LiteLLM proxy: docker compose --profile litellm up -d
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app:z
+      - eval-studio-data:/app/data:z
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/eval_studio.db
+    command: uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    image: node:22-slim
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app:z
+      - frontend-node-modules:/app/node_modules:z
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    command: sh -c "npm install --silent && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    profiles:
+      - litellm
+
+volumes:
+  eval-studio-data:
+  frontend-node-modules:
