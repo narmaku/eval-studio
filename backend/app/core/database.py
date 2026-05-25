@@ -36,6 +36,14 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency that provides an async database session."""
+    """FastAPI dependency that provides an async database session.
+
+    Rolls back on unhandled exceptions to avoid leaving the session in a
+    dirty state, then re-raises so FastAPI's exception handlers can respond.
+    """
     async with async_session_factory() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise

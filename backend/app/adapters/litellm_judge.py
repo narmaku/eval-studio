@@ -1,4 +1,5 @@
 import json
+import logging
 
 import litellm
 
@@ -9,6 +10,8 @@ from app.adapters.base import (
     Score,
     ToolCall,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class LiteLLMJudgeAdapter(EvaluationAdapter):
@@ -54,7 +57,14 @@ Respond with ONLY a JSON object: {{"score": <float>, "reasoning": "<explanation>
                 response_format={"type": "json_object"},
             )
             content = response.choices[0].message.content
-            result = json.loads(content)
+            if content is None:
+                logger.warning("LLM returned empty content for Q&A evaluation")
+                return Score(value=0.0, passed=False, reasoning="LLM returned empty response")
+            try:
+                result = json.loads(content)
+            except (json.JSONDecodeError, TypeError) as exc:
+                logger.error("Failed to parse LLM judge response: %s", exc, extra={"raw_content": content})
+                return Score(value=0.0, passed=False, reasoning=f"Failed to parse judge response: {exc}")
             score_value = float(result.get("score", 0.0))
             reasoning = result.get("reasoning", "")
             passed = score_value >= (judge_config.pass_threshold or 0.7)

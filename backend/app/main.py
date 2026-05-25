@@ -22,7 +22,6 @@ async def lifespan(app: FastAPI):
         "Starting eval-studio backend",
         version=settings.app_version,
         debug=settings.debug,
-        database_url=settings.database_url,
     )
     yield
     logger = get_logger("app.main")
