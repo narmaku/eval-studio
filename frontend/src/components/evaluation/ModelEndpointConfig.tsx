@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,21 +37,23 @@ export function ModelEndpointConfig({ value, onChange, disabled }: ModelEndpoint
     },
   });
 
-  // Reset form when external value changes
+  const isInternalChange = useRef(false);
+
   useEffect(() => {
-    if (value) {
+    if (value && !isInternalChange.current) {
       reset({
         name: value.name,
         litellm_model: value.litellm_model,
         api_base: value.api_base ?? '',
       });
     }
+    isInternalChange.current = false;
   }, [value, reset]);
 
-  // Emit valid values to parent
   useEffect(() => {
     const subscription = watch((formValues) => {
       if (isValid && formValues.name && formValues.litellm_model) {
+        isInternalChange.current = true;
         onChange({
           name: formValues.name,
           litellm_model: formValues.litellm_model,
