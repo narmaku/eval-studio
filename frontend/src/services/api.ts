@@ -21,12 +21,14 @@ import type {
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 class ApiClientError extends Error {
-  constructor(
-    public status: number,
-    public detail: ApiError,
-  ) {
+  status: number;
+  detail: ApiError;
+
+  constructor(status: number, detail: ApiError) {
     super(detail.detail);
     this.name = 'ApiClientError';
+    this.status = status;
+    this.detail = detail;
   }
 }
 
