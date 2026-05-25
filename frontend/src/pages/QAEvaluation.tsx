@@ -28,7 +28,8 @@ export default function QAEvaluation() {
   const [selectedScore, setSelectedScore] = useState<Score | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const { currentEvaluation, createAndRunEvaluation, isLoading } = useEvaluationStore();
+  const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading } =
+    useEvaluationStore();
   const { results, fetchResults } = useResultStore();
 
   const isConfigValid = Boolean(selectedDatasetId && modelEndpoint && judgeConfig);
@@ -63,6 +64,9 @@ export default function QAEvaluation() {
       setPhase('complete');
     } else if (evaluation?.status === 'failed') {
       toast.error(`Evaluation failed: ${evaluation.error ?? 'Unknown error'}`);
+      setPhase('configure');
+    } else if (evaluation?.status === 'cancelled') {
+      toast('Evaluation was cancelled');
       setPhase('configure');
     }
   }, [fetchResults]);
@@ -143,6 +147,7 @@ export default function QAEvaluation() {
           <Button
             variant="outline"
             onClick={() => {
+              setCurrentEvaluation(null);
               setPhase('configure');
               toast('Evaluation cancelled');
             }}

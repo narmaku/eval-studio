@@ -21,7 +21,7 @@ interface EvaluationStore {
   pollEvaluation: (id: string, onComplete: () => void) => () => void;
 }
 
-export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
+export const useEvaluationStore = create<EvaluationStore>((set, _get) => ({
   evaluations: [],
   currentEvaluation: null,
   isLoading: false,
@@ -63,7 +63,11 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
       try {
         const evaluation = await api.getEvaluation(id);
         set({ currentEvaluation: evaluation });
-        if (evaluation.status === 'completed' || evaluation.status === 'failed') {
+        if (
+          evaluation.status === 'completed' ||
+          evaluation.status === 'failed' ||
+          evaluation.status === 'cancelled'
+        ) {
           clearInterval(intervalId);
           onComplete();
         }
@@ -71,7 +75,6 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
         // Silently ignore polling errors to avoid spamming the user;
         // the next tick will retry. If the evaluation is truly gone,
         // the page will handle it via status checks.
-        void get(); // keep linter happy about unused get
       }
     }, POLL_INTERVAL_MS);
 
