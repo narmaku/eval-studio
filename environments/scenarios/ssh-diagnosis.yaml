@@ -1,0 +1,38 @@
+# Scenario: SSH service is not running
+# The agent must diagnose and fix SSH connectivity.
+
+name: ssh-diagnosis
+description: >
+  SSH service has been stopped on the target machine.
+  The agent must diagnose why SSH connections are failing
+  and restore the service.
+category: networking
+difficulty: beginner
+
+environment:
+  type: compose
+  template: rhel9-base
+  # Alternative: type: byoe (for real RHEL machines)
+
+setup:
+  description: Stop the SSH service to simulate failure
+  steps:
+    - command: "systemctl stop sshd"
+      description: "Stop SSH daemon"
+
+success_criteria:
+  - description: "SSH service is running"
+    check: "systemctl is-active sshd"
+    expected: "active"
+  - description: "SSH port is listening"
+    check: "ss -tlnp | grep :22"
+    expected_contains: "LISTEN"
+
+max_turns: 10
+timeout_seconds: 300
+
+tags:
+  - ssh
+  - networking
+  - systemd
+  - beginner

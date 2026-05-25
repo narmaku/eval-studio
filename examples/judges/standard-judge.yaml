@@ -1,0 +1,36 @@
+# Standard judge configuration
+# Single LLM judge with balanced quality and cost.
+
+name: Standard Judge
+description: >
+  Single capable model judge. Good balance of quality and cost.
+  Suitable for most evaluation tasks.
+
+model: gpt-4.1
+temperature: 0.0
+
+prompt_template: |
+  You are evaluating the quality of an AI assistant's response
+  to a technical question.
+
+  Question: {question}
+  Expected Answer: {expected_answer}
+  Actual Answer: {actual_answer}
+
+  Score the response on a scale of 0.0 to 1.0 for each dimension:
+  - correctness: Does the answer contain accurate information?
+  - completeness: Does it cover the key points from the expected answer?
+  - helpfulness: Would a system administrator find this useful?
+
+  Respond with JSON only:
+  {{"correctness": 0.0, "completeness": 0.0, "helpfulness": 0.0}}
+
+pass_threshold: 0.7
+
+dimensions:
+  - name: correctness
+    weight: 0.5
+  - name: completeness
+    weight: 0.3
+  - name: helpfulness
+    weight: 0.2

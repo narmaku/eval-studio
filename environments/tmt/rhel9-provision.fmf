@@ -1,0 +1,24 @@
+# TMT plan for provisioning a RHEL 9 machine via Testing Farm.
+# Placeholder -- to be expanded when TMT provider is implemented.
+#
+# Reference: https://tmt.readthedocs.io/
+
+summary: Provision RHEL 9 machine for eval-studio scenarios
+description: >
+  Provisions a RHEL 9.5 virtual machine via Testing Farm API
+  for use as an evaluation environment.
+
+provision:
+  how: connect
+  # Testing Farm will provide connection details
+  # host, port, user, and key are injected at runtime
+
+prepare:
+  how: shell
+  script:
+    - dnf install -y openssh-server openssh-clients
+
+execute:
+  how: shell
+  script:
+    - echo "Environment ready for eval-studio"
