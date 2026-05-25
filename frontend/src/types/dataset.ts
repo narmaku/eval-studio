@@ -18,8 +18,9 @@ export interface Dataset {
 export interface DatasetItem {
   id: string;
   question: string;
-  expected_answer: string;
-  metadata: Record<string, unknown>;
+  expected_answer: string | null;
+  metadata: Record<string, unknown> | null;
+  order_index: number;
 }
 
 export interface DatasetDetail extends Dataset {

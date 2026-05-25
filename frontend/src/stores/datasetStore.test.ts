@@ -37,6 +37,7 @@ const makeDatasetDetail = (overrides: Partial<DatasetDetail> = {}): DatasetDetai
       question: 'What is Linux?',
       expected_answer: 'An operating system kernel',
       metadata: {},
+      order_index: 0,
     },
   ],
   ...overrides,
