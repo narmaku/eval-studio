@@ -33,6 +33,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = ["B008"]  # Allow Depends() in function defaults (FastAPI convention)
+
+[tool.ruff.lint.per-file-ignores]
+"app/core/exceptions.py" = ["N818"]  # Exception classes follow domain naming, not Error suffix
 
 [tool.ruff.format]
 quote-style = "double"

@@ -1,18 +1,18 @@
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 
-class EvaluationMode(str, Enum):
+class EvaluationMode(StrEnum):
     QA = "qa"
     AGENT = "agent"
     RAG = "rag"
     ARENA = "arena"
 
 
-class EvaluationStatus(str, Enum):
+class EvaluationStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"

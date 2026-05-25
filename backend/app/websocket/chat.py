@@ -10,11 +10,13 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
     try:
         while True:
             data = await websocket.receive_json()
-            await websocket.send_json({
-                "type": "echo",
-                "session_id": session_id,
-                "data": data,
-                "message": "WebSocket session endpoint is a stub. Echo mode only.",
-            })
+            await websocket.send_json(
+                {
+                    "type": "echo",
+                    "session_id": session_id,
+                    "data": data,
+                    "message": "WebSocket session endpoint is a stub. Echo mode only.",
+                }
+            )
     except WebSocketDisconnect:
         pass

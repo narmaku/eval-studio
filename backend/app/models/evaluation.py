@@ -1,13 +1,13 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, JSON, String, Text
+from sqlalchemy import JSON, DateTime, Float, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Evaluation(Base):
@@ -22,10 +22,8 @@ class Evaluation(Base):
     judge_config_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
-    results: Mapped[list["Result"]] = relationship("Result", back_populates="evaluation", lazy="selectin")  # noqa: F821
-    sessions: Mapped[list["Session"]] = relationship(  # noqa: F821
-        "Session", back_populates="evaluation", lazy="selectin"
-    )
+    results: Mapped[list["Result"]] = relationship("Result", back_populates="evaluation", lazy="selectin")
+    sessions: Mapped[list["Session"]] = relationship("Session", back_populates="evaluation", lazy="selectin")
 
 
 class JudgeConfig(Base):
@@ -43,5 +41,5 @@ class JudgeConfig(Base):
 
 
 # Avoid circular import: import at module level after class definitions
-from app.models.result import Result  # noqa: E402, F401
-from app.models.session import Session  # noqa: E402, F401
+from app.models.result import Result  # noqa: E402
+from app.models.session import Session  # noqa: E402

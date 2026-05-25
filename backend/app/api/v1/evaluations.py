@@ -20,9 +20,7 @@ router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 
 
 @router.post("", response_model=EvaluationResponse, status_code=201)
-async def create_evaluation(
-    payload: EvaluationCreate, db: AsyncSession = Depends(get_db)
-) -> EvaluationResponse:
+async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depends(get_db)) -> EvaluationResponse:
     """Create a new evaluation."""
     # Validate dataset exists if provided
     if payload.dataset_id:
