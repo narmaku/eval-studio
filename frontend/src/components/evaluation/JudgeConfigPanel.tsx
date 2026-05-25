@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -110,14 +110,11 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
     }
   };
 
-  // Sync from external value on mount
-  useEffect(() => {
-    if (value?.preset) {
-      setSelectedPreset(value.preset);
-    } else if (value?.judge_id) {
-      setSelectedJudgeId(value.judge_id);
-    }
-  }, [value]);
+  // Sync from external value -- derive state instead of using an effect.
+  // This runs during render (before commit), avoiding the lint error about
+  // calling setState inside an effect.
+  const effectivePreset = value?.preset ?? selectedPreset;
+  const effectiveJudgeId = value?.judge_id ?? selectedJudgeId;
 
   return (
     <Card>
@@ -141,7 +138,7 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
                   onClick={() => handlePresetSelect(preset.key)}
                   className={cn(
                     'rounded-lg border p-3 text-left transition-colors hover:border-primary',
-                    selectedPreset === preset.key
+                    effectivePreset === preset.key
                       ? 'border-primary bg-primary/5'
                       : 'border-border',
                     disabled && 'pointer-events-none opacity-50',
@@ -164,7 +161,7 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
               <div className="space-y-1.5">
                 <Label>Existing Judge</Label>
                 <Select
-                  value={selectedJudgeId}
+                  value={effectiveJudgeId}
                   onValueChange={handleJudgeSelect}
                   disabled={disabled}
                 >
