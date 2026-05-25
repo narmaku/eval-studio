@@ -13,6 +13,7 @@ interface ResultStore {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
+
   fetchResults: (evaluationId?: string) => Promise<void>;
   fetchResult: (id: string) => Promise<void>;
 }
