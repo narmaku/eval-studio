@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { ScoreDistributionChart, bucketScores } from './ScoreDistributionChart';
+import { ScoreDistributionChart } from './ScoreDistributionChart';
+import { bucketScores } from './scoreUtils';
 import type { Score } from '@/types';
 
 // Mock ResizeObserver for Recharts ResponsiveContainer
