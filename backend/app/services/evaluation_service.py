@@ -77,7 +77,8 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         # 5. Determine the model under test
         config = evaluation.config or {}
-        model_under_test = config.get("model", settings.litellm_model)
+        model_endpoint = config.get("model_endpoint", {})
+        model_under_test = model_endpoint.get("litellm_model") or config.get("model") or settings.litellm_model
 
         # 6. Instantiate the adapter
         adapter = LiteLLMJudgeAdapter(

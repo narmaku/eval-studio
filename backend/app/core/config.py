@@ -11,12 +11,16 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite+aiosqlite:///./eval_studio.db"
 
-    cors_origins: list[str] = ["http://localhost:5173"]
+    cors_origins: str = "http://localhost:5173"
 
     litellm_api_key: str | None = None
     litellm_model: str = "gpt-4.1"
 
     auth_enabled: bool = False
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
 settings = Settings()
