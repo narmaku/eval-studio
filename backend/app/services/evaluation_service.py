@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+from contextlib import contextmanager
 
 import litellm
 from sqlalchemy import select
@@ -8,12 +10,41 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.base import JudgeConfigParams, Score
 from app.adapters.litellm_judge import LiteLLMJudgeAdapter
 from app.core.config import settings
+from app.core.providers import provider_registry
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.websocket.progress import broadcast_progress
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _proxy_env(proxy: str | None):
+    """Temporarily set HTTP_PROXY/HTTPS_PROXY for LiteLLM calls.
+
+    Note: env vars are process-global. For concurrent evaluations with different
+    proxies, this could race. Acceptable for MVP -- a proper fix would use
+    httpx transport-level proxy config.
+    """
+    if not proxy:
+        yield
+        return
+    old_http = os.environ.get("HTTP_PROXY")
+    old_https = os.environ.get("HTTPS_PROXY")
+    os.environ["HTTP_PROXY"] = proxy
+    os.environ["HTTPS_PROXY"] = proxy
+    try:
+        yield
+    finally:
+        if old_http is None:
+            os.environ.pop("HTTP_PROXY", None)
+        else:
+            os.environ["HTTP_PROXY"] = old_http
+        if old_https is None:
+            os.environ.pop("HTTPS_PROXY", None)
+        else:
+            os.environ["HTTPS_PROXY"] = old_https
 
 
 def _to_judge_params(judge_config: JudgeConfig | None) -> JudgeConfigParams:
@@ -75,10 +106,24 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         judge_params = _to_judge_params(judge_config)
 
-        # 5. Determine the model under test
+        # 5. Determine the model under test (with provider profile support)
         config = evaluation.config or {}
         model_endpoint = config.get("model_endpoint", {})
-        model_under_test = model_endpoint.get("litellm_model") or config.get("model") or settings.litellm_model
+
+        # Resolve provider profile if specified
+        provider_id = model_endpoint.get("provider_id")
+        provider = provider_registry.get_provider(provider_id) if provider_id else None
+
+        if provider:
+            model_under_test = provider.litellm_model
+            model_api_base = provider.api_base
+            model_api_key = provider.api_key or settings.litellm_api_key
+            model_proxy = provider.proxy
+        else:
+            model_under_test = model_endpoint.get("litellm_model") or config.get("model") or settings.litellm_model
+            model_api_base = model_endpoint.get("api_base")
+            model_api_key = settings.litellm_api_key
+            model_proxy = None
 
         # 6. Instantiate the adapter
         adapter = LiteLLMJudgeAdapter(
@@ -96,12 +141,16 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         async def process_item(idx: int, item: DatasetItem) -> Result:
             nonlocal completed_counter
 
-            # Step A: Call the model under test
-            response = await litellm.acompletion(
-                model=model_under_test,
-                messages=[{"role": "user", "content": item.question}],
-                api_key=settings.litellm_api_key,
-            )
+            # Step A: Call the model under test (with proxy support)
+            litellm_kwargs: dict = {
+                "model": model_under_test,
+                "messages": [{"role": "user", "content": item.question}],
+                "api_key": model_api_key,
+            }
+            if model_api_base:
+                litellm_kwargs["api_base"] = model_api_base
+            with _proxy_env(model_proxy):
+                response = await litellm.acompletion(**litellm_kwargs)
             actual_answer = response.choices[0].message.content or ""
 
             # Step B: Score the response using the judge
