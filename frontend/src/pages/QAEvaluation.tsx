@@ -11,6 +11,7 @@ import { AggregateStats } from '@/components/evaluation/AggregateStats';
 import { ResultDetailDrawer } from '@/components/evaluation/ResultDetailDrawer';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useResultStore } from '@/stores/resultStore';
+import { useNotificationStore } from '@/stores/notificationStore';
 import type {
   ModelEndpoint,
   JudgeReference,
@@ -51,22 +52,50 @@ export default function QAEvaluation() {
       await createAndRunEvaluation(request);
       toast.success('Evaluation started');
       setPhase('running');
-    } catch {
+    } catch (err) {
       toast.error('Failed to start evaluation');
+      useNotificationStore.getState().addNotification({
+        type: 'error',
+        title: 'Failed to Start Evaluation',
+        message: err instanceof Error ? err.message : 'An unknown error occurred',
+        details: err instanceof Error ? err.stack : undefined,
+      });
     }
   };
 
   const handleComplete = useCallback(() => {
     const evaluation = useEvaluationStore.getState().currentEvaluation;
+    const addNotification = useNotificationStore.getState().addNotification;
+
     if (evaluation?.status === 'completed') {
       toast.success('Evaluation completed');
+      addNotification({
+        type: 'success',
+        title: 'Evaluation Completed',
+        message: `"${evaluation.name}" finished successfully`,
+        evaluationId: evaluation.id,
+        details: `Evaluation: ${evaluation.name}\nMode: ${evaluation.mode}\nCompleted at: ${evaluation.completed_at ?? 'N/A'}`,
+      });
       void fetchResults(evaluation.id);
       setPhase('complete');
     } else if (evaluation?.status === 'failed') {
       toast.error(`Evaluation failed: ${evaluation.error ?? 'Unknown error'}`);
+      addNotification({
+        type: 'error',
+        title: 'Evaluation Failed',
+        message: evaluation.error ?? 'Unknown error',
+        evaluationId: evaluation.id,
+        details: `Evaluation: ${evaluation.name}\nMode: ${evaluation.mode}\nError: ${evaluation.error ?? 'Unknown'}`,
+      });
       setPhase('configure');
     } else if (evaluation?.status === 'cancelled') {
       toast('Evaluation was cancelled');
+      addNotification({
+        type: 'warning',
+        title: 'Evaluation Cancelled',
+        message: `"${evaluation.name}" was cancelled`,
+        evaluationId: evaluation.id,
+      });
       setPhase('configure');
     }
   }, [fetchResults]);
