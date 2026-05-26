@@ -24,8 +24,10 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [selectedId, setSelectedId] = useState<string>(value?.provider_id ?? '');
-  const [isCustom, setIsCustom] = useState(!value?.provider_id);
+  // selection tracks dropdown value: provider id, 'custom', or '' (nothing selected)
+  const [selection, setSelection] = useState<string>(
+    value?.provider_id ?? (value?.name ? 'custom' : ''),
+  );
 
   // Custom fields -- local state, emitted onBlur to avoid infinite re-render
   const [customName, setCustomName] = useState(value?.name ?? '');
@@ -46,14 +48,13 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
   }, []);
 
   const handleProviderSelect = (providerId: string) => {
+    setSelection(providerId);
+
     if (providerId === 'custom') {
-      setIsCustom(true);
-      setSelectedId('');
+      // Don't emit until custom fields are filled
       return;
     }
 
-    setIsCustom(false);
-    setSelectedId(providerId);
     const provider = providers.find((p) => p.id === providerId);
     if (provider) {
       onChange({
@@ -75,7 +76,8 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
     }
   };
 
-  const showCustomFields = isCustom || error || providers.length === 0;
+  const isCustom = selection === 'custom';
+  const showCustomFields = isCustom || error || (!isLoading && providers.length === 0);
 
   return (
     <Card>
@@ -88,7 +90,7 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
           <div className="space-y-1.5">
             <Label htmlFor="provider-select">Provider</Label>
             <Select
-              value={isCustom ? 'custom' : selectedId}
+              value={selection || undefined}
               onValueChange={handleProviderSelect}
               disabled={disabled || isLoading}
             >
