@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useNotificationStore } from './notificationStore';
 
 describe('notificationStore', () => {
@@ -30,7 +30,7 @@ describe('notificationStore', () => {
       const state = useNotificationStore.getState();
       expect(state.notifications).toHaveLength(1);
 
-      const notification = state.notifications[0];
+      const notification = state.notifications[0]!;
       expect(notification.id).toBeDefined();
       expect(notification.type).toBe('success');
       expect(notification.title).toBe('Evaluation Completed');
@@ -72,7 +72,7 @@ describe('notificationStore', () => {
         evaluationId: 'eval-123',
       });
 
-      const notification = useNotificationStore.getState().notifications[0];
+      const notification = state().notifications[0]!;
       expect(notification.details).toBe('Stack trace here');
       expect(notification.evaluationId).toBe('eval-123');
     });
@@ -88,12 +88,12 @@ describe('notificationStore', () => {
         });
       }
 
-      const state = useNotificationStore.getState();
-      expect(state.notifications).toHaveLength(50);
+      const s = state();
+      expect(s.notifications).toHaveLength(50);
       // The newest should be at index 0
-      expect(state.notifications[0].title).toBe('Notification 54');
+      expect(s.notifications[0]!.title).toBe('Notification 54');
       // The oldest remaining should be at the end
-      expect(state.notifications[49].title).toBe('Notification 5');
+      expect(s.notifications[49]!.title).toBe('Notification 5');
     });
   });
 
@@ -102,11 +102,11 @@ describe('notificationStore', () => {
       const { addNotification } = useNotificationStore.getState();
 
       addNotification({ type: 'info', title: 'Test', message: 'msg' });
-      const id = useNotificationStore.getState().notifications[0].id;
+      const id = state().notifications[0]!.id;
 
       useNotificationStore.getState().markAsRead(id);
 
-      const notification = useNotificationStore.getState().notifications[0];
+      const notification = state().notifications[0]!;
       expect(notification.read).toBe(true);
     });
 
@@ -115,11 +115,11 @@ describe('notificationStore', () => {
 
       addNotification({ type: 'info', title: 'A', message: 'msg' });
       addNotification({ type: 'info', title: 'B', message: 'msg' });
-      expect(useNotificationStore.getState().unreadCount).toBe(2);
+      expect(state().unreadCount).toBe(2);
 
-      const id = useNotificationStore.getState().notifications[0].id;
+      const id = state().notifications[0]!.id;
       useNotificationStore.getState().markAsRead(id);
-      expect(useNotificationStore.getState().unreadCount).toBe(1);
+      expect(state().unreadCount).toBe(1);
     });
 
     it('does not affect other notifications', () => {
@@ -128,12 +128,12 @@ describe('notificationStore', () => {
       addNotification({ type: 'info', title: 'A', message: 'msg' });
       addNotification({ type: 'info', title: 'B', message: 'msg' });
 
-      const notifications = useNotificationStore.getState().notifications;
-      useNotificationStore.getState().markAsRead(notifications[0].id);
+      const notifications = state().notifications;
+      useNotificationStore.getState().markAsRead(notifications[0]!.id);
 
-      const updated = useNotificationStore.getState().notifications;
-      expect(updated[0].read).toBe(true);
-      expect(updated[1].read).toBe(false);
+      const updated = state().notifications;
+      expect(updated[0]!.read).toBe(true);
+      expect(updated[1]!.read).toBe(false);
     });
 
     it('is a no-op for non-existent ids', () => {
@@ -142,8 +142,8 @@ describe('notificationStore', () => {
 
       useNotificationStore.getState().markAsRead('non-existent-id');
 
-      expect(useNotificationStore.getState().unreadCount).toBe(1);
-      expect(useNotificationStore.getState().notifications[0].read).toBe(false);
+      expect(state().unreadCount).toBe(1);
+      expect(state().notifications[0]!.read).toBe(false);
     });
   });
 
@@ -157,9 +157,9 @@ describe('notificationStore', () => {
 
       useNotificationStore.getState().markAllAsRead();
 
-      const state = useNotificationStore.getState();
-      expect(state.unreadCount).toBe(0);
-      state.notifications.forEach((n) => {
+      const s = state();
+      expect(s.unreadCount).toBe(0);
+      s.notifications.forEach((n) => {
         expect(n.read).toBe(true);
       });
     });
@@ -172,15 +172,13 @@ describe('notificationStore', () => {
       addNotification({ type: 'info', title: 'Keep', message: 'msg' });
       addNotification({ type: 'info', title: 'Remove', message: 'msg' });
 
-      const idToRemove = useNotificationStore
-        .getState()
-        .notifications.find((n) => n.title === 'Remove')!.id;
+      const toRemove = state().notifications.find((n) => n.title === 'Remove');
+      expect(toRemove).toBeDefined();
+      useNotificationStore.getState().removeNotification(toRemove!.id);
 
-      useNotificationStore.getState().removeNotification(idToRemove);
-
-      const state = useNotificationStore.getState();
-      expect(state.notifications).toHaveLength(1);
-      expect(state.notifications[0].title).toBe('Keep');
+      const s = state();
+      expect(s.notifications).toHaveLength(1);
+      expect(s.notifications[0]!.title).toBe('Keep');
     });
 
     it('updates unreadCount when removing an unread notification', () => {
@@ -188,11 +186,11 @@ describe('notificationStore', () => {
 
       addNotification({ type: 'info', title: 'A', message: 'msg' });
       addNotification({ type: 'info', title: 'B', message: 'msg' });
-      expect(useNotificationStore.getState().unreadCount).toBe(2);
+      expect(state().unreadCount).toBe(2);
 
-      const id = useNotificationStore.getState().notifications[0].id;
+      const id = state().notifications[0]!.id;
       useNotificationStore.getState().removeNotification(id);
-      expect(useNotificationStore.getState().unreadCount).toBe(1);
+      expect(state().unreadCount).toBe(1);
     });
   });
 
@@ -205,29 +203,29 @@ describe('notificationStore', () => {
 
       useNotificationStore.getState().clearAll();
 
-      const state = useNotificationStore.getState();
-      expect(state.notifications).toEqual([]);
-      expect(state.unreadCount).toBe(0);
+      const s = state();
+      expect(s.notifications).toEqual([]);
+      expect(s.unreadCount).toBe(0);
     });
   });
 
   describe('panel open/close', () => {
     it('setOpen controls isOpen state', () => {
       useNotificationStore.getState().setOpen(true);
-      expect(useNotificationStore.getState().isOpen).toBe(true);
+      expect(state().isOpen).toBe(true);
 
       useNotificationStore.getState().setOpen(false);
-      expect(useNotificationStore.getState().isOpen).toBe(false);
+      expect(state().isOpen).toBe(false);
     });
 
     it('toggleOpen toggles isOpen state', () => {
-      expect(useNotificationStore.getState().isOpen).toBe(false);
+      expect(state().isOpen).toBe(false);
 
       useNotificationStore.getState().toggleOpen();
-      expect(useNotificationStore.getState().isOpen).toBe(true);
+      expect(state().isOpen).toBe(true);
 
       useNotificationStore.getState().toggleOpen();
-      expect(useNotificationStore.getState().isOpen).toBe(false);
+      expect(state().isOpen).toBe(false);
     });
   });
 
@@ -238,10 +236,13 @@ describe('notificationStore', () => {
       addNotification({ type: 'info', title: 'A', message: 'msg' });
       addNotification({ type: 'info', title: 'B', message: 'msg' });
 
-      const ids = useNotificationStore
-        .getState()
-        .notifications.map((n) => n.id);
+      const ids = state().notifications.map((n) => n.id);
       expect(ids[0]).not.toBe(ids[1]);
     });
   });
 });
+
+/** Helper to reduce verbosity in assertions. */
+function state() {
+  return useNotificationStore.getState();
+}

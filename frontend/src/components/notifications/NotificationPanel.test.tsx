@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -273,7 +273,7 @@ describe('NotificationPanel', () => {
     await user.click(card);
 
     const state = useNotificationStore.getState();
-    expect(state.notifications[0].read).toBe(true);
+    expect(state.notifications[0]!.read).toBe(true);
     expect(state.unreadCount).toBe(0);
   });
 });
