@@ -17,6 +17,7 @@ import type {
   Judge,
   CreateJudgeRequest,
   JudgePreset,
+  Provider,
 } from '@/types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
@@ -152,6 +153,15 @@ export const api = {
     evaluationIds.forEach((id) => query.append('evaluation_id', id));
     return request<ResultComparison>(`/api/v1/results/compare?${query.toString()}`);
   },
+
+  // --- Providers ---
+  listProviders: (purpose?: string) => {
+    const query = new URLSearchParams();
+    if (purpose) query.set('purpose', purpose);
+    const qs = query.toString();
+    return request<Provider[]>(`/api/v1/providers${qs ? `?${qs}` : ''}`);
+  },
+  getProvider: (id: string) => request<Provider>(`/api/v1/providers/${id}`),
 
   // --- Adapters & Config ---
   listAdapters: () => request<{ name: string; modes: string[] }[]>('/api/v1/adapters'),
