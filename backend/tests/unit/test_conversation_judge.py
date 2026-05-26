@@ -152,8 +152,7 @@ async def test_evaluate_conversation_long_transcript():
     judge_config = _make_judge_config()
 
     long_messages = [
-        Message(role="user" if i % 2 == 0 else "assistant", content=f"Message number {i}")
-        for i in range(60)
+        Message(role="user" if i % 2 == 0 else "assistant", content=f"Message number {i}") for i in range(60)
     ]
 
     response_json = (
