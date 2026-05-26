@@ -58,19 +58,23 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
     Receives JSON messages with type "message" or "end_session".
     Streams agent responses back as typed JSON envelopes.
     """
-    # 1. Validate session exists and is active before accepting
+    # 1. Validate session exists and is active before accepting.
+    # WebSocket protocol requires accept() before close(), so we accept first
+    # and then close with an application-level error code if validation fails.
     async with async_session_factory() as db:
         result = await db.execute(select(Session).where(Session.id == session_id))
         session = result.scalar_one_or_none()
-        if not session:
-            await websocket.close(code=4004, reason=f"Session '{session_id}' not found")
-            return
-        if session.status != "active":
-            await websocket.close(code=4009, reason=f"Session '{session_id}' is not active")
-            return
 
-    # 2. Accept connection and track it
     await websocket.accept()
+
+    if not session:
+        await websocket.close(code=4004, reason=f"Session '{session_id}' not found")
+        return
+    if session.status != "active":
+        await websocket.close(code=4009, reason=f"Session '{session_id}' is not active")
+        return
+
+    # 2. Track connection
     _active_connections[session_id] = websocket
 
     logger.info("ws.connected", session_id=session_id)
@@ -88,7 +92,16 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
 
         # 3. Main message loop
         while True:
-            raw = await websocket.receive_json()
+            try:
+                raw = await websocket.receive_json()
+            except ValueError:
+                await _send_error(websocket, session_id, "Invalid JSON message.")
+                continue
+
+            if not isinstance(raw, dict):
+                await _send_error(websocket, session_id, "Message must be a JSON object.")
+                continue
+
             msg_type = raw.get("type")
 
             if msg_type == "message":
@@ -131,9 +144,16 @@ async def _handle_user_message(ws: WebSocket, session_id: str, raw: dict) -> Non
         await _send_error(ws, session_id, "A message is currently being processed. Please wait.")
         return
 
-    content = raw.get("data", {}).get("content", "")
-    if not content:
+    data = raw.get("data")
+    if not isinstance(data, dict):
+        await _send_error(ws, session_id, "Message 'data' field must be an object.")
+        return
+    content = data.get("content", "")
+    if not isinstance(content, str) or not content.strip():
         await _send_error(ws, session_id, "Message content is required.")
+        return
+    if len(content) > 100_000:
+        await _send_error(ws, session_id, "Message content exceeds maximum length (100,000 characters).")
         return
 
     _processing.add(session_id)

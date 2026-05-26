@@ -281,13 +281,9 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
                 passed=score.passed,
             )
 
-        except Exception:
+        except Exception as exc:
             logger.exception("agent_chat.judge_error", session_id=session_id)
-            session.error = f"Judge scoring failed: {Exception!s}"
-            # Capture the actual exception message
-            import traceback
-
-            session.error = f"Judge scoring failed: {traceback.format_exc()}"
+            session.error = f"Judge scoring failed: {exc}"
 
     await db.commit()
 

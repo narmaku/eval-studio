@@ -185,7 +185,7 @@ class TestProviderRegistry:
 
 
 class TestProxyEnv:
-    def testproxy_env_sets_and_restores(self):
+    def test_proxy_env_sets_and_restores(self):
         """proxy_env sets HTTP_PROXY/HTTPS_PROXY and restores original values."""
         # Ensure clean state
         os.environ.pop("HTTP_PROXY", None)
@@ -198,7 +198,7 @@ class TestProxyEnv:
         assert "HTTP_PROXY" not in os.environ
         assert "HTTPS_PROXY" not in os.environ
 
-    def testproxy_env_restores_existing_values(self):
+    def test_proxy_env_restores_existing_values(self):
         """proxy_env restores pre-existing proxy env vars."""
         os.environ["HTTP_PROXY"] = "http://original:1111"
         os.environ["HTTPS_PROXY"] = "http://original:2222"
@@ -214,7 +214,7 @@ class TestProxyEnv:
             os.environ.pop("HTTP_PROXY", None)
             os.environ.pop("HTTPS_PROXY", None)
 
-    def testproxy_env_noop_when_none(self):
+    def test_proxy_env_noop_when_none(self):
         """proxy_env is a no-op when proxy is None."""
         os.environ.pop("HTTP_PROXY", None)
         os.environ.pop("HTTPS_PROXY", None)
@@ -223,7 +223,7 @@ class TestProxyEnv:
             assert "HTTP_PROXY" not in os.environ
             assert "HTTPS_PROXY" not in os.environ
 
-    def testproxy_env_restores_on_exception(self):
+    def test_proxy_env_restores_on_exception(self):
         """proxy_env restores env vars even if an exception occurs."""
         os.environ.pop("HTTP_PROXY", None)
         os.environ.pop("HTTPS_PROXY", None)

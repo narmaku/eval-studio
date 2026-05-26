@@ -83,15 +83,22 @@ async def test_ws_connect_valid_session(ws_setup):
 
 @pytest.mark.asyncio
 async def test_ws_connect_nonexistent_session(ws_setup):
-    """WebSocket connection to nonexistent session should be rejected."""
+    """WebSocket connection to nonexistent session should be accepted then immediately closed."""
     from app.main import app
 
     setup = ws_setup
 
     with patch("app.websocket.chat.async_session_factory", setup["factory"]):
         client = TestClient(app)
-        with pytest.raises(Exception), client.websocket_connect("/ws/session/nonexistent-id"):  # noqa: B017
-            pass
+        # Connection is accepted first, then immediately closed with application error code 4004.
+        with client.websocket_connect("/ws/session/nonexistent-id") as ws:
+            # The server closes the connection right after accept; attempting to
+            # receive should raise WebSocketDisconnect or return the close frame.
+            try:
+                ws.receive_json()
+                pytest.fail("Expected server to close the connection for nonexistent session")
+            except Exception:
+                pass  # Expected: server closed the connection
 
 
 @pytest.mark.asyncio
