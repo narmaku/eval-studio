@@ -22,11 +22,9 @@ import {
   Clock,
   ExternalLink,
 } from 'lucide-react';
-import { api } from '@/services/api';
 import type {
   ModelEndpoint,
   JudgeReference,
-  CreateEvaluationRequest,
 } from '@/types';
 
 type PagePhase = 'configure' | 'active' | 'ended';
@@ -103,21 +101,11 @@ export default function AgentEvaluation() {
   const handleStart = useCallback(async () => {
     if (!modelEndpoint || !judgeConfig) return;
 
-    const evalRequest: CreateEvaluationRequest = {
-      name: `Agent Eval - ${modelEndpoint.name}`,
-      mode: 'agent',
-      config: {
-        model_endpoint: modelEndpoint,
-        judge_config: judgeConfig,
-      },
-    };
-
     try {
       setEvalLoading(true);
-      const evaluation = await api.createEvaluation(evalRequest);
 
       await createSession({
-        evaluation_id: evaluation.id,
+        name: `Agent Chat - ${modelEndpoint.name}`,
         mode: 'live',
         agent_config: {
           provider_id: modelEndpoint.provider_id,

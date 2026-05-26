@@ -91,6 +91,20 @@ export const api = {
     request<Evaluation>(`/api/v1/evaluations/${id}/rerun`, { method: 'POST' }),
 
   // --- Sessions ---
+  listSessions: (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    evaluation_id?: string;
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.page_size) query.set('page_size', String(params.page_size));
+    if (params?.status) query.set('status', params.status);
+    if (params?.evaluation_id) query.set('evaluation_id', params.evaluation_id);
+    const qs = query.toString();
+    return request<PaginatedResponse<Session>>(`/api/v1/sessions${qs ? `?${qs}` : ''}`);
+  },
   createSession: (data: CreateSessionRequest) =>
     request<Session>('/api/v1/sessions', { method: 'POST', body: JSON.stringify(data) }),
   getSession: (id: string) => request<Session>(`/api/v1/sessions/${id}`),
@@ -100,6 +114,11 @@ export const api = {
       body: JSON.stringify(data),
     }),
   endSession: (id: string) => request<Session>(`/api/v1/sessions/${id}/end`, { method: 'POST' }),
+  scoreSession: (id: string, judgeConfig: Record<string, unknown>) =>
+    request<Session>(`/api/v1/sessions/${id}/score`, {
+      method: 'POST',
+      body: JSON.stringify({ judge_config: judgeConfig }),
+    }),
   getSessionReplay: (id: string) => request<Session>(`/api/v1/sessions/${id}/replay`),
 
   // --- Datasets ---

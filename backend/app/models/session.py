@@ -13,7 +13,8 @@ def _utcnow() -> datetime:
 class Session(Base):
     __tablename__ = "sessions"
 
-    evaluation_id: Mapped[str] = mapped_column(String(36), ForeignKey("evaluations.id"), nullable=False)
+    evaluation_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("evaluations.id"), nullable=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")
     mode: Mapped[str] = mapped_column(String(50), nullable=False, default="live")
     transcript: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)

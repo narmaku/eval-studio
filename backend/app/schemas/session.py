@@ -13,7 +13,8 @@ class SessionMode(StrEnum):
 class SessionCreate(BaseModel):
     """Schema for creating a session."""
 
-    evaluation_id: str
+    evaluation_id: str | None = None
+    name: str | None = None
     mode: SessionMode = Field(default=SessionMode.LIVE, description="Session mode: 'live' or 'simulated'")
     agent_config: dict[str, Any] | None = None
     judge_config: dict[str, Any] | None = None
@@ -25,11 +26,18 @@ class SessionMessageRequest(BaseModel):
     content: str = Field(min_length=1)
 
 
+class ScoreSessionRequest(BaseModel):
+    """Schema for scoring a session with a judge."""
+
+    judge_config: dict[str, Any]
+
+
 class SessionResponse(BaseModel):
     """Schema for a session in API responses."""
 
     id: str
-    evaluation_id: str
+    evaluation_id: str | None
+    name: str | None
     status: str
     mode: SessionMode
     transcript: list[dict[str, Any]] | None

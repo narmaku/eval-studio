@@ -5,22 +5,27 @@ export type SessionMode = 'live' | 'simulated';
 export type SessionStatus = 'active' | 'ended' | 'scoring' | 'completed' | 'failed';
 export type MessageSender = 'user' | 'agent' | 'system' | 'judge';
 
+export interface SessionScores {
+  overall: number;
+  passed: boolean;
+  reasoning: string | null;
+  breakdown: Record<string, number> | null;
+}
+
 export interface Session {
   id: string;
-  evaluation_id: string;
+  evaluation_id: string | null;
+  name: string | null;
   mode: SessionMode;
   status: SessionStatus;
-  environment_id: string | null;
-  scenario_id: string | null;
+  transcript: Record<string, unknown>[] | null;
   agent_config: Record<string, unknown> | null;
   judge_config_snapshot: Record<string, unknown> | null;
-  messages: Message[];
-  tool_calls: ToolCall[];
-  scores: SessionScore[] | null;
+  scores: SessionScores | null;
   error: string | null;
   started_at: string;
   ended_at: string | null;
-  turn_count: number;
+  created_at: string;
 }
 
 export interface Message {
@@ -48,7 +53,8 @@ export interface SessionScore {
 }
 
 export interface CreateSessionRequest {
-  evaluation_id: string;
+  evaluation_id?: string;
+  name?: string;
   mode: SessionMode;
   agent_config?: {
     provider_id?: string;
