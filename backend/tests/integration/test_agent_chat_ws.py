@@ -3,14 +3,13 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from starlette.testclient import TestClient
 
 from app.core.database import Base
 from app.models.evaluation import Evaluation
 from app.models.session import Session
-from app.websocket.chat import _active_connections, _processing
+from app.websocket.chat import _processing
 
 
 @pytest.fixture
@@ -91,9 +90,8 @@ async def test_ws_connect_nonexistent_session(ws_setup):
 
     with patch("app.websocket.chat.async_session_factory", setup["factory"]):
         client = TestClient(app)
-        with pytest.raises(Exception):
-            with client.websocket_connect("/ws/session/nonexistent-id"):
-                pass
+        with pytest.raises(Exception), client.websocket_connect("/ws/session/nonexistent-id"):  # noqa: B017
+            pass
 
 
 @pytest.mark.asyncio
@@ -130,10 +128,12 @@ async def test_ws_message_streams_response(ws_setup):
             assert connected["type"] == "connected"
 
             # Send a user message
-            ws.send_json({
-                "type": "message",
-                "data": {"content": "Hello"},
-            })
+            ws.send_json(
+                {
+                    "type": "message",
+                    "data": {"content": "Hello"},
+                }
+            )
 
             # Should receive chunk + complete
             chunk = ws.receive_json()

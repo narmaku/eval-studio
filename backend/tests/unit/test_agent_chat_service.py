@@ -21,7 +21,7 @@ def _make_streaming_chunks(content: str, tool_calls: list | None = None):
     chunks = []
 
     # Content chunks
-    for i, char in enumerate(content):
+    for _i, char in enumerate(content):
         chunk = MagicMock()
         chunk.choices = [MagicMock()]
         chunk.choices[0].delta = MagicMock()

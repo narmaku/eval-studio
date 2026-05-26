@@ -39,13 +39,15 @@ def _iso_now() -> str:
 
 async def _send_error(ws: WebSocket, session_id: str, message: str) -> None:
     """Send a typed error envelope to the WebSocket client."""
-    await ws.send_json({
-        "type": "error",
-        "data": {"message": message},
-        "timestamp": _iso_now(),
-        "sender": "system",
-        "session_id": session_id,
-    })
+    await ws.send_json(
+        {
+            "type": "error",
+            "data": {"message": message},
+            "timestamp": _iso_now(),
+            "sender": "system",
+            "session_id": session_id,
+        }
+    )
 
 
 @router.websocket("/ws/session/{session_id}")
@@ -74,13 +76,15 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
     logger.info("ws.connected", session_id=session_id)
 
     try:
-        await websocket.send_json({
-            "type": "connected",
-            "data": {"session_id": session_id},
-            "timestamp": _iso_now(),
-            "sender": "system",
-            "session_id": session_id,
-        })
+        await websocket.send_json(
+            {
+                "type": "connected",
+                "data": {"session_id": session_id},
+                "timestamp": _iso_now(),
+                "sender": "system",
+                "session_id": session_id,
+            }
+        )
 
         # 3. Main message loop
         while True:
@@ -152,13 +156,15 @@ async def _handle_end_session(ws: WebSocket, session_id: str) -> None:
         async with async_session_factory() as db:
             result = await end_and_score_session(session_id, db)
 
-        await ws.send_json({
-            "type": "session_ended",
-            "data": result,
-            "timestamp": _iso_now(),
-            "sender": "system",
-            "session_id": session_id,
-        })
+        await ws.send_json(
+            {
+                "type": "session_ended",
+                "data": result,
+                "timestamp": _iso_now(),
+                "sender": "system",
+                "session_id": session_id,
+            }
+        )
 
         await ws.close(code=1000, reason="Session ended")
     except ValueError as e:

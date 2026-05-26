@@ -283,7 +283,7 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
 
         except Exception:
             logger.exception("agent_chat.judge_error", session_id=session_id)
-            session.error = f"Judge scoring failed: {str(Exception)}"
+            session.error = f"Judge scoring failed: {Exception!s}"
             # Capture the actual exception message
             import traceback
 
