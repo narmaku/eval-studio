@@ -61,8 +61,19 @@ function JudgeReasoning({ reasoning }: { reasoning: string }) {
   );
 }
 
+const EMPTY_METRICS = {
+  total_items: 0,
+  passed_items: 0,
+  failed_items: 0,
+  mean_score: 0,
+  median_score: 0,
+  pass_rate: 0,
+  score_distribution: {},
+};
+
 export function ResultDetailView({ result, evaluationName, evaluationMode }: ResultDetailViewProps) {
-  const { aggregate_metrics: metrics, scores } = result;
+  const metrics = result.aggregate_metrics ?? EMPTY_METRICS;
+  const { scores } = result;
 
   return (
     <div className="space-y-6">

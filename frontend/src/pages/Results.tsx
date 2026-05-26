@@ -39,9 +39,9 @@ export default function Results() {
         name: evaluation?.name ?? 'Unknown Evaluation',
         mode: evaluation?.mode ?? 'qa',
         status: evaluation?.status ?? result.status,
-        totalItems: result.aggregate_metrics.total_items,
-        passRate: result.aggregate_metrics.pass_rate,
-        meanScore: result.aggregate_metrics.mean_score,
+        totalItems: result.aggregate_metrics?.total_items ?? 0,
+        passRate: result.aggregate_metrics?.pass_rate ?? 0,
+        meanScore: result.aggregate_metrics?.mean_score ?? 0,
         createdAt: result.created_at,
       };
     });
