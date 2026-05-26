@@ -69,27 +69,21 @@ async def list_judges(
 
 @router.get("/presets", response_model=list[JudgeConfigResponse])
 async def get_judge_presets() -> list[JudgeConfigResponse]:
-    """Get available judge presets."""
+    """Get available judge presets.
+
+    Presets are now driven by provider profiles with purpose='judge'.
+    This endpoint returns them as JudgeConfigResponse for backward compat.
+    """
+    from app.core.providers import provider_registry
+
     now = datetime.now(UTC)
+    judge_providers = provider_registry.list_providers(purpose="judge")
     return [
         JudgeConfigResponse(
-            id="preset-quick-check",
-            name="Quick Check",
-            preset="quick_check",
-            model="gpt-4.1-mini",
-            temperature=0.0,
-            prompt_template=None,
-            pass_threshold=0.5,
-            dimensions=None,
-            aggregation=None,
-            created_at=now,
-            updated_at=now,
-        ),
-        JudgeConfigResponse(
-            id="preset-standard",
-            name="Standard",
-            preset="standard",
-            model="gpt-4.1",
+            id=f"provider-{p.id}",
+            name=p.name,
+            preset=None,
+            model=p.litellm_model,
             temperature=0.0,
             prompt_template=None,
             pass_threshold=0.7,
@@ -97,24 +91,8 @@ async def get_judge_presets() -> list[JudgeConfigResponse]:
             aggregation=None,
             created_at=now,
             updated_at=now,
-        ),
-        JudgeConfigResponse(
-            id="preset-rigorous",
-            name="Rigorous",
-            preset="rigorous",
-            model="gpt-4.1",
-            temperature=0.0,
-            prompt_template=None,
-            pass_threshold=0.85,
-            dimensions=[
-                {"name": "correctness", "weight": 0.4},
-                {"name": "completeness", "weight": 0.3},
-                {"name": "clarity", "weight": 0.3},
-            ],
-            aggregation="weighted_average",
-            created_at=now,
-            updated_at=now,
-        ),
+        )
+        for p in judge_providers
     ]
 
 

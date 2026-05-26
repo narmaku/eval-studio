@@ -29,7 +29,7 @@ async def test_create_judge_defaults(client):
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "Minimal Judge"
-    assert data["model"] == "gpt-4.1"
+    assert data["model"] is None
     assert data["temperature"] == 0.0
     assert data["pass_threshold"] == 0.7
     assert data["preset"] is None
@@ -135,17 +135,12 @@ async def test_update_judge_not_found(client):
 
 @pytest.mark.asyncio
 async def test_get_judge_presets(client):
-    """GET /judges/presets returns 3 presets with expected names."""
+    """GET /judges/presets returns presets based on configured judge providers."""
     response = await client.get("/api/v1/judges/presets")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 3
-    names = [p["name"] for p in data]
-    assert "Quick Check" in names
-    assert "Standard" in names
-    assert "Rigorous" in names
-    # Verify rigorous has dimensions
-    rigorous = next(p for p in data if p["name"] == "Rigorous")
-    assert rigorous["dimensions"] is not None
-    assert len(rigorous["dimensions"]) == 3
-    assert rigorous["aggregation"] == "weighted_average"
+    assert len(data) >= 1
+    for preset in data:
+        assert "id" in preset
+        assert "name" in preset
+        assert preset["id"].startswith("provider-")

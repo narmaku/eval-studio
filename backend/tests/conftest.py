@@ -3,6 +3,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import Base, get_db
+from app.core.providers import ProviderProfile, provider_registry
 from app.main import app
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"  # in-memory
@@ -38,3 +39,16 @@ async def client(async_engine):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _register_test_judge_provider():
+    """Register a test judge provider for evaluations that need one."""
+    provider_registry._providers["__test__"] = ProviderProfile(
+        id="__test__",
+        name="Test Judge",
+        litellm_model="test-judge-model",
+        purpose="judge",
+    )
+    yield
+    provider_registry._providers.pop("__test__", None)

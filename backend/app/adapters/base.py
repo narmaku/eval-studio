@@ -42,7 +42,7 @@ class JudgeConfigParams:
     adapter code does not depend on the ORM layer.
     """
 
-    model: str = "gpt-4.1"
+    model: str | None = None
     temperature: float = 0.0
     prompt_template: str | None = None
     pass_threshold: float = 0.7

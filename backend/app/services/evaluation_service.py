@@ -117,13 +117,19 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         if provider:
             model_under_test = provider.litellm_model
             model_api_base = provider.api_base
-            model_api_key = provider.api_key or settings.litellm_api_key
+            model_api_key = provider.api_key
             model_proxy = provider.proxy
         else:
             model_under_test = model_endpoint.get("litellm_model") or config.get("model") or settings.litellm_model
             model_api_base = model_endpoint.get("api_base")
             model_api_key = settings.litellm_api_key
             model_proxy = None
+
+        if not model_under_test:
+            logger.error("No model under test configured for evaluation %s", evaluation_id)
+            evaluation.status = "failed"
+            await db.commit()
+            return
 
         # LiteLLM's openai/ provider requires an api_key even for local servers.
         # Pass a dummy value when using a custom api_base without a real key.
@@ -138,10 +144,10 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             provider_id or "none",
         )
 
-        # 6. Resolve judge provider (if judge model matches a provider profile)
-        judge_model = judge_params.model or settings.litellm_model
+        # 6. Resolve judge: provider profile > DB judge config > LITELLM_MODEL env
         judge_api_key: str | None = None
         judge_api_base: str | None = None
+        judge_model: str | None = None
 
         judge_ref = config.get("judge_config", {})
         judge_provider_id = judge_ref.get("provider_id") if isinstance(judge_ref, dict) else None
@@ -151,8 +157,18 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             judge_model = judge_provider.litellm_model
             judge_api_key = judge_provider.api_key
             judge_api_base = judge_provider.api_base
-        elif settings.litellm_api_key:
-            judge_api_key = settings.litellm_api_key
+        elif judge_params.model:
+            judge_model = judge_params.model
+            judge_api_key = settings.litellm_api_key if settings.litellm_api_key else None
+        elif settings.litellm_model:
+            judge_model = settings.litellm_model
+            judge_api_key = settings.litellm_api_key if settings.litellm_api_key else None
+
+        if not judge_model:
+            logger.error("No judge model configured for evaluation %s", evaluation_id)
+            evaluation.status = "failed"
+            await db.commit()
+            return
 
         logger.info(
             "Judge resolved: model=%s, api_base=%s, has_key=%s, provider=%s",

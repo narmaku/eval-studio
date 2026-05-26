@@ -33,7 +33,7 @@ class JudgeConfig(Base):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     preset: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    model: Mapped[str] = mapped_column(String(255), nullable=False, default="gpt-4.1")
+    model: Mapped[str | None] = mapped_column(String(255), nullable=True)
     temperature: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     prompt_template: Mapped[str | None] = mapped_column(Text, nullable=True)
     pass_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)

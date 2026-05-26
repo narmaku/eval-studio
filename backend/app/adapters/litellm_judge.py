@@ -31,7 +31,7 @@ Respond with ONLY a JSON object: {{"score": <float>, "reasoning": "<explanation>
 
     def __init__(
         self,
-        model: str = "gpt-4.1",
+        model: str | None = None,
         api_key: str | None = None,
         api_base: str | None = None,
         max_concurrency: int = 10,

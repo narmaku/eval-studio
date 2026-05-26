@@ -9,7 +9,7 @@ class JudgeConfigCreate(BaseModel):
 
     name: str
     preset: str | None = None
-    model: str = "gpt-4.1"
+    model: str | None = None
     temperature: float = 0.0
     prompt_template: str | None = None
     pass_threshold: float = 0.7
@@ -35,7 +35,7 @@ class JudgeConfigResponse(BaseModel):
     id: str
     name: str
     preset: str | None
-    model: str
+    model: str | None
     temperature: float
     prompt_template: str | None
     pass_threshold: float

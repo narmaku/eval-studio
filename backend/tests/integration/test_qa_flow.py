@@ -132,7 +132,15 @@ async def test_rerun_evaluation(client, mock_bg_session_factory):
     # Create evaluation
     eval_resp = await client.post(
         "/api/v1/evaluations",
-        json={"name": "Rerun Eval", "mode": "qa", "dataset_id": dataset_id, "config": {"model": "test-model"}},
+        json={
+            "name": "Rerun Eval",
+            "mode": "qa",
+            "dataset_id": dataset_id,
+            "config": {
+                "model_endpoint": {"litellm_model": "test-model"},
+                "judge_config": {"provider_id": "__test__"},
+            },
+        },
     )
     eval_id = eval_resp.json()["id"]
 

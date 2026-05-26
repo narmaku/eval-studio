@@ -5,10 +5,23 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import Score
+from app.core.providers import ProviderProfile, provider_registry
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.services.evaluation_service import run_qa_evaluation
+
+
+@pytest.fixture(autouse=True)
+def _register_test_judge_provider():
+    provider_registry._providers["__test__"] = ProviderProfile(
+        id="__test__",
+        name="Test Judge",
+        litellm_model="test-judge-model",
+        purpose="judge",
+    )
+    yield
+    provider_registry._providers.pop("__test__", None)
 
 
 @pytest.fixture
@@ -40,7 +53,10 @@ async def evaluation_with_dataset(db_session: AsyncSession):
         mode="qa",
         status="pending",
         dataset_id=dataset.id,
-        config={"model": "test-model"},
+        config={
+            "model_endpoint": {"litellm_model": "test-model"},
+            "judge_config": {"provider_id": "__test__"},
+        },
     )
     db_session.add(evaluation)
     await db_session.commit()
