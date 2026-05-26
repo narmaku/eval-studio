@@ -118,9 +118,7 @@ async def test_list_models_not_found(client):
 @pytest.mark.asyncio
 async def test_list_models_url_construction(client):
     """Verify the URL is correctly built from api_base ending with /v1."""
-    cm, mock_inner = _make_mock_client(
-        response_data={"data": [{"id": "test-model", "owned_by": "test"}]}
-    )
+    cm, mock_inner = _make_mock_client(response_data={"data": [{"id": "test-model", "owned_by": "test"}]})
 
     with patch("app.api.v1.providers.httpx.AsyncClient", return_value=cm):
         await client.get("/api/v1/providers/with-api-base/models")
