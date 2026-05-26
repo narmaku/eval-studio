@@ -125,10 +125,26 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             model_api_key = settings.litellm_api_key
             model_proxy = None
 
-        # 6. Instantiate the adapter
+        # 6. Resolve judge provider (if judge model matches a provider profile)
+        judge_model = judge_params.model or settings.litellm_model
+        judge_api_key: str | None = None
+        judge_api_base: str | None = None
+
+        judge_ref = config.get("judge_config", {})
+        judge_provider_id = judge_ref.get("provider_id") if isinstance(judge_ref, dict) else None
+        judge_provider = provider_registry.get_provider(judge_provider_id) if judge_provider_id else None
+
+        if judge_provider:
+            judge_model = judge_provider.litellm_model
+            judge_api_key = judge_provider.api_key
+            judge_api_base = judge_provider.api_base
+        elif settings.litellm_api_key:
+            judge_api_key = settings.litellm_api_key
+
         adapter = LiteLLMJudgeAdapter(
-            model=judge_params.model,
-            api_key=settings.litellm_api_key,
+            model=judge_model,
+            api_key=judge_api_key,
+            api_base=judge_api_base,
             max_concurrency=config.get("max_concurrency", 10),
         )
 
@@ -145,8 +161,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             litellm_kwargs: dict = {
                 "model": model_under_test,
                 "messages": [{"role": "user", "content": item.question}],
-                "api_key": model_api_key,
             }
+            if model_api_key:
+                litellm_kwargs["api_key"] = model_api_key
             if model_api_base:
                 litellm_kwargs["api_base"] = model_api_base
             with _proxy_env(model_proxy):

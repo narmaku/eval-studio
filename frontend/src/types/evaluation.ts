@@ -51,6 +51,7 @@ export interface Provider {
 export interface JudgeReference {
   judge_id?: string;
   preset?: string;
+  provider_id?: string;
 }
 
 export interface CreateEvaluationRequest {

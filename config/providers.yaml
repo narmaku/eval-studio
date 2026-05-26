@@ -2,6 +2,12 @@
 # Each provider is a named endpoint that can be selected in the UI.
 
 providers:
+  - id: llama-cpp-151
+    name: "Llama.cpp (.151)"
+    litellm_model: "openai/gemma-4-31B-it-Q6_K.gguf"
+    api_base: "http://192.168.0.151:3080/v1"
+    tags: ["local", "llama.cpp"]
+    purpose: "test"
   - id: rls-staging
     name: "RLS Staging (Granite)"
     litellm_model: "openai/granite-3.3-8b-instruct"
@@ -37,4 +43,11 @@ providers:
     litellm_model: "gpt-4.1"
     api_key_env: "OPENAI_API_KEY"
     tags: ["judge"]
+    purpose: "judge"
+
+  - id: judge-gemini-flash
+    name: "Judge - Gemini 2.5 Flash"
+    litellm_model: "gemini/gemini-2.5-flash"
+    api_key_env: "GEMINI_API_KEY"
+    tags: ["judge", "gemini", "cheap"]
     purpose: "judge"

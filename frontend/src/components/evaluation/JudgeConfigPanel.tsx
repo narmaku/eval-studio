@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -13,31 +14,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
-import type { JudgeReference, Judge } from '@/types';
-
-const PRESETS = [
-  {
-    key: 'quick_check',
-    name: 'Quick Check',
-    description: 'Fast single-model evaluation with relaxed thresholds.',
-    model: 'gpt-4o-mini',
-    threshold: 0.6,
-  },
-  {
-    key: 'standard',
-    name: 'Standard',
-    description: 'Balanced evaluation with moderate scoring criteria.',
-    model: 'gpt-4o',
-    threshold: 0.7,
-  },
-  {
-    key: 'rigorous',
-    name: 'Rigorous',
-    description: 'Thorough multi-judge panel with strict thresholds.',
-    model: 'gpt-4o (panel)',
-    threshold: 0.8,
-  },
-] as const;
+import type { JudgeReference, Judge, Provider } from '@/types';
 
 interface JudgeConfigPanelProps {
   value: JudgeReference | undefined;
@@ -46,26 +23,35 @@ interface JudgeConfigPanelProps {
 }
 
 export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanelProps) {
-  const [selectedPreset, setSelectedPreset] = useState<string | undefined>(value?.preset);
+  const [judgeProviders, setJudgeProviders] = useState<Provider[]>([]);
   const [judges, setJudges] = useState<Judge[]>([]);
-  const [selectedJudgeId, setSelectedJudgeId] = useState<string | undefined>(value?.judge_id);
   const [advancedLoaded, setAdvancedLoaded] = useState(false);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(
+    value?.provider_id,
+  );
+  const [selectedJudgeId, setSelectedJudgeId] = useState<string | undefined>(value?.judge_id);
 
-  // Custom judge fields
   const [customModel, setCustomModel] = useState('');
   const [customTemperature, setCustomTemperature] = useState('0.3');
   const [customThreshold, setCustomThreshold] = useState('0.7');
   const [customPrompt, setCustomPrompt] = useState('');
 
-  const handlePresetSelect = (presetKey: string) => {
-    setSelectedPreset(presetKey);
+  useEffect(() => {
+    api
+      .listProviders('judge')
+      .then(setJudgeProviders)
+      .catch(() => {});
+  }, []);
+
+  const handleProviderSelect = (providerId: string) => {
+    setSelectedProviderId(providerId);
     setSelectedJudgeId(undefined);
-    onChange({ preset: presetKey });
+    onChange({ provider_id: providerId });
   };
 
   const handleJudgeSelect = (judgeId: string) => {
     setSelectedJudgeId(judgeId);
-    setSelectedPreset(undefined);
+    setSelectedProviderId(undefined);
     onChange({ judge_id: judgeId });
   };
 
@@ -81,7 +67,7 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
       const result = await api.listJudges();
       setJudges(result);
     } catch {
-      // Backend may not be available yet -- leave empty list
+      // Backend may not be available yet
     }
   };
 
@@ -103,17 +89,14 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
         dimensions: [{ name: 'overall', weight: 1 }],
       });
       setSelectedJudgeId(judge.id);
-      setSelectedPreset(undefined);
+      setSelectedProviderId(undefined);
       onChange({ judge_id: judge.id });
     } catch {
-      // Error creating judge -- the user can try again
+      // Error creating judge
     }
   };
 
-  // Sync from external value -- derive state instead of using an effect.
-  // This runs during render (before commit), avoiding the lint error about
-  // calling setState inside an effect.
-  const effectivePreset = value?.preset ?? selectedPreset;
+  const effectiveProviderId = value?.provider_id ?? selectedProviderId;
   const effectiveJudgeId = value?.judge_id ?? selectedJudgeId;
 
   return (
@@ -129,31 +112,46 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
           </TabsList>
 
           <TabsContent value="simple" className="mt-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              {PRESETS.map((preset) => (
-                <button
-                  key={preset.key}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => handlePresetSelect(preset.key)}
-                  className={cn(
-                    'rounded-lg border p-3 text-left transition-colors hover:border-primary',
-                    effectivePreset === preset.key
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border',
-                    disabled && 'pointer-events-none opacity-50',
-                  )}
-                >
-                  <p className="text-sm font-medium">{preset.name}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{preset.description}</p>
-                  <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
-                    <span>{preset.model}</span>
-                    <span>|</span>
-                    <span>Threshold: {preset.threshold}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {judgeProviders.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {judgeProviders.map((provider) => (
+                  <button
+                    key={provider.id}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => handleProviderSelect(provider.id)}
+                    className={cn(
+                      'rounded-lg border p-3 text-left transition-colors hover:border-primary',
+                      effectiveProviderId === provider.id
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border',
+                      disabled && 'pointer-events-none opacity-50',
+                    )}
+                  >
+                    <p className="text-sm font-medium">{provider.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{provider.litellm_model}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {provider.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {!provider.has_api_key && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                          no key
+                        </Badge>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No judge providers configured. Add providers with{' '}
+                <code className="text-xs">purpose: &quot;judge&quot;</code> in{' '}
+                <code className="text-xs">config/providers.yaml</code>, or use the Advanced tab.
+              </p>
+            )}
           </TabsContent>
 
           <TabsContent value="advanced" className="mt-4 space-y-4">
@@ -186,7 +184,7 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
                 <Label htmlFor="judge-model">Model</Label>
                 <Input
                   id="judge-model"
-                  placeholder="e.g. openai/gpt-4o"
+                  placeholder="e.g. gemini/gemini-2.5-flash"
                   value={customModel}
                   onChange={(e) => setCustomModel(e.target.value)}
                   disabled={disabled}

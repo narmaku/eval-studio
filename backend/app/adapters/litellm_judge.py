@@ -29,10 +29,17 @@ A score of 0.0 means the actual answer is completely wrong.
 
 Respond with ONLY a JSON object: {{"score": <float>, "reasoning": "<explanation>"}}"""
 
-    def __init__(self, model: str = "gpt-4.1", api_key: str | None = None, max_concurrency: int = 10):
+    def __init__(
+        self,
+        model: str = "gpt-4.1",
+        api_key: str | None = None,
+        api_base: str | None = None,
+        max_concurrency: int = 10,
+    ):
         super().__init__(max_concurrency=max_concurrency)
         self.model = model
         self.api_key = api_key
+        self.api_base = api_base
 
     async def evaluate_qa(
         self,
@@ -49,13 +56,17 @@ Respond with ONLY a JSON object: {{"score": <float>, "reasoning": "<explanation>
                 expected_answer=expected_answer,
                 actual_answer=actual_answer,
             )
-            response = await litellm.acompletion(
-                model=judge_config.model or self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=judge_config.temperature if judge_config.temperature is not None else 0.0,
-                api_key=self.api_key,
-                response_format={"type": "json_object"},
-            )
+            kwargs: dict = {
+                "model": judge_config.model or self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": judge_config.temperature if judge_config.temperature is not None else 0.0,
+                "response_format": {"type": "json_object"},
+            }
+            if self.api_key:
+                kwargs["api_key"] = self.api_key
+            if self.api_base:
+                kwargs["api_base"] = self.api_base
+            response = await litellm.acompletion(**kwargs)
             content = response.choices[0].message.content
             if content is None:
                 logger.warning("LLM returned empty content for Q&A evaluation")
