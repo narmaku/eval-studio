@@ -61,9 +61,16 @@ async def process_user_message(
 
     # 3. Build messages array from transcript + new user message
     transcript = list(session.transcript or [])
-    messages_for_llm = []
+    messages_for_llm: list[dict] = []
+
+    # Inject system prompt from agent_config if present and not already in transcript
+    system_prompt = agent_config.get("system_prompt")
+    has_system_in_transcript = any(e.get("role") == "system" for e in transcript)
+    if system_prompt and not has_system_in_transcript:
+        messages_for_llm.append({"role": "system", "content": system_prompt})
+
     for entry in transcript:
-        msg = {"role": entry["role"], "content": entry.get("content", "")}
+        msg: dict = {"role": entry["role"], "content": entry.get("content", "")}
         if entry.get("tool_calls"):
             msg["tool_calls"] = entry["tool_calls"]
         messages_for_llm.append(msg)
@@ -225,17 +232,18 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
     if session.judge_config_snapshot:
         try:
             judge_config = session.judge_config_snapshot
+
+            # Resolve judge model via provider registry or direct config
+            judge_resolved = resolve_model_config(judge_config)
+
             judge_params = JudgeConfigParams(
-                model=judge_config.get("model"),
+                model=judge_resolved.model,
                 temperature=judge_config.get("temperature", 0.0),
                 prompt_template=judge_config.get("prompt_template"),
                 pass_threshold=judge_config.get("pass_threshold", 0.7),
                 dimensions=judge_config.get("dimensions"),
                 aggregation=judge_config.get("aggregation"),
             )
-
-            # Resolve judge provider
-            judge_resolved = resolve_model_config(judge_config)
 
             adapter = LiteLLMJudgeAdapter(
                 model=judge_resolved.model,
