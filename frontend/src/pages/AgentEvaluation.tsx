@@ -22,6 +22,7 @@ import {
   Clock,
   ExternalLink,
 } from 'lucide-react';
+import { api } from '@/services/api';
 import type {
   ModelEndpoint,
   JudgeReference,
@@ -37,7 +38,7 @@ export default function AgentEvaluation() {
   const [systemPrompt, setSystemPrompt] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  const { createAndRunEvaluation, isLoading: evalLoading } = useEvaluationStore();
+  const { isLoading: evalLoading, setLoading: setEvalLoading } = useEvaluationStore();
 
   const {
     currentSession,
@@ -112,7 +113,8 @@ export default function AgentEvaluation() {
     };
 
     try {
-      const evaluation = await createAndRunEvaluation(evalRequest);
+      setEvalLoading(true);
+      const evaluation = await api.createEvaluation(evalRequest);
 
       await createSession({
         evaluation_id: evaluation.id,
@@ -143,8 +145,10 @@ export default function AgentEvaluation() {
         message: err instanceof Error ? err.message : 'An unknown error occurred',
         details: err instanceof Error ? err.stack : undefined,
       });
+    } finally {
+      setEvalLoading(false);
     }
-  }, [modelEndpoint, judgeConfig, systemPrompt, createAndRunEvaluation, createSession, connectWebSocket]);
+  }, [modelEndpoint, judgeConfig, systemPrompt, setEvalLoading, createSession, connectWebSocket]);
 
   const handleEndSession = useCallback(async () => {
     try {
