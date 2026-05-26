@@ -162,6 +162,8 @@ export const api = {
     return request<Provider[]>(`/api/v1/providers${qs ? `?${qs}` : ''}`);
   },
   getProvider: (id: string) => request<Provider>(`/api/v1/providers/${id}`),
+  listProviderModels: (providerId: string) =>
+    request<{ id: string; owned_by: string }[]>(`/api/v1/providers/${providerId}/models`),
 
   // --- Adapters & Config ---
   listAdapters: () => request<{ name: string; modes: string[] }[]>('/api/v1/adapters'),

@@ -48,6 +48,11 @@ export interface Provider {
   purpose: string;
 }
 
+export interface ProviderModel {
+  id: string;
+  owned_by: string;
+}
+
 export interface JudgeReference {
   judge_id?: string;
   preset?: string;
