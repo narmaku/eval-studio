@@ -1,0 +1,40 @@
+# Inference provider profiles for eval-studio
+# Each provider is a named endpoint that can be selected in the UI.
+
+providers:
+  - id: rls-staging
+    name: "RLS Staging (Granite)"
+    litellm_model: "openai/granite-3.3-8b-instruct"
+    api_base: "https://lightspeed-stack.staging.example.com/v1"
+    api_key_env: "RLS_API_KEY"
+    proxy: "http://squid.corp.redhat.com:3128"
+    tags: ["staging", "granite", "rhel-lightspeed"]
+    purpose: "test"
+
+  - id: openai-gpt4
+    name: "OpenAI GPT-4.1"
+    litellm_model: "gpt-4.1"
+    api_key_env: "OPENAI_API_KEY"
+    tags: ["production", "openai"]
+    purpose: "test"
+
+  - id: openai-gpt4o-mini
+    name: "OpenAI GPT-4o-mini"
+    litellm_model: "gpt-4o-mini"
+    api_key_env: "OPENAI_API_KEY"
+    tags: ["dev", "cheap", "openai"]
+    purpose: "test"
+
+  - id: ollama-local
+    name: "Local Ollama"
+    litellm_model: "ollama/llama3.2:3b"
+    api_base: "http://localhost:11434"
+    tags: ["local", "dev", "free"]
+    purpose: "test"
+
+  - id: judge-gpt4
+    name: "Judge - GPT-4.1"
+    litellm_model: "gpt-4.1"
+    api_key_env: "OPENAI_API_KEY"
+    tags: ["judge"]
+    purpose: "judge"
