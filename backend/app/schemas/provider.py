@@ -14,3 +14,10 @@ class ProviderResponse(BaseModel):
     proxy: str | None = None
     tags: list[str] = []
     purpose: str = "test"
+
+
+class ProviderModelResponse(BaseModel):
+    """A model available from a provider's OpenAI-compatible /v1/models endpoint."""
+
+    id: str
+    owned_by: str = ""
