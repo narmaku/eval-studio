@@ -21,8 +21,8 @@ interface ResultDetailViewProps {
   evaluationMode?: string;
 }
 
-function DimensionBadges({ dimensions }: { dimensions: Record<string, number> }) {
-  const entries = Object.entries(dimensions);
+function DimensionBadges({ dimensions }: { dimensions: Record<string, number> | undefined }) {
+  const entries = Object.entries(dimensions ?? {});
   if (entries.length === 0) {
     return <span className="text-muted-foreground">--</span>;
   }
@@ -37,17 +37,18 @@ function DimensionBadges({ dimensions }: { dimensions: Record<string, number> })
   );
 }
 
-function JudgeReasoning({ reasoning }: { reasoning: string }) {
+function JudgeReasoning({ reasoning }: { reasoning: string | undefined }) {
   const [expanded, setExpanded] = useState(false);
   const maxLength = 100;
+  const text = reasoning ?? '';
 
-  if (reasoning.length <= maxLength) {
-    return <span className="text-sm">{reasoning}</span>;
+  if (text.length <= maxLength) {
+    return <span className="text-sm">{text}</span>;
   }
 
   return (
     <span className="text-sm">
-      {expanded ? reasoning : `${reasoning.slice(0, maxLength)}...`}
+      {expanded ? text : `${text.slice(0, maxLength)}...`}
       <button
         className="ml-1 text-primary underline text-xs"
         onClick={(e) => {
@@ -73,7 +74,7 @@ const EMPTY_METRICS = {
 
 export function ResultDetailView({ result, evaluationName, evaluationMode }: ResultDetailViewProps) {
   const metrics = result.aggregate_metrics ?? EMPTY_METRICS;
-  const { scores } = result;
+  const scores = result.scores ?? [];
 
   return (
     <div className="space-y-6">
