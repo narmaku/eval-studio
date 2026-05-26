@@ -13,16 +13,17 @@ import {
 } from '@/components/ui/table';
 import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { PassFailChart } from './PassFailChart';
-import type { Result, Score } from '@/types';
+import type { Result, AggregateMetrics } from '@/types';
 
 interface ResultDetailViewProps {
-  result: Result;
+  results: Result[];
+  aggregateMetrics?: AggregateMetrics | null;
   evaluationName?: string;
   evaluationMode?: string;
 }
 
-function DimensionBadges({ dimensions }: { dimensions: Record<string, number> | undefined }) {
-  const entries = Object.entries(dimensions ?? {});
+function ScoreBreakdownBadges({ breakdown }: { breakdown: Record<string, number> | null | undefined }) {
+  const entries = Object.entries(breakdown ?? {});
   if (entries.length === 0) {
     return <span className="text-muted-foreground">--</span>;
   }
@@ -37,13 +38,13 @@ function DimensionBadges({ dimensions }: { dimensions: Record<string, number> | 
   );
 }
 
-function JudgeReasoning({ reasoning }: { reasoning: string | undefined }) {
+function JudgeReasoning({ reasoning }: { reasoning: string | null | undefined }) {
   const [expanded, setExpanded] = useState(false);
-  const maxLength = 100;
   const text = reasoning ?? '';
+  const maxLength = 100;
 
   if (text.length <= maxLength) {
-    return <span className="text-sm">{text}</span>;
+    return <span className="text-sm">{text || '--'}</span>;
   }
 
   return (
@@ -62,7 +63,7 @@ function JudgeReasoning({ reasoning }: { reasoning: string | undefined }) {
   );
 }
 
-const EMPTY_METRICS = {
+const EMPTY_METRICS: AggregateMetrics = {
   total_items: 0,
   passed_items: 0,
   failed_items: 0,
@@ -72,9 +73,8 @@ const EMPTY_METRICS = {
   score_distribution: {},
 };
 
-export function ResultDetailView({ result, evaluationName, evaluationMode }: ResultDetailViewProps) {
-  const metrics = result.aggregate_metrics ?? EMPTY_METRICS;
-  const scores = result.scores ?? [];
+export function ResultDetailView({ results, aggregateMetrics, evaluationName, evaluationMode }: ResultDetailViewProps) {
+  const metrics = aggregateMetrics ?? EMPTY_METRICS;
 
   return (
     <div className="space-y-6">
@@ -93,16 +93,13 @@ export function ResultDetailView({ result, evaluationName, evaluationMode }: Res
                 {evaluationMode.toUpperCase()}
               </Badge>
             )}
-            <Badge variant={result.status === 'completed' ? 'default' : 'destructive'}>
-              {result.status}
-            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
               <p className="text-sm text-muted-foreground">Total Items</p>
-              <p className="text-2xl font-bold">{metrics.total_items}</p>
+              <p className="text-2xl font-bold">{metrics.total_items || results.length}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Pass Rate</p>
@@ -122,7 +119,7 @@ export function ResultDetailView({ result, evaluationName, evaluationMode }: Res
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <ScoreDistributionChart scores={scores} />
+        <ScoreDistributionChart results={results} />
         <PassFailChart passedItems={metrics.passed_items} failedItems={metrics.failed_items} />
       </div>
 
@@ -132,37 +129,39 @@ export function ResultDetailView({ result, evaluationName, evaluationMode }: Res
           <CardTitle>Per-Item Results</CardTitle>
         </CardHeader>
         <CardContent>
-          {scores.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-center">No individual scores available.</p>
+          {results.length === 0 ? (
+            <p className="text-muted-foreground py-4 text-center">No individual results available.</p>
           ) : (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Item ID</TableHead>
-                    <TableHead>Overall Score</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Score</TableHead>
                     <TableHead>Pass/Fail</TableHead>
-                    <TableHead>Dimensions</TableHead>
+                    <TableHead>Breakdown</TableHead>
                     <TableHead>Judge Reasoning</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {scores.map((score: Score) => (
-                    <TableRow key={score.item_id}>
-                      <TableCell className="font-mono text-sm">{score.item_id}</TableCell>
-                      <TableCell>{score.overall.toFixed(3)}</TableCell>
+                  {results.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-mono text-sm">{r.dataset_item_id?.slice(0, 8) ?? '--'}</TableCell>
+                      <TableCell>{r.score != null ? r.score.toFixed(3) : '--'}</TableCell>
                       <TableCell>
-                        {score.pass ? (
+                        {r.passed === true ? (
                           <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        ) : (
+                        ) : r.passed === false ? (
                           <XCircle className="h-5 w-5 text-red-500" />
+                        ) : (
+                          <span className="text-muted-foreground">--</span>
                         )}
                       </TableCell>
                       <TableCell>
-                        <DimensionBadges dimensions={score.dimensions} />
+                        <ScoreBreakdownBadges breakdown={r.scores_breakdown} />
                       </TableCell>
                       <TableCell className="max-w-xs">
-                        <JudgeReasoning reasoning={score.judge_reasoning} />
+                        <JudgeReasoning reasoning={r.judge_reasoning} />
                       </TableCell>
                     </TableRow>
                   ))}

@@ -53,19 +53,14 @@ describe('resultStore', () => {
         {
           id: 'r1',
           evaluation_id: 'e1',
-          status: 'completed' as const,
-          scores: [],
-          aggregate_metrics: {
-            mean_score: 0.85,
-            median_score: 0.9,
-            pass_rate: 0.8,
-            score_distribution: {},
-            total_items: 10,
-            passed_items: 8,
-            failed_items: 2,
-          },
+          dataset_item_id: 'item-1',
+          session_id: null,
+          score: 0.85,
+          passed: true,
+          actual_answer: 'test answer',
+          judge_reasoning: 'good answer',
+          scores_breakdown: null,
           created_at: '2026-01-01T00:00:00Z',
-          completed_at: '2026-01-01T01:00:00Z',
         },
       ];
       mockedApi.listResults.mockResolvedValue({
@@ -117,19 +112,14 @@ describe('resultStore', () => {
       const mockResult = {
         id: 'r1',
         evaluation_id: 'e1',
-        status: 'completed' as const,
-        scores: [],
-        aggregate_metrics: {
-          mean_score: 0.85,
-          median_score: 0.9,
-          pass_rate: 0.8,
-          score_distribution: {},
-          total_items: 10,
-          passed_items: 8,
-          failed_items: 2,
-        },
+        dataset_item_id: 'item-1',
+        session_id: null,
+        score: 0.85,
+        passed: true,
+        actual_answer: 'test answer',
+        judge_reasoning: 'good answer',
+        scores_breakdown: null,
         created_at: '2026-01-01T00:00:00Z',
-        completed_at: '2026-01-01T01:00:00Z',
       };
       mockedApi.getResult.mockResolvedValue(mockResult);
 

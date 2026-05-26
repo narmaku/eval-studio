@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { bucketScores } from './scoreUtils';
-import type { Score } from '@/types';
+import type { Result } from '@/types';
 
 // Mock ResizeObserver for Recharts ResponsiveContainer
 class ResizeObserverMock {
@@ -12,24 +12,29 @@ class ResizeObserverMock {
 }
 globalThis.ResizeObserver = ResizeObserverMock;
 
-const makeScore = (overall: number): Score => ({
-  item_id: `item-${overall}`,
-  dimensions: {},
-  overall,
-  pass: overall >= 0.5,
+let idCounter = 0;
+const makeResult = (score: number): Result => ({
+  id: `r-${++idCounter}`,
+  evaluation_id: 'e1',
+  dataset_item_id: `item-${score}`,
+  session_id: null,
+  score,
+  passed: score >= 0.5,
+  actual_answer: 'test',
   judge_reasoning: 'test',
-  raw_response: 'test',
+  scores_breakdown: null,
+  created_at: '2026-01-01T00:00:00Z',
 });
 
 describe('bucketScores', () => {
   it('buckets scores into 10 bins', () => {
     const scores = [
-      makeScore(0.05),
-      makeScore(0.15),
-      makeScore(0.25),
-      makeScore(0.85),
-      makeScore(0.95),
-      makeScore(1.0),
+      makeResult(0.05),
+      makeResult(0.15),
+      makeResult(0.25),
+      makeResult(0.85),
+      makeResult(0.95),
+      makeResult(1.0),
     ];
 
     const buckets = bucketScores(scores);
@@ -49,13 +54,13 @@ describe('bucketScores', () => {
   });
 
   it('places score of exactly 1.0 in the last bucket', () => {
-    const scores = [makeScore(1.0)];
+    const scores = [makeResult(1.0)];
     const buckets = bucketScores(scores);
     expect(buckets[9]!.count).toBe(1);
   });
 
   it('places score of exactly 0.0 in the first bucket', () => {
-    const scores = [makeScore(0.0)];
+    const scores = [makeResult(0.0)];
     const buckets = bucketScores(scores);
     expect(buckets[0]!.count).toBe(1);
   });
@@ -63,8 +68,8 @@ describe('bucketScores', () => {
 
 describe('ScoreDistributionChart', () => {
   it('renders with data without crashing', () => {
-    const scores = [makeScore(0.5), makeScore(0.7), makeScore(0.9)];
-    const { container } = render(<ScoreDistributionChart scores={scores} />);
+    const results = [makeResult(0.5), makeResult(0.7), makeResult(0.9)];
+    const { container } = render(<ScoreDistributionChart results={results} />);
 
     expect(screen.getByText('Score Distribution')).toBeInTheDocument();
     // Recharts renders SVG in real DOM, but in jsdom it may not fully render.
@@ -73,7 +78,7 @@ describe('ScoreDistributionChart', () => {
   });
 
   it('renders empty state when no scores provided', () => {
-    render(<ScoreDistributionChart scores={[]} />);
+    render(<ScoreDistributionChart results={[]} />);
     expect(screen.getByText('No score data available.')).toBeInTheDocument();
   });
 });

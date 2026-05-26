@@ -1,23 +1,16 @@
-// TODO: Consider generating these types from the FastAPI OpenAPI spec
-// using openapi-typescript once the backend is implemented.
+// Types aligned with backend ResultResponse schema
 
 export interface Result {
   id: string;
   evaluation_id: string;
-  status: 'pending' | 'completed' | 'failed';
-  scores: Score[];
-  aggregate_metrics: AggregateMetrics;
+  dataset_item_id: string | null;
+  session_id: string | null;
+  score: number | null;
+  passed: boolean | null;
+  actual_answer: string | null;
+  judge_reasoning: string | null;
+  scores_breakdown: Record<string, number> | null;
   created_at: string;
-  completed_at: string | null;
-}
-
-export interface Score {
-  item_id: string;
-  dimensions: Record<string, number>;
-  overall: number;
-  pass: boolean;
-  judge_reasoning: string;
-  raw_response: string;
 }
 
 export interface AggregateMetrics {

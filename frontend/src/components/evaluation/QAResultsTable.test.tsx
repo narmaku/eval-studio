@@ -2,48 +2,68 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { QAResultsTable } from './QAResultsTable';
-import type { Score, DatasetItem } from '@/types';
+import type { Result, DatasetItem } from '@/types';
 
-const mockScores: Score[] = [
+const mockResults: Result[] = [
   {
-    item_id: 'item-1',
-    dimensions: { accuracy: 0.9 },
-    overall: 0.9,
-    pass: true,
+    id: 'r1',
+    evaluation_id: 'e1',
+    dataset_item_id: 'item-1',
+    session_id: null,
+    score: 0.9,
+    passed: true,
+    actual_answer: 'Use systemctl restart sshd',
     judge_reasoning: 'The answer correctly describes the systemctl command.',
-    raw_response: 'Use systemctl restart sshd',
+    scores_breakdown: { accuracy: 0.9 },
+    created_at: '2026-01-01T00:00:00Z',
   },
   {
-    item_id: 'item-2',
-    dimensions: { accuracy: 0.3 },
-    overall: 0.3,
-    pass: false,
+    id: 'r2',
+    evaluation_id: 'e1',
+    dataset_item_id: 'item-2',
+    session_id: null,
+    score: 0.3,
+    passed: false,
+    actual_answer: 'Just restart it',
     judge_reasoning: 'The answer is incomplete and misses key steps.',
-    raw_response: 'Just restart it',
+    scores_breakdown: { accuracy: 0.3 },
+    created_at: '2026-01-01T00:00:00Z',
   },
   {
-    item_id: 'item-3',
-    dimensions: { accuracy: 0.75 },
-    overall: 0.75,
-    pass: true,
+    id: 'r3',
+    evaluation_id: 'e1',
+    dataset_item_id: 'item-3',
+    session_id: null,
+    score: 0.75,
+    passed: true,
+    actual_answer: 'Run firewall-cmd --add-port=443/tcp --permanent',
     judge_reasoning: 'Adequate coverage of firewall rules.',
-    raw_response: 'Run firewall-cmd --add-port=443/tcp --permanent',
+    scores_breakdown: { accuracy: 0.75 },
+    created_at: '2026-01-01T00:00:00Z',
   },
   {
-    item_id: 'item-4',
-    dimensions: { accuracy: 0.5 },
-    overall: 0.5,
-    pass: false,
+    id: 'r4',
+    evaluation_id: 'e1',
+    dataset_item_id: 'item-4',
+    session_id: null,
+    score: 0.5,
+    passed: false,
+    actual_answer: 'Change the port in sshd_config',
     judge_reasoning: 'Missing SELinux context adjustment.',
-    raw_response: 'Change the port in sshd_config',
+    scores_breakdown: { accuracy: 0.5 },
+    created_at: '2026-01-01T00:00:00Z',
   },
   {
-    item_id: 'item-5',
-    dimensions: { accuracy: 0.95 },
-    overall: 0.95,
-    pass: true,
+    id: 'r5',
+    evaluation_id: 'e1',
+    dataset_item_id: 'item-5',
+    session_id: null,
+    score: 0.95,
+    passed: true,
+    actual_answer: 'Use pvcreate, vgcreate, and lvcreate in sequence.',
     judge_reasoning: 'Excellent explanation of LVM concepts.',
-    raw_response: 'Use pvcreate, vgcreate, and lvcreate in sequence.',
+    scores_breakdown: { accuracy: 0.95 },
+    created_at: '2026-01-01T00:00:00Z',
   },
 ];
 
@@ -88,7 +108,7 @@ const mockDatasetItems: DatasetItem[] = [
 describe('QAResultsTable', () => {
   it('renders all score rows', () => {
     render(
-      <QAResultsTable scores={mockScores} datasetItems={mockDatasetItems} />,
+      <QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />,
     );
 
     // We should see 5 rows of data (not counting header)
@@ -99,7 +119,7 @@ describe('QAResultsTable', () => {
 
   it('displays pass/fail badges correctly', () => {
     render(
-      <QAResultsTable scores={mockScores} datasetItems={mockDatasetItems} />,
+      <QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />,
     );
 
     const passBadges = screen.getAllByText('Pass');
@@ -110,7 +130,7 @@ describe('QAResultsTable', () => {
 
   it('displays question text from dataset items', () => {
     render(
-      <QAResultsTable scores={mockScores} datasetItems={mockDatasetItems} />,
+      <QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />,
     );
 
     expect(
@@ -124,7 +144,7 @@ describe('QAResultsTable', () => {
   it('expands row on chevron click to show judge reasoning', async () => {
     const user = userEvent.setup();
     render(
-      <QAResultsTable scores={mockScores} datasetItems={mockDatasetItems} />,
+      <QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />,
     );
 
     // Find the expand buttons
@@ -145,7 +165,7 @@ describe('QAResultsTable', () => {
     const onRowClick = vi.fn();
     render(
       <QAResultsTable
-        scores={mockScores}
+        results={mockResults}
         datasetItems={mockDatasetItems}
         onRowClick={onRowClick}
       />,
@@ -156,11 +176,11 @@ describe('QAResultsTable', () => {
     // rows[0] is header, rows[1] is first data row
     await user.click(rows[1]!);
 
-    expect(onRowClick).toHaveBeenCalledWith(mockScores[0]);
+    expect(onRowClick).toHaveBeenCalledWith(mockResults[0]);
   });
 
-  it('shows empty state when no scores are provided', () => {
-    render(<QAResultsTable scores={[]} />);
+  it('shows empty state when no results are provided', () => {
+    render(<QAResultsTable results={[]} />);
 
     expect(screen.getByText('No results to display.')).toBeInTheDocument();
   });

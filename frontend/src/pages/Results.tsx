@@ -29,20 +29,37 @@ export default function Results() {
   const error = resultsError ?? evaluationsError;
 
   const rows = useMemo<EvaluationResultRow[]>(() => {
-    const evaluationMap = new Map(evaluations.map((e) => [e.id, e]));
+    // Group results by evaluation_id and compute aggregates
+    const resultsByEval = new Map<string, typeof results>();
+    for (const r of results) {
+      const existing = resultsByEval.get(r.evaluation_id) ?? [];
+      existing.push(r);
+      resultsByEval.set(r.evaluation_id, existing);
+    }
 
-    return results.map((result) => {
-      const evaluation = evaluationMap.get(result.evaluation_id);
+    // Build rows from evaluations that have completed
+    const completedEvals = evaluations.filter(
+      (e) => e.status === 'completed' || e.status === 'failed',
+    );
+
+    return completedEvals.map((evaluation) => {
+      const evalResults = resultsByEval.get(evaluation.id) ?? [];
+      const scores = evalResults.filter((r) => r.score != null).map((r) => r.score!);
+      const passedCount = evalResults.filter((r) => r.passed === true).length;
+      const totalItems = evalResults.length;
+      const meanScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+      const passRate = totalItems > 0 ? passedCount / totalItems : 0;
+
       return {
-        evaluationId: result.evaluation_id,
-        resultId: result.id,
-        name: evaluation?.name ?? 'Unknown Evaluation',
-        mode: evaluation?.mode ?? 'qa',
-        status: evaluation?.status ?? result.status,
-        totalItems: result.aggregate_metrics?.total_items ?? 0,
-        passRate: result.aggregate_metrics?.pass_rate ?? 0,
-        meanScore: result.aggregate_metrics?.mean_score ?? 0,
-        createdAt: result.created_at,
+        evaluationId: evaluation.id,
+        resultId: evaluation.id,
+        name: evaluation.name,
+        mode: evaluation.mode ?? 'qa',
+        status: evaluation.status,
+        totalItems,
+        passRate,
+        meanScore,
+        createdAt: evaluation.created_at,
       };
     });
   }, [results, evaluations]);

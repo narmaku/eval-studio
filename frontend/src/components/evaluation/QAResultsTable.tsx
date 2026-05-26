@@ -19,20 +19,21 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDownIcon, ChevronRightIcon, ArrowUpDownIcon } from 'lucide-react';
-import type { Score, DatasetItem } from '@/types';
+import type { Result, DatasetItem } from '@/types';
 
 interface QAResultsTableProps {
-  scores: Score[];
+  results: Result[];
   datasetItems?: DatasetItem[];
-  onRowClick?: (score: Score) => void;
+  onRowClick?: (result: Result) => void;
 }
 
-function truncate(text: string, maxLength: number): string {
+function truncate(text: string | null | undefined, maxLength: number): string {
+  if (!text) return '--';
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + '...';
 }
 
-export function QAResultsTable({ scores, datasetItems, onRowClick }: QAResultsTableProps) {
+export function QAResultsTable({ results, datasetItems, onRowClick }: QAResultsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
 
@@ -42,7 +43,7 @@ export function QAResultsTable({ scores, datasetItems, onRowClick }: QAResultsTa
     return map;
   }, [datasetItems]);
 
-  const columns = useMemo<ColumnDef<Score>[]>(
+  const columns = useMemo<ColumnDef<Result>[]>(
     () => [
       {
         id: 'expander',
@@ -70,8 +71,8 @@ export function QAResultsTable({ scores, datasetItems, onRowClick }: QAResultsTa
         id: 'question',
         header: 'Question',
         accessorFn: (row) => {
-          const item = itemMap.get(row.item_id);
-          return item?.question ?? row.item_id;
+          const item = row.dataset_item_id ? itemMap.get(row.dataset_item_id) : undefined;
+          return item?.question ?? row.dataset_item_id ?? '--';
         },
         cell: ({ getValue }) => (
           <span className="block max-w-[200px] truncate" title={getValue<string>()}>
@@ -83,7 +84,7 @@ export function QAResultsTable({ scores, datasetItems, onRowClick }: QAResultsTa
         id: 'expected',
         header: 'Expected Answer',
         accessorFn: (row) => {
-          const item = itemMap.get(row.item_id);
+          const item = row.dataset_item_id ? itemMap.get(row.dataset_item_id) : undefined;
           return item?.expected_answer ?? '';
         },
         cell: ({ getValue }) => (
@@ -95,9 +96,9 @@ export function QAResultsTable({ scores, datasetItems, onRowClick }: QAResultsTa
       {
         id: 'actual',
         header: 'Actual Answer',
-        accessorFn: (row) => row.raw_response,
+        accessorFn: (row) => row.actual_answer,
         cell: ({ getValue }) => (
-          <span className="block max-w-[200px] truncate" title={getValue<string>()}>
+          <span className="block max-w-[200px] truncate" title={getValue<string>() ?? ''}>
             {truncate(getValue<string>(), 60)}
           </span>
         ),
@@ -114,7 +115,7 @@ export function QAResultsTable({ scores, datasetItems, onRowClick }: QAResultsTa
             <ArrowUpDownIcon className="size-3" />
           </button>
         ),
-        accessorFn: (row) => row.overall,
+        accessorFn: (row) => row.score ?? 0,
         cell: ({ getValue }) => (
           <span className="text-right tabular-nums">
             {(getValue<number>() * 100).toFixed(0)}%
@@ -125,22 +126,28 @@ export function QAResultsTable({ scores, datasetItems, onRowClick }: QAResultsTa
       {
         id: 'pass',
         header: 'Pass/Fail',
-        accessorFn: (row) => row.pass,
-        cell: ({ getValue }) =>
-          getValue<boolean>() ? (
-            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-              Pass
-            </Badge>
-          ) : (
-            <Badge variant="destructive">Fail</Badge>
-          ),
+        accessorFn: (row) => row.passed,
+        cell: ({ getValue }) => {
+          const val = getValue<boolean | null>();
+          if (val === true) {
+            return (
+              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                Pass
+              </Badge>
+            );
+          }
+          if (val === false) {
+            return <Badge variant="destructive">Fail</Badge>;
+          }
+          return <span className="text-muted-foreground">--</span>;
+        },
       },
     ],
     [itemMap],
   );
 
   const table = useReactTable({
-    data: scores,
+    data: results,
     columns,
     state: { sorting, expanded },
     onSortingChange: setSorting,
@@ -189,7 +196,7 @@ export function QAResultsTable({ scores, datasetItems, onRowClick }: QAResultsTa
               {row.getIsExpanded() && (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="bg-muted/30 p-4">
-                    <ExpandedRowDetail score={row.original} datasetItem={itemMap.get(row.original.item_id)} />
+                    <ExpandedRowDetail result={row.original} datasetItem={row.original.dataset_item_id ? itemMap.get(row.original.dataset_item_id) : undefined} />
                   </TableCell>
                 </TableRow>
               )}
@@ -202,17 +209,17 @@ export function QAResultsTable({ scores, datasetItems, onRowClick }: QAResultsTa
 }
 
 function ExpandedRowDetail({
-  score,
+  result,
   datasetItem,
 }: {
-  score: Score;
+  result: Result;
   datasetItem?: DatasetItem;
 }) {
   return (
     <div className="space-y-3 text-sm">
       <div>
         <p className="font-medium">Question</p>
-        <p className="text-muted-foreground">{datasetItem?.question ?? score.item_id}</p>
+        <p className="text-muted-foreground">{datasetItem?.question ?? result.dataset_item_id ?? '--'}</p>
       </div>
       <div>
         <p className="font-medium">Expected Answer</p>
@@ -220,12 +227,12 @@ function ExpandedRowDetail({
       </div>
       <div>
         <p className="font-medium">Actual Answer</p>
-        <p className="text-muted-foreground">{score.raw_response || 'N/A'}</p>
+        <p className="text-muted-foreground">{result.actual_answer || 'N/A'}</p>
       </div>
       <div>
         <p className="font-medium">Judge Reasoning</p>
         <blockquote className="mt-1 border-l-2 border-muted-foreground/30 pl-3 text-muted-foreground italic">
-          {score.judge_reasoning || 'No reasoning provided.'}
+          {result.judge_reasoning || 'No reasoning provided.'}
         </blockquote>
       </div>
     </div>

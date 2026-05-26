@@ -7,17 +7,20 @@ import {
 } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import type { Score, DatasetItem } from '@/types';
+import type { Result, DatasetItem } from '@/types';
 
 interface ResultDetailDrawerProps {
-  score: Score | null;
+  result: Result | null;
   datasetItem?: DatasetItem;
   open: boolean;
   onClose: () => void;
 }
 
-export function ResultDetailDrawer({ score, datasetItem, open, onClose }: ResultDetailDrawerProps) {
-  if (!score) return null;
+export function ResultDetailDrawer({ result, datasetItem, open, onClose }: ResultDetailDrawerProps) {
+  if (!result) return null;
+
+  const breakdown = result.scores_breakdown ?? {};
+  const hasBreakdown = Object.keys(breakdown).length > 0;
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -25,7 +28,7 @@ export function ResultDetailDrawer({ score, datasetItem, open, onClose }: Result
         <SheetHeader>
           <SheetTitle>Result Detail</SheetTitle>
           <SheetDescription>
-            Item: {datasetItem?.question ? datasetItem.question.slice(0, 60) : score.item_id}
+            Item: {datasetItem?.question ? datasetItem.question.slice(0, 60) : (result.dataset_item_id?.slice(0, 8) ?? '--')}
           </SheetDescription>
         </SheetHeader>
 
@@ -33,15 +36,15 @@ export function ResultDetailDrawer({ score, datasetItem, open, onClose }: Result
           {/* Score + Pass/Fail */}
           <div className="flex items-center gap-3">
             <span className="text-2xl font-bold tabular-nums">
-              {(score.overall * 100).toFixed(0)}%
+              {result.score != null ? `${(result.score * 100).toFixed(0)}%` : '--'}
             </span>
-            {score.pass ? (
+            {result.passed === true ? (
               <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                 Pass
               </Badge>
-            ) : (
+            ) : result.passed === false ? (
               <Badge variant="destructive">Fail</Badge>
-            )}
+            ) : null}
           </div>
 
           <Separator />
@@ -50,7 +53,7 @@ export function ResultDetailDrawer({ score, datasetItem, open, onClose }: Result
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Question</h3>
             <p className="text-sm text-muted-foreground">
-              {datasetItem?.question ?? score.item_id}
+              {datasetItem?.question ?? '--'}
             </p>
           </div>
 
@@ -69,18 +72,18 @@ export function ResultDetailDrawer({ score, datasetItem, open, onClose }: Result
           {/* Actual Answer */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Actual Answer</h3>
-            <p className="text-sm text-muted-foreground">{score.raw_response || 'N/A'}</p>
+            <p className="text-sm text-muted-foreground">{result.actual_answer || 'N/A'}</p>
           </div>
 
           <Separator />
 
-          {/* Per-Dimension Scores */}
-          {Object.keys(score.dimensions).length > 0 && (
+          {/* Score Breakdown */}
+          {hasBreakdown && (
             <>
               <div className="space-y-1">
-                <h3 className="text-sm font-medium">Dimension Scores</h3>
+                <h3 className="text-sm font-medium">Score Breakdown</h3>
                 <ul className="space-y-1">
-                  {Object.entries(score.dimensions).map(([name, value]) => (
+                  {Object.entries(breakdown).map(([name, value]) => (
                     <li key={name} className="flex justify-between text-sm">
                       <span className="text-muted-foreground">{name}</span>
                       <span className="tabular-nums">{(value * 100).toFixed(0)}%</span>
@@ -96,7 +99,7 @@ export function ResultDetailDrawer({ score, datasetItem, open, onClose }: Result
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Judge Reasoning</h3>
             <blockquote className="border-l-2 border-muted-foreground/30 pl-3 text-sm text-muted-foreground italic">
-              {score.judge_reasoning || 'No reasoning provided.'}
+              {result.judge_reasoning || 'No reasoning provided.'}
             </blockquote>
           </div>
         </div>

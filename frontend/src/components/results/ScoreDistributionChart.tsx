@@ -2,16 +2,16 @@ import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { bucketScores } from './scoreUtils';
-import type { Score } from '@/types';
+import type { Result } from '@/types';
 
 interface ScoreDistributionChartProps {
-  scores: Score[];
+  results: Result[];
 }
 
-export function ScoreDistributionChart({ scores }: ScoreDistributionChartProps) {
-  const data = useMemo(() => bucketScores(scores), [scores]);
+export function ScoreDistributionChart({ results }: ScoreDistributionChartProps) {
+  const data = useMemo(() => bucketScores(results), [results]);
 
-  if (scores.length === 0) {
+  if (results.length === 0) {
     return (
       <Card>
         <CardHeader>

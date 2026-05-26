@@ -1,4 +1,4 @@
-import type { Score } from '@/types';
+import type { Result } from '@/types';
 
 export interface Bucket {
   label: string;
@@ -18,12 +18,14 @@ const BUCKET_LABELS = [
   '0.9-1.0',
 ];
 
-export function bucketScores(scores: Score[]): Bucket[] {
+export function bucketScores(results: Result[]): Bucket[] {
   const counts = new Array<number>(10).fill(0);
 
-  for (const score of scores) {
-    const index = Math.min(Math.floor(score.overall * 10), 9);
-    counts[index]!++;
+  for (const r of results) {
+    if (r.score != null) {
+      const index = Math.min(Math.floor(r.score * 10), 9);
+      counts[index]!++;
+    }
   }
 
   return BUCKET_LABELS.map((label, i) => ({

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,6 @@ import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { QAResultsTable } from '@/components/evaluation/QAResultsTable';
-import { AggregateStats } from '@/components/evaluation/AggregateStats';
 import { ResultDetailDrawer } from '@/components/evaluation/ResultDetailDrawer';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useResultStore } from '@/stores/resultStore';
@@ -15,7 +14,7 @@ import { useNotificationStore } from '@/stores/notificationStore';
 import type {
   ModelEndpoint,
   JudgeReference,
-  Score,
+  Result,
   CreateEvaluationRequest,
 } from '@/types';
 
@@ -26,7 +25,7 @@ export default function QAEvaluation() {
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>();
   const [modelEndpoint, setModelEndpoint] = useState<ModelEndpoint>();
   const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
-  const [selectedScore, setSelectedScore] = useState<Score | null>(null);
+  const [selectedResult, setSelectedResult] = useState<Result | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading } =
@@ -74,7 +73,6 @@ export default function QAEvaluation() {
         title: 'Evaluation Completed',
         message: `"${evaluation.name}" finished successfully`,
         evaluationId: evaluation.id,
-        details: `Evaluation: ${evaluation.name}\nMode: ${evaluation.mode}\nCompleted at: ${evaluation.completed_at ?? 'N/A'}`,
       });
       void fetchResults(evaluation.id);
       setPhase('complete');
@@ -85,7 +83,6 @@ export default function QAEvaluation() {
         title: 'Evaluation Failed',
         message: evaluation.error ?? 'Unknown error',
         evaluationId: evaluation.id,
-        details: `Evaluation: ${evaluation.name}\nMode: ${evaluation.mode}\nError: ${evaluation.error ?? 'Unknown'}`,
       });
       setPhase('configure');
     } else if (evaluation?.status === 'cancelled') {
@@ -100,8 +97,8 @@ export default function QAEvaluation() {
     }
   }, [fetchResults]);
 
-  const handleRowClick = (score: Score) => {
-    setSelectedScore(score);
+  const handleRowClick = (result: Result) => {
+    setSelectedResult(result);
     setDrawerOpen(true);
   };
 
@@ -110,17 +107,9 @@ export default function QAEvaluation() {
     setSelectedDatasetId(undefined);
     setModelEndpoint(undefined);
     setJudgeConfig(undefined);
-    setSelectedScore(null);
+    setSelectedResult(null);
     setDrawerOpen(false);
   };
-
-  // Collect all scores from all results
-  const allScores = useMemo(() => {
-    return results.flatMap((r) => r.scores);
-  }, [results]);
-
-  // Use first result's aggregate metrics if available
-  const aggregateMetrics = results[0]?.aggregate_metrics;
 
   return (
     <div className="space-y-6">
@@ -189,15 +178,13 @@ export default function QAEvaluation() {
       {/* Complete Phase */}
       {phase === 'complete' && (
         <>
-          {aggregateMetrics && <AggregateStats metrics={aggregateMetrics} />}
-
           <QAResultsTable
-            scores={allScores}
+            results={results}
             onRowClick={handleRowClick}
           />
 
           <ResultDetailDrawer
-            score={selectedScore}
+            result={selectedResult}
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
           />

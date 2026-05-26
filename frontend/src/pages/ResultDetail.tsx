@@ -1,17 +1,22 @@
 import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useResultStore } from '@/stores/resultStore';
+import { useEvaluationStore } from '@/stores/evaluationStore';
 import { ResultDetailView } from '@/components/results';
 
 export default function ResultDetail() {
   const { resultId } = useParams<{ resultId: string }>();
-  const { currentResult, isLoading, error, fetchResult } = useResultStore();
+  const { results, isLoading, error, fetchResults } = useResultStore();
+  const { evaluations, fetchEvaluations } = useEvaluationStore();
 
   useEffect(() => {
     if (resultId) {
-      void fetchResult(resultId);
+      void fetchResults(resultId);
+      void fetchEvaluations();
     }
-  }, [resultId, fetchResult]);
+  }, [resultId, fetchResults, fetchEvaluations]);
+
+  const evaluation = evaluations.find((e) => e.id === resultId);
 
   if (isLoading) {
     return (
@@ -32,13 +37,38 @@ export default function ResultDetail() {
     );
   }
 
-  if (!currentResult) {
+  if (results.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Result not found.</p>
+        <p className="text-muted-foreground">No results found.</p>
       </div>
     );
   }
 
-  return <ResultDetailView result={currentResult} />;
+  // Compute aggregate metrics from per-item results
+  const scores = results.filter((r) => r.score != null).map((r) => r.score!);
+  const passedCount = results.filter((r) => r.passed === true).length;
+  const failedCount = results.filter((r) => r.passed === false).length;
+  const sorted = [...scores].sort((a, b) => a - b);
+  const meanScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+  const medianScore = sorted.length > 0 ? (sorted[Math.floor(sorted.length / 2)] ?? 0) : 0;
+
+  const aggregateMetrics = {
+    total_items: results.length,
+    passed_items: passedCount,
+    failed_items: failedCount,
+    mean_score: meanScore,
+    median_score: medianScore,
+    pass_rate: results.length > 0 ? passedCount / results.length : 0,
+    score_distribution: {},
+  };
+
+  return (
+    <ResultDetailView
+      results={results}
+      aggregateMetrics={aggregateMetrics}
+      evaluationName={evaluation?.name}
+      evaluationMode={evaluation?.mode}
+    />
+  );
 }
