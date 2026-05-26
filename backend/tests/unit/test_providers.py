@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from app.core.providers import ProviderProfile, ProviderRegistry
-from app.services.evaluation_service import _proxy_env
+from app.services.provider_utils import proxy_env
 
 
 class TestProviderProfile:
@@ -185,26 +185,26 @@ class TestProviderRegistry:
 
 
 class TestProxyEnv:
-    def test_proxy_env_sets_and_restores(self):
-        """_proxy_env sets HTTP_PROXY/HTTPS_PROXY and restores original values."""
+    def testproxy_env_sets_and_restores(self):
+        """proxy_env sets HTTP_PROXY/HTTPS_PROXY and restores original values."""
         # Ensure clean state
         os.environ.pop("HTTP_PROXY", None)
         os.environ.pop("HTTPS_PROXY", None)
 
-        with _proxy_env("http://proxy:3128"):
+        with proxy_env("http://proxy:3128"):
             assert os.environ["HTTP_PROXY"] == "http://proxy:3128"
             assert os.environ["HTTPS_PROXY"] == "http://proxy:3128"
 
         assert "HTTP_PROXY" not in os.environ
         assert "HTTPS_PROXY" not in os.environ
 
-    def test_proxy_env_restores_existing_values(self):
-        """_proxy_env restores pre-existing proxy env vars."""
+    def testproxy_env_restores_existing_values(self):
+        """proxy_env restores pre-existing proxy env vars."""
         os.environ["HTTP_PROXY"] = "http://original:1111"
         os.environ["HTTPS_PROXY"] = "http://original:2222"
 
         try:
-            with _proxy_env("http://new-proxy:3128"):
+            with proxy_env("http://new-proxy:3128"):
                 assert os.environ["HTTP_PROXY"] == "http://new-proxy:3128"
                 assert os.environ["HTTPS_PROXY"] == "http://new-proxy:3128"
 
@@ -214,21 +214,21 @@ class TestProxyEnv:
             os.environ.pop("HTTP_PROXY", None)
             os.environ.pop("HTTPS_PROXY", None)
 
-    def test_proxy_env_noop_when_none(self):
-        """_proxy_env is a no-op when proxy is None."""
+    def testproxy_env_noop_when_none(self):
+        """proxy_env is a no-op when proxy is None."""
         os.environ.pop("HTTP_PROXY", None)
         os.environ.pop("HTTPS_PROXY", None)
 
-        with _proxy_env(None):
+        with proxy_env(None):
             assert "HTTP_PROXY" not in os.environ
             assert "HTTPS_PROXY" not in os.environ
 
-    def test_proxy_env_restores_on_exception(self):
-        """_proxy_env restores env vars even if an exception occurs."""
+    def testproxy_env_restores_on_exception(self):
+        """proxy_env restores env vars even if an exception occurs."""
         os.environ.pop("HTTP_PROXY", None)
         os.environ.pop("HTTPS_PROXY", None)
 
-        with pytest.raises(RuntimeError), _proxy_env("http://proxy:3128"):
+        with pytest.raises(RuntimeError), proxy_env("http://proxy:3128"):
             assert os.environ["HTTP_PROXY"] == "http://proxy:3128"
             raise RuntimeError("test error")
 
