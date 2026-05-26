@@ -21,12 +21,12 @@ function buildWsUrl(sessionId: string): string {
 
   if (apiBase) {
     const wsBase = apiBase.replace(/^http/, 'ws');
-    return `${wsBase}/ws/chat/${sessionId}`;
+    return `${wsBase}/ws/session/${sessionId}`;
   }
 
   // Derive from current window location
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/ws/chat/${sessionId}`;
+  return `${protocol}//${window.location.host}/ws/session/${sessionId}`;
 }
 
 interface SessionStore {
