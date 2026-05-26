@@ -130,6 +130,14 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         if not model_api_key and model_api_base:
             model_api_key = "no-key-needed"
 
+        logger.info(
+            "Model under test resolved: model=%s, api_base=%s, has_key=%s, provider=%s",
+            model_under_test,
+            model_api_base,
+            bool(model_api_key),
+            provider_id or "none",
+        )
+
         # 6. Resolve judge provider (if judge model matches a provider profile)
         judge_model = judge_params.model or settings.litellm_model
         judge_api_key: str | None = None
@@ -145,6 +153,14 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             judge_api_base = judge_provider.api_base
         elif settings.litellm_api_key:
             judge_api_key = settings.litellm_api_key
+
+        logger.info(
+            "Judge resolved: model=%s, api_base=%s, has_key=%s, provider=%s",
+            judge_model,
+            judge_api_base,
+            bool(judge_api_key),
+            judge_provider_id or "none",
+        )
 
         adapter = LiteLLMJudgeAdapter(
             model=judge_model,
