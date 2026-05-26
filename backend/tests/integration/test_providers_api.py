@@ -1,7 +1,5 @@
 """Integration tests for the providers API endpoints."""
 
-import os
-
 import pytest
 
 from app.core.providers import ProviderProfile, provider_registry
@@ -114,10 +112,10 @@ async def test_provider_response_has_api_key_boolean_true(client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_provider_response_has_api_key_boolean_false_when_unset(client):
+async def test_provider_response_has_api_key_boolean_false_when_unset(client, monkeypatch):
     """Response has has_api_key=false when the env var is not set."""
     # Ensure the env var is NOT set
-    os.environ.pop("TEST_API_KEY_FOR_PROVIDERS", None)
+    monkeypatch.delenv("TEST_API_KEY_FOR_PROVIDERS", raising=False)
     response = await client.get("/api/v1/providers/test-model")
     assert response.status_code == 200
     data = response.json()
