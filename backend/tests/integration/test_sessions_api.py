@@ -155,3 +155,53 @@ async def test_send_message_to_ended_session(client):
     # Try to send a message
     response = await client.post(f"/api/v1/sessions/{session_id}/message", json={"content": "should fail"})
     assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_end_already_ended_session(client):
+    """POST /sessions/{id}/end on an already-ended session returns 409."""
+    eval_resp = await client.post("/api/v1/evaluations", json={"name": "Double End Eval", "mode": "agent"})
+    eval_id = eval_resp.json()["id"]
+
+    create_resp = await client.post("/api/v1/sessions", json={"evaluation_id": eval_id})
+    session_id = create_resp.json()["id"]
+
+    # End the session
+    response = await client.post(f"/api/v1/sessions/{session_id}/end")
+    assert response.status_code == 200
+
+    # Try to end again
+    response2 = await client.post(f"/api/v1/sessions/{session_id}/end")
+    assert response2.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_create_session_invalid_mode(client):
+    """POST /sessions with invalid mode returns 422."""
+    eval_resp = await client.post("/api/v1/evaluations", json={"name": "Invalid Mode Eval", "mode": "agent"})
+    eval_id = eval_resp.json()["id"]
+
+    payload = {"evaluation_id": eval_id, "mode": "invalid_mode"}
+    response = await client.post("/api/v1/sessions", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_session_nonexistent_evaluation(client):
+    """POST /sessions with nonexistent evaluation_id returns 404."""
+    payload = {"evaluation_id": "nonexistent-eval-id"}
+    response = await client.post("/api/v1/sessions", json=payload)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_send_empty_message(client):
+    """POST /sessions/{id}/message with empty content returns 422."""
+    eval_resp = await client.post("/api/v1/evaluations", json={"name": "Empty Msg Eval", "mode": "agent"})
+    eval_id = eval_resp.json()["id"]
+
+    create_resp = await client.post("/api/v1/sessions", json={"evaluation_id": eval_id})
+    session_id = create_resp.json()["id"]
+
+    response = await client.post(f"/api/v1/sessions/{session_id}/message", json={"content": ""})
+    assert response.status_code == 422

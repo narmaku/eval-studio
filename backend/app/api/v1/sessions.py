@@ -96,6 +96,9 @@ async def end_session(session_id: str, db: AsyncSession = Depends(get_db)) -> Se
     if not session:
         raise NotFoundException("Session", session_id)
 
+    if session.status != "active":
+        raise ConflictException(f"Session '{session_id}' is '{session.status}' and cannot be ended.")
+
     session.status = "ended"
     session.ended_at = datetime.now(UTC)
 
