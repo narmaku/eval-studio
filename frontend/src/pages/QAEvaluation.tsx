@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { DatasetSelector } from '@/components/evaluation/DatasetSelector';
-import { ModelEndpointConfig } from '@/components/evaluation/ModelEndpointConfig';
+import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { QAResultsTable } from '@/components/evaluation/QAResultsTable';
@@ -115,7 +115,7 @@ export default function QAEvaluation() {
                   onChange={setSelectedDatasetId}
                 />
               </div>
-              <ModelEndpointConfig
+              <ProviderSelector
                 value={modelEndpoint}
                 onChange={setModelEndpoint}
               />
