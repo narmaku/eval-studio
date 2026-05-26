@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import os
-from contextlib import contextmanager
 
 import litellm
 from sqlalchemy import select
@@ -14,37 +12,10 @@ from app.core.providers import provider_registry
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
+from app.services.provider_utils import proxy_env, resolve_model_config
 from app.websocket.progress import broadcast_progress
 
 logger = logging.getLogger(__name__)
-
-
-@contextmanager
-def _proxy_env(proxy: str | None):
-    """Temporarily set HTTP_PROXY/HTTPS_PROXY for LiteLLM calls.
-
-    Note: env vars are process-global. For concurrent evaluations with different
-    proxies, this could race. Acceptable for MVP -- a proper fix would use
-    httpx transport-level proxy config.
-    """
-    if not proxy:
-        yield
-        return
-    old_http = os.environ.get("HTTP_PROXY")
-    old_https = os.environ.get("HTTPS_PROXY")
-    os.environ["HTTP_PROXY"] = proxy
-    os.environ["HTTPS_PROXY"] = proxy
-    try:
-        yield
-    finally:
-        if old_http is None:
-            os.environ.pop("HTTP_PROXY", None)
-        else:
-            os.environ["HTTP_PROXY"] = old_http
-        if old_https is None:
-            os.environ.pop("HTTPS_PROXY", None)
-        else:
-            os.environ["HTTPS_PROXY"] = old_https
 
 
 def _to_judge_params(judge_config: JudgeConfig | None) -> JudgeConfigParams:
@@ -110,38 +81,32 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         config = evaluation.config or {}
         model_endpoint = config.get("model_endpoint", {})
 
-        # Resolve provider profile if specified
-        provider_id = model_endpoint.get("provider_id")
-        provider = provider_registry.get_provider(provider_id) if provider_id else None
+        # Merge top-level "model" key as fallback for backward compatibility
+        resolution_config = dict(model_endpoint)
+        if "litellm_model" not in resolution_config and "model" not in resolution_config:
+            top_level_model = config.get("model")
+            if top_level_model:
+                resolution_config["model"] = top_level_model
 
-        if provider:
-            model_under_test = provider.litellm_model
-            model_api_base = provider.api_base
-            model_api_key = provider.api_key
-            model_proxy = provider.proxy
-        else:
-            model_under_test = model_endpoint.get("litellm_model") or config.get("model") or settings.litellm_model
-            model_api_base = model_endpoint.get("api_base")
-            model_api_key = settings.litellm_api_key
-            model_proxy = None
-
-        if not model_under_test:
+        try:
+            resolved = resolve_model_config(resolution_config)
+        except ValueError:
             logger.error("No model under test configured for evaluation %s", evaluation_id)
             evaluation.status = "failed"
             await db.commit()
             return
 
-        # LiteLLM's openai/ provider requires an api_key even for local servers.
-        # Pass a dummy value when using a custom api_base without a real key.
-        if not model_api_key and model_api_base:
-            model_api_key = "no-key-needed"
+        model_under_test = resolved.model
+        model_api_base = resolved.api_base
+        model_api_key = resolved.api_key
+        model_proxy = resolved.proxy
 
         logger.info(
             "Model under test resolved: model=%s, api_base=%s, has_key=%s, provider=%s",
             model_under_test,
             model_api_base,
             bool(model_api_key),
-            provider_id or "none",
+            model_endpoint.get("provider_id") or "none",
         )
 
         # 6. Resolve judge: provider profile > DB judge config > LITELLM_MODEL env
@@ -203,7 +168,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 litellm_kwargs["api_key"] = model_api_key
             if model_api_base:
                 litellm_kwargs["api_base"] = model_api_base
-            with _proxy_env(model_proxy):
+            with proxy_env(model_proxy):
                 response = await litellm.acompletion(**litellm_kwargs)
             actual_answer = response.choices[0].message.content or ""
 
