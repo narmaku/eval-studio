@@ -121,6 +121,7 @@ export default function AgentEvaluation() {
           provider_id: modelEndpoint.provider_id,
           litellm_model: modelEndpoint.litellm_model,
           api_base: modelEndpoint.api_base,
+          ...(systemPrompt.trim() && { system_prompt: systemPrompt.trim() }),
         },
         judge_config: {
           provider_id: judgeConfig.provider_id,
@@ -143,7 +144,7 @@ export default function AgentEvaluation() {
         details: err instanceof Error ? err.stack : undefined,
       });
     }
-  }, [modelEndpoint, judgeConfig, createAndRunEvaluation, createSession, connectWebSocket]);
+  }, [modelEndpoint, judgeConfig, systemPrompt, createAndRunEvaluation, createSession, connectWebSocket]);
 
   const handleEndSession = useCallback(async () => {
     try {
