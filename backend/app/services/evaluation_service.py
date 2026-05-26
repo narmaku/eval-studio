@@ -125,6 +125,11 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             model_api_key = settings.litellm_api_key
             model_proxy = None
 
+        # LiteLLM's openai/ provider requires an api_key even for local servers.
+        # Pass a dummy value when using a custom api_base without a real key.
+        if not model_api_key and model_api_base:
+            model_api_key = "no-key-needed"
+
         # 6. Resolve judge provider (if judge model matches a provider profile)
         judge_model = judge_params.model or settings.litellm_model
         judge_api_key: str | None = None
