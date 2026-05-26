@@ -28,7 +28,7 @@ jobs:
       - name: Lint backend
         working-directory: backend
         run: |
-          uv sync --quiet
+          uv sync --quiet --all-extras
           uv run ruff check .
           uv run ruff format --check .
 
@@ -62,7 +62,7 @@ jobs:
       - name: Run backend tests
         working-directory: backend
         run: |
-          uv sync --quiet
+          uv sync --quiet --all-extras
           uv run pytest -v --tb=short
 
   test-frontend:

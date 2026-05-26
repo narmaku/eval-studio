@@ -34,8 +34,10 @@ COPY backend/ .
 # Copy frontend build output
 COPY --from=build-frontend /build/dist ./static/
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
+# Create data directory for SQLite and uv cache
+RUN mkdir -p /app/data /app/.cache/uv
+
+ENV UV_CACHE_DIR=/app/.cache/uv
 
 # Run as non-root user (OpenShift compatible)
 RUN chown -R 1001:0 /app && chmod -R g=u /app
