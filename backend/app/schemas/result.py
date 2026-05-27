@@ -16,6 +16,7 @@ class ResultResponse(BaseModel):
     actual_answer: str | None
     judge_reasoning: str | None
     scores_breakdown: dict[str, Any] | None
+    retrieved_chunks: list[dict[str, Any]] | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
