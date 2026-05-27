@@ -9,15 +9,15 @@ import json
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 
-import litellm
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import JudgeConfigParams, Message, ToolCall
-from app.adapters.litellm_judge import LiteLLMJudgeAdapter
+from app.adapters.factory import create_evaluation_adapter
+from app.agent_backends.factory import create_agent_backend
 from app.models.session import Session
-from app.services.provider_utils import proxy_env, resolve_model_config
+from app.services.provider_utils import resolve_model_config
 
 logger = structlog.get_logger()
 
@@ -55,19 +55,20 @@ async def process_user_message(
     if session.status != "active":
         raise ValueError(f"Session '{session_id}' is not active (status: {session.status})")
 
-    # 2. Resolve provider from agent_config
+    # 2. Resolve provider from agent_config and create backend adapter
     agent_config = session.agent_config or {}
-    resolved = resolve_model_config(agent_config)
+    adapter = create_agent_backend(agent_config)
 
     # 3. Build messages array from transcript + new user message
     transcript = list(session.transcript or [])
     messages_for_llm: list[dict] = []
 
-    # Inject system prompt from agent_config if present and not already in transcript
+    # System prompt is passed separately to the adapter
     system_prompt = agent_config.get("system_prompt")
     has_system_in_transcript = any(e.get("role") == "system" for e in transcript)
-    if system_prompt and not has_system_in_transcript:
-        messages_for_llm.append({"role": "system", "content": system_prompt})
+    if has_system_in_transcript:
+        # Already in transcript, don't pass separately
+        system_prompt = None
 
     for entry in transcript:
         msg: dict = {"role": entry["role"], "content": entry.get("content", "")}
@@ -88,62 +89,50 @@ async def process_user_message(
     session.transcript = transcript
     await db.commit()
 
-    # 5. Call LiteLLM with streaming
-    litellm_kwargs: dict = {
-        "model": resolved.model,
-        "messages": messages_for_llm,
-        "stream": True,
-    }
-    if resolved.api_key:
-        litellm_kwargs["api_key"] = resolved.api_key
-    if resolved.api_base:
-        litellm_kwargs["api_base"] = resolved.api_base
-
     logger.info(
         "agent_chat.llm_call",
         session_id=session_id,
-        model=resolved.model,
+        model=adapter.model,
         message_count=len(messages_for_llm),
     )
 
-    # 6. Stream the response
+    # 5. Stream the response via adapter
     full_content = ""
     accumulated_tool_calls: dict[int, dict] = {}  # index -> {id, name, arguments_str}
 
-    with proxy_env(resolved.proxy):
-        stream = await litellm.acompletion(**litellm_kwargs)
-        async for chunk in stream:
-            delta = chunk.choices[0].delta
+    async for chunk in adapter.send_message(messages_for_llm, system_prompt):
+        if chunk.done:
+            break
 
-            # Content tokens
-            if delta.content:
-                full_content += delta.content
-                yield {
-                    "type": "message_chunk",
-                    "data": {"content": delta.content},
-                    "timestamp": _iso_now(),
-                    "sender": "agent",
-                    "session_id": session_id,
+        # Content tokens
+        if chunk.content:
+            full_content += chunk.content
+            yield {
+                "type": "message_chunk",
+                "data": {"content": chunk.content},
+                "timestamp": _iso_now(),
+                "sender": "agent",
+                "session_id": session_id,
+            }
+
+        # Tool call chunks (accumulated across multiple chunks)
+        if chunk.tool_call_chunk:
+            tc = chunk.tool_call_chunk
+            idx = tc["index"]
+            if idx not in accumulated_tool_calls:
+                accumulated_tool_calls[idx] = {
+                    "id": tc.get("id", ""),
+                    "name": tc.get("name", ""),
+                    "arguments": tc.get("arguments", ""),
                 }
-
-            # Tool call chunks (accumulated across multiple chunks)
-            if delta.tool_calls:
-                for tc_chunk in delta.tool_calls:
-                    idx = tc_chunk.index
-                    if idx not in accumulated_tool_calls:
-                        accumulated_tool_calls[idx] = {
-                            "id": tc_chunk.id or "",
-                            "name": tc_chunk.function.name or "",
-                            "arguments": tc_chunk.function.arguments or "",
-                        }
-                    else:
-                        # Accumulate partial data
-                        if tc_chunk.id:
-                            accumulated_tool_calls[idx]["id"] = tc_chunk.id
-                        if tc_chunk.function.name:
-                            accumulated_tool_calls[idx]["name"] += tc_chunk.function.name
-                        if tc_chunk.function.arguments:
-                            accumulated_tool_calls[idx]["arguments"] += tc_chunk.function.arguments
+            else:
+                # Accumulate partial data
+                if tc.get("id"):
+                    accumulated_tool_calls[idx]["id"] = tc["id"]
+                if tc.get("name"):
+                    accumulated_tool_calls[idx]["name"] += tc["name"]
+                if tc.get("arguments"):
+                    accumulated_tool_calls[idx]["arguments"] += tc["arguments"]
 
     # 7. Yield tool_call messages
     tool_calls_list = []
@@ -245,7 +234,7 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
                 aggregation=judge_config.get("aggregation"),
             )
 
-            adapter = LiteLLMJudgeAdapter(
+            adapter = create_evaluation_adapter(
                 model=judge_resolved.model,
                 api_key=judge_resolved.api_key,
                 api_base=judge_resolved.api_base,
