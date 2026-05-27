@@ -22,17 +22,23 @@ export default function SessionDetail() {
 
   useEffect(() => {
     if (!sessionId) return;
-    setIsLoading(true);
-    api
-      .getSession(sessionId)
-      .then((s) => {
-        setSession(s);
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Failed to load session');
-        setIsLoading(false);
-      });
+    let cancelled = false;
+    const fetchSession = async () => {
+      try {
+        const s = await api.getSession(sessionId);
+        if (!cancelled) {
+          setSession(s);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load session');
+          setIsLoading(false);
+        }
+      }
+    };
+    void fetchSession();
+    return () => { cancelled = true; };
   }, [sessionId]);
 
   const messages: Message[] = (session?.transcript as Record<string, unknown>[] | undefined ?? [])
