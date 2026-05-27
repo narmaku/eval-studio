@@ -1,6 +1,7 @@
 import math
 from datetime import UTC, datetime
 
+import structlog
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,8 @@ from app.core.exceptions import NotFoundException
 from app.models.evaluation import JudgeConfig
 from app.schemas.common import PaginatedResponse
 from app.schemas.judge import JudgeConfigCreate, JudgeConfigResponse, JudgeConfigUpdate
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/judges", tags=["judges"])
 
@@ -33,6 +36,7 @@ async def create_judge(
     db.add(judge_config)
     await db.commit()
     await db.refresh(judge_config)
+    logger.info("judge.created", id=judge_config.id, name=judge_config.name)
     return JudgeConfigResponse.model_validate(judge_config)
 
 
@@ -127,4 +131,5 @@ async def update_judge(
 
     await db.commit()
     await db.refresh(judge_config)
+    logger.info("judge.updated", id=judge_id)
     return JudgeConfigResponse.model_validate(judge_config)
