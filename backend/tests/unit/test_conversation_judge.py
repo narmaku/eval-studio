@@ -263,7 +263,7 @@ async def test_supports_mode_agent():
     adapter = _make_adapter()
     assert adapter.supports_mode("agent") is True
     assert adapter.supports_mode("qa") is True
-    assert adapter.supports_mode("rag") is False
+    assert adapter.supports_mode("rag") is True
 
 
 @pytest.mark.asyncio
