@@ -8,6 +8,7 @@ import os
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+from app.adapters.base import JudgeConfigParams
 from app.core.config import settings
 from app.core.providers import ProviderRegistry, provider_registry
 
@@ -82,6 +83,45 @@ def resolve_model_config(
         api_key = "no-key-needed"
 
     return ResolvedModel(model=model, api_key=api_key, api_base=api_base, proxy=proxy)
+
+
+def resolve_judge_config(
+    config: dict,
+    judge_params: JudgeConfigParams,
+) -> ResolvedModel:
+    """Resolve judge model config from evaluation config.
+
+    Resolution order: provider profile > JudgeConfig model > settings fallback.
+
+    Args:
+        config: The evaluation config dict (may contain ``judge_config.provider_id``).
+        judge_params: JudgeConfigParams from the ORM JudgeConfig.
+
+    Returns:
+        ResolvedModel with the resolved judge model values.
+
+    Raises:
+        ValueError: If no judge model can be resolved from any source.
+    """
+    judge_ref = config.get("judge_config", {})
+    judge_provider_id = judge_ref.get("provider_id") if isinstance(judge_ref, dict) else None
+
+    if judge_provider_id:
+        return resolve_model_config({"provider_id": judge_provider_id})
+
+    if judge_params.model:
+        return ResolvedModel(
+            model=judge_params.model,
+            api_key=settings.litellm_api_key if settings.litellm_api_key else None,
+        )
+
+    if settings.litellm_model:
+        return ResolvedModel(
+            model=settings.litellm_model,
+            api_key=settings.litellm_api_key if settings.litellm_api_key else None,
+        )
+
+    raise ValueError("No judge model configured")
 
 
 @contextmanager

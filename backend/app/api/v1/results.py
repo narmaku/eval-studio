@@ -1,5 +1,6 @@
 import math
 
+import structlog
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,8 @@ from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.schemas.common import PaginatedResponse
 from app.schemas.result import ComparisonResponse, EvaluationComparisonItem, ResultResponse
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/results", tags=["results"])
 
@@ -36,6 +39,7 @@ async def list_results(
     result = await db.execute(query)
     results = result.scalars().all()
 
+    logger.info("results.listed", total=total, page=page, evaluation_id=evaluation_id)
     return PaginatedResponse[ResultResponse](
         items=[ResultResponse.model_validate(r) for r in results],
         total=total,
@@ -80,6 +84,7 @@ async def compare_results(
             )
         )
 
+    logger.info("results.compared", evaluation_ids=evaluation_ids)
     return ComparisonResponse(evaluations=comparisons)
 
 
@@ -93,4 +98,5 @@ async def get_result(
     result_obj = result.scalar_one_or_none()
     if not result_obj:
         raise NotFoundException("Result", result_id)
+    logger.info("result.retrieved", id=result_id)
     return ResultResponse.model_validate(result_obj)

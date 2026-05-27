@@ -1,6 +1,7 @@
 import asyncio
 import math
 
+import structlog
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,8 @@ from app.schemas.evaluation import (
 )
 from app.services.evaluation_service import run_qa_evaluation
 from app.services.rag_evaluation_service import run_rag_evaluation
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 
@@ -48,6 +51,7 @@ async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depend
     db.add(evaluation)
     await db.commit()
     await db.refresh(evaluation)
+    logger.info("evaluation.created", id=evaluation.id, name=evaluation.name, mode=payload.mode.value)
     return EvaluationResponse.model_validate(evaluation)
 
 
@@ -116,6 +120,7 @@ async def delete_evaluation(evaluation_id: str, db: AsyncSession = Depends(get_d
 
     await db.delete(evaluation)
     await db.commit()
+    logger.info("evaluation.deleted", id=evaluation_id)
     return Response(status_code=204)
 
 
@@ -156,6 +161,7 @@ async def run_evaluation(
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
 
+    logger.info("evaluation.run_started", id=evaluation_id, mode=evaluation.mode)
     return EvaluationResponse.model_validate(evaluation)
 
 
@@ -198,4 +204,5 @@ async def rerun_evaluation(
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
 
+    logger.info("evaluation.rerun_started", id=evaluation_id, mode=evaluation.mode)
     return EvaluationResponse.model_validate(evaluation)
