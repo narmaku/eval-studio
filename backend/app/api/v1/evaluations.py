@@ -18,6 +18,7 @@ from app.schemas.evaluation import (
     EvaluationStatus,
 )
 from app.services.evaluation_service import run_qa_evaluation
+from app.services.rag_evaluation_service import run_rag_evaluation
 
 router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 
@@ -135,7 +136,7 @@ async def run_evaluation(
             "Only 'pending' or 'failed' evaluations can be run."
         )
 
-    if evaluation.mode != "qa":
+    if evaluation.mode not in ("qa", "rag"):
         raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
 
     # Reset status to pending before launching background task
@@ -146,7 +147,10 @@ async def run_evaluation(
     # Launch background task with its own database session
     async def _run_in_background() -> None:
         async with async_session_factory() as bg_session:
-            await run_qa_evaluation(evaluation_id, bg_session)
+            if evaluation.mode == "rag":
+                await run_rag_evaluation(evaluation_id, bg_session)
+            else:
+                await run_qa_evaluation(evaluation_id, bg_session)
 
     task = asyncio.create_task(_run_in_background())
     _background_tasks.add(task)
@@ -169,7 +173,7 @@ async def rerun_evaluation(
     if evaluation.status == "running":
         raise ConflictException("Evaluation is currently running.")
 
-    if evaluation.mode != "qa":
+    if evaluation.mode not in ("qa", "rag"):
         raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
 
     # Delete existing results for this evaluation
@@ -185,7 +189,10 @@ async def rerun_evaluation(
     # Launch background task
     async def _run_in_background() -> None:
         async with async_session_factory() as bg_session:
-            await run_qa_evaluation(evaluation_id, bg_session)
+            if evaluation.mode == "rag":
+                await run_rag_evaluation(evaluation_id, bg_session)
+            else:
+                await run_qa_evaluation(evaluation_id, bg_session)
 
     task = asyncio.create_task(_run_in_background())
     _background_tasks.add(task)

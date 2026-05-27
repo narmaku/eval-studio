@@ -15,6 +15,7 @@ class Result(Base):
     actual_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
     judge_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     scores_breakdown: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    retrieved_chunks: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     evaluation: Mapped["Evaluation"] = relationship("Evaluation", back_populates="results")  # noqa: F821
 
