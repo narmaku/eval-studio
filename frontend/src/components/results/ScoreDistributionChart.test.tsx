@@ -23,6 +23,7 @@ const makeResult = (score: number): Result => ({
   actual_answer: 'test',
   judge_reasoning: 'test',
   scores_breakdown: null,
+  retrieved_chunks: null,
   created_at: '2026-01-01T00:00:00Z',
 });
 

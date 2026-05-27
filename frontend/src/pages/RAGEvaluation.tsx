@@ -1,7 +1,130 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useCallback } from 'react';
+import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { DatasetSelector } from '@/components/evaluation/DatasetSelector';
+import { RAGEndpointConfig } from '@/components/evaluation/RAGEndpointConfig';
+import type { RAGEndpointSettings } from '@/types';
+import { RAGMetricsSelector, ALL_RAG_METRICS } from '@/components/evaluation/RAGMetricsSelector';
+import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
+import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
+import { RAGResultsTable } from '@/components/evaluation/RAGResultsTable';
+import { RAGResultDetailDrawer } from '@/components/evaluation/RAGResultDetailDrawer';
+import { useEvaluationStore } from '@/stores/evaluationStore';
+import { useResultStore } from '@/stores/resultStore';
+import { useNotificationStore } from '@/stores/notificationStore';
+import type {
+  JudgeReference,
+  Result,
+  CreateEvaluationRequest,
+} from '@/types';
+
+type PagePhase = 'configure' | 'running' | 'complete';
 
 export default function RAGEvaluation() {
+  const [phase, setPhase] = useState<PagePhase>('configure');
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string>();
+  const [ragEndpoint, setRagEndpoint] = useState<RAGEndpointSettings>();
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(ALL_RAG_METRICS);
+  const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
+  const [selectedResult, setSelectedResult] = useState<Result | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading } =
+    useEvaluationStore();
+  const { results, fetchResults } = useResultStore();
+
+  const isConfigValid = Boolean(
+    selectedDatasetId &&
+      ragEndpoint?.endpoint_url &&
+      judgeConfig &&
+      selectedMetrics.length > 0,
+  );
+
+  const handleStart = async () => {
+    if (!selectedDatasetId || !ragEndpoint?.endpoint_url || !judgeConfig) return;
+
+    const request: CreateEvaluationRequest = {
+      name: `RAG Eval - ${ragEndpoint.endpoint_url}`,
+      mode: 'rag',
+      dataset_id: selectedDatasetId,
+      config: {
+        model_endpoint: {
+          name: 'RAG Endpoint',
+          litellm_model: 'rag',
+          api_base: ragEndpoint.endpoint_url,
+        },
+        judge_config: judgeConfig,
+        rag_endpoint: ragEndpoint,
+        rag_metrics: selectedMetrics,
+      },
+    };
+
+    try {
+      await createAndRunEvaluation(request);
+      toast.success('RAG evaluation started');
+      setPhase('running');
+    } catch (err) {
+      toast.error('Failed to start evaluation');
+      useNotificationStore.getState().addNotification({
+        type: 'error',
+        title: 'Failed to Start RAG Evaluation',
+        message: err instanceof Error ? err.message : 'An unknown error occurred',
+        details: err instanceof Error ? err.stack : undefined,
+      });
+    }
+  };
+
+  const handleComplete = useCallback(() => {
+    const evaluation = useEvaluationStore.getState().currentEvaluation;
+    const addNotification = useNotificationStore.getState().addNotification;
+
+    if (evaluation?.status === 'completed') {
+      toast.success('RAG evaluation completed');
+      addNotification({
+        type: 'success',
+        title: 'RAG Evaluation Completed',
+        message: `"${evaluation.name}" finished successfully`,
+        evaluationId: evaluation.id,
+      });
+      void fetchResults(evaluation.id);
+      setPhase('complete');
+    } else if (evaluation?.status === 'failed') {
+      toast.error(`Evaluation failed: ${evaluation.error ?? 'Unknown error'}`);
+      addNotification({
+        type: 'error',
+        title: 'RAG Evaluation Failed',
+        message: evaluation.error ?? 'Unknown error',
+        evaluationId: evaluation.id,
+      });
+      setPhase('configure');
+    } else if (evaluation?.status === 'cancelled') {
+      toast('Evaluation was cancelled');
+      addNotification({
+        type: 'warning',
+        title: 'RAG Evaluation Cancelled',
+        message: `"${evaluation.name}" was cancelled`,
+        evaluationId: evaluation.id,
+      });
+      setPhase('configure');
+    }
+  }, [fetchResults]);
+
+  const handleRowClick = (result: Result) => {
+    setSelectedResult(result);
+    setDrawerOpen(true);
+  };
+
+  const handleNewEvaluation = () => {
+    setPhase('configure');
+    setSelectedDatasetId(undefined);
+    setRagEndpoint(undefined);
+    setSelectedMetrics(ALL_RAG_METRICS);
+    setJudgeConfig(undefined);
+    setSelectedResult(null);
+    setDrawerOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -12,38 +135,84 @@ export default function RAGEvaluation() {
         </p>
       </div>
       <Separator />
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Question + Expected Answer</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">
-              Question and expected answer will appear here.
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Retrieved Chunks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">
-              Retrieved document chunks will appear here.
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Generated Answer + Metrics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">
-              Generated answer and scoring metrics will appear here.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+
+      {/* Configure Phase */}
+      {phase === 'configure' && (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h2 className="text-sm font-medium">Dataset</h2>
+                <DatasetSelector
+                  value={selectedDatasetId}
+                  onChange={setSelectedDatasetId}
+                />
+              </div>
+              <RAGEndpointConfig
+                value={ragEndpoint}
+                onChange={setRagEndpoint}
+              />
+            </div>
+            <div className="space-y-4">
+              <RAGMetricsSelector
+                value={selectedMetrics}
+                onChange={setSelectedMetrics}
+              />
+              <JudgeConfigPanel
+                value={judgeConfig}
+                onChange={setJudgeConfig}
+              />
+            </div>
+          </div>
+          <Button
+            className="w-full"
+            disabled={!isConfigValid || isLoading}
+            onClick={() => void handleStart()}
+          >
+            {isLoading ? 'Starting...' : 'Start RAG Evaluation'}
+          </Button>
+        </>
+      )}
+
+      {/* Running Phase */}
+      {phase === 'running' && currentEvaluation && (
+        <>
+          <EvaluationProgress
+            evaluationId={currentEvaluation.id}
+            onComplete={handleComplete}
+          />
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCurrentEvaluation(null);
+              setPhase('configure');
+              toast('Evaluation cancelled');
+            }}
+          >
+            Cancel
+          </Button>
+        </>
+      )}
+
+      {/* Complete Phase */}
+      {phase === 'complete' && (
+        <>
+          <RAGResultsTable
+            results={results}
+            onRowClick={handleRowClick}
+          />
+
+          <RAGResultDetailDrawer
+            result={selectedResult}
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+          />
+
+          <Button variant="outline" onClick={handleNewEvaluation}>
+            New Evaluation
+          </Button>
+        </>
+      )}
     </div>
   );
 }

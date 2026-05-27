@@ -1,5 +1,11 @@
 // Types aligned with backend ResultResponse schema
 
+export interface RetrievedChunk {
+  content: string;
+  source?: string;
+  relevance_score?: number;
+}
+
 export interface Result {
   id: string;
   evaluation_id: string;
@@ -10,6 +16,7 @@ export interface Result {
   actual_answer: string | null;
   judge_reasoning: string | null;
   scores_breakdown: Record<string, number> | null;
+  retrieved_chunks: RetrievedChunk[] | null;
   created_at: string;
 }
 
