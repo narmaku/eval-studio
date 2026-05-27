@@ -7,16 +7,15 @@ export type EvaluationStatus = 'pending' | 'running' | 'completed' | 'failed' | 
 export interface Evaluation {
   id: string;
   name: string;
-  description: string;
   mode: EvaluationMode;
   status: EvaluationStatus;
   dataset_id: string | null;
-  judge_id: string | null;
+  environment_id: string | null;
+  judge_config_id: string | null;
   config: EvaluationConfig;
+  result_count: number | null;
   created_at: string;
   updated_at: string;
-  completed_at: string | null;
-  error: string | null;
 }
 
 export interface RAGEndpointSettings {
@@ -81,9 +80,8 @@ export interface JudgeReference {
 
 export interface CreateEvaluationRequest {
   name: string;
-  description?: string;
   mode: EvaluationMode;
   dataset_id?: string;
-  judge_id?: string;
+  judge_config_id?: string;
   config: EvaluationConfig;
 }

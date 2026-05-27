@@ -10,6 +10,14 @@ class SessionMode(StrEnum):
     SIMULATED = "simulated"
 
 
+class SessionStatus(StrEnum):
+    ACTIVE = "active"
+    ENDED = "ended"
+    SCORING = "scoring"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 class SessionCreate(BaseModel):
     """Schema for creating a session."""
 
@@ -38,7 +46,7 @@ class SessionResponse(BaseModel):
     id: str
     evaluation_id: str | None
     name: str | None
-    status: str
+    status: SessionStatus
     mode: SessionMode
     transcript: list[dict[str, Any]] | None
     agent_config: dict[str, Any] | None

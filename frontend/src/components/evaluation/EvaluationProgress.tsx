@@ -67,9 +67,6 @@ export function EvaluationProgress({ evaluationId, onComplete }: EvaluationProgr
         {status === 'failed' && (
           <div className="space-y-1">
             <p className="text-sm text-destructive">Evaluation failed.</p>
-            {currentEvaluation?.error && (
-              <p className="text-xs text-muted-foreground">{currentEvaluation.error}</p>
-            )}
           </div>
         )}
       </CardContent>
