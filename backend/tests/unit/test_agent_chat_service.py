@@ -92,7 +92,7 @@ async def test_process_user_message_streams_content(db_session: AsyncSession, se
 
     mock_stream = _make_streaming_chunks("Hello!")
 
-    with patch("app.services.agent_chat_service.litellm.acompletion", new_callable=AsyncMock) as mock_acomp:
+    with patch("app.agent_backends.litellm_agent.litellm.acompletion", new_callable=AsyncMock) as mock_acomp:
         mock_acomp.return_value = mock_stream
 
         messages = []
@@ -129,7 +129,7 @@ async def test_process_user_message_with_tool_calls(db_session: AsyncSession, se
     ]
     mock_stream = _make_streaming_chunks("Let me check.", tool_calls=tool_calls)
 
-    with patch("app.services.agent_chat_service.litellm.acompletion", new_callable=AsyncMock) as mock_acomp:
+    with patch("app.agent_backends.litellm_agent.litellm.acompletion", new_callable=AsyncMock) as mock_acomp:
         mock_acomp.return_value = mock_stream
 
         messages = []
@@ -210,7 +210,7 @@ async def test_end_and_score_session_with_judge(db_session: AsyncSession, sessio
     mock_score.breakdown = {"helpfulness": 0.9}
 
     with patch(
-        "app.services.agent_chat_service.LiteLLMJudgeAdapter.evaluate_conversation",
+        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
         new_callable=AsyncMock,
         return_value=mock_score,
     ):
@@ -238,7 +238,7 @@ async def test_end_and_score_session_judge_error(db_session: AsyncSession, sessi
     await db_session.commit()
 
     with patch(
-        "app.services.agent_chat_service.LiteLLMJudgeAdapter.evaluate_conversation",
+        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
         new_callable=AsyncMock,
         side_effect=RuntimeError("Judge API down"),
     ):
