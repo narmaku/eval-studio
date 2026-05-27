@@ -34,25 +34,43 @@ export default function RAGEvaluation() {
     useEvaluationStore();
   const { results, fetchResults } = useResultStore();
 
+  const isRagEndpointValid = (() => {
+    if (!ragEndpoint) return false;
+    if (ragEndpoint.backend_type === 'pgvector') {
+      return Boolean(ragEndpoint.connection_string && ragEndpoint.table_name);
+    }
+    return Boolean(ragEndpoint.endpoint_url);
+  })();
+
   const isConfigValid = Boolean(
     selectedDatasetId &&
-      ragEndpoint?.endpoint_url &&
+      isRagEndpointValid &&
       judgeConfig &&
       selectedMetrics.length > 0,
   );
 
   const handleStart = async () => {
-    if (!selectedDatasetId || !ragEndpoint?.endpoint_url || !judgeConfig) return;
+    if (!selectedDatasetId || !ragEndpoint || !judgeConfig || !isRagEndpointValid) return;
+
+    const evalName =
+      ragEndpoint.backend_type === 'pgvector'
+        ? `RAG Eval - pgvector:${ragEndpoint.table_name ?? ''}`
+        : `RAG Eval - ${ragEndpoint.endpoint_url ?? ''}`;
+
+    const modelApiBase =
+      ragEndpoint.backend_type === 'pgvector'
+        ? undefined
+        : ragEndpoint.endpoint_url;
 
     const request: CreateEvaluationRequest = {
-      name: `RAG Eval - ${ragEndpoint.endpoint_url}`,
+      name: evalName,
       mode: 'rag',
       dataset_id: selectedDatasetId,
       config: {
         model_endpoint: {
           name: 'RAG Endpoint',
           litellm_model: 'rag',
-          api_base: ragEndpoint.endpoint_url,
+          api_base: modelApiBase,
         },
         judge_config: judgeConfig,
         rag_endpoint: ragEndpoint,

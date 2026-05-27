@@ -20,11 +20,21 @@ export interface Evaluation {
 }
 
 export interface RAGEndpointSettings {
-  endpoint_url: string;
+  backend_type: 'http' | 'pgvector';
+  // HTTP fields
+  endpoint_url?: string;
   auth_header?: string;
-  query_field: string;
-  answer_field: string;
-  chunks_field: string;
+  query_field?: string;
+  answer_field?: string;
+  chunks_field?: string;
+  // pgvector fields
+  connection_string?: string;
+  table_name?: string;
+  embedding_column?: string;
+  content_column?: string;
+  top_k?: number;
+  generator_provider_id?: string;
+  embedding_model?: string;
 }
 
 export interface EvaluationConfig {
