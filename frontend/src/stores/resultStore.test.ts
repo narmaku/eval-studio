@@ -60,6 +60,7 @@ describe('resultStore', () => {
           actual_answer: 'test answer',
           judge_reasoning: 'good answer',
           scores_breakdown: null,
+          retrieved_chunks: null,
           created_at: '2026-01-01T00:00:00Z',
         },
       ];
@@ -119,6 +120,7 @@ describe('resultStore', () => {
         actual_answer: 'test answer',
         judge_reasoning: 'good answer',
         scores_breakdown: null,
+        retrieved_chunks: null,
         created_at: '2026-01-01T00:00:00Z',
       };
       mockedApi.getResult.mockResolvedValue(mockResult);

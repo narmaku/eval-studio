@@ -15,6 +15,7 @@ const mockResults: Result[] = [
     actual_answer: 'Use systemctl restart sshd',
     judge_reasoning: 'The answer correctly describes the systemctl command.',
     scores_breakdown: { accuracy: 0.9 },
+    retrieved_chunks: null,
     created_at: '2026-01-01T00:00:00Z',
   },
   {
@@ -27,6 +28,7 @@ const mockResults: Result[] = [
     actual_answer: 'Just restart it',
     judge_reasoning: 'The answer is incomplete and misses key steps.',
     scores_breakdown: { accuracy: 0.3 },
+    retrieved_chunks: null,
     created_at: '2026-01-01T00:00:00Z',
   },
   {
@@ -39,6 +41,7 @@ const mockResults: Result[] = [
     actual_answer: 'Run firewall-cmd --add-port=443/tcp --permanent',
     judge_reasoning: 'Adequate coverage of firewall rules.',
     scores_breakdown: { accuracy: 0.75 },
+    retrieved_chunks: null,
     created_at: '2026-01-01T00:00:00Z',
   },
   {
@@ -51,6 +54,7 @@ const mockResults: Result[] = [
     actual_answer: 'Change the port in sshd_config',
     judge_reasoning: 'Missing SELinux context adjustment.',
     scores_breakdown: { accuracy: 0.5 },
+    retrieved_chunks: null,
     created_at: '2026-01-01T00:00:00Z',
   },
   {
@@ -63,6 +67,7 @@ const mockResults: Result[] = [
     actual_answer: 'Use pvcreate, vgcreate, and lvcreate in sequence.',
     judge_reasoning: 'Excellent explanation of LVM concepts.',
     scores_breakdown: { accuracy: 0.95 },
+    retrieved_chunks: null,
     created_at: '2026-01-01T00:00:00Z',
   },
 ];

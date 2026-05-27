@@ -19,6 +19,14 @@ export interface Evaluation {
   error: string | null;
 }
 
+export interface RAGEndpointSettings {
+  endpoint_url: string;
+  auth_header?: string;
+  query_field: string;
+  answer_field: string;
+  chunks_field: string;
+}
+
 export interface EvaluationConfig {
   model_endpoint: ModelEndpoint;
   judge_config: JudgeReference;
@@ -26,6 +34,8 @@ export interface EvaluationConfig {
   scenario_id?: string;
   environment_id?: string;
   contestants?: ModelEndpoint[]; // arena mode
+  rag_endpoint?: RAGEndpointSettings; // rag mode
+  rag_metrics?: string[]; // rag mode
 }
 
 export interface ModelEndpoint {
