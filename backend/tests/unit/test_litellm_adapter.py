@@ -133,4 +133,4 @@ async def test_litellm_adapter_supports_mode():
     adapter = LiteLLMJudgeAdapter()
     assert adapter.supports_mode("qa") is True
     assert adapter.supports_mode("agent") is True
-    assert adapter.supports_mode("rag") is False
+    assert adapter.supports_mode("rag") is True
