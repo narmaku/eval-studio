@@ -1,15 +1,14 @@
 """RAG evaluation service.
 
-Orchestrates end-to-end RAG evaluation runs: calls a configurable RAG endpoint
-via httpx, extracts answer + context chunks, and scores them with the LiteLLM
-judge adapter.
+Orchestrates end-to-end RAG evaluation runs: instantiates a pluggable RAG
+backend adapter (HTTP, pgvector, etc.) via the adapter factory, retrieves
+answer + context chunks, and scores them with the LiteLLM judge adapter.
 """
 
 import asyncio
 import logging
 from typing import Any
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +19,7 @@ from app.core.providers import provider_registry
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
+from app.rag_backends.factory import create_rag_adapter
 from app.websocket.progress import broadcast_progress
 
 logger = logging.getLogger(__name__)
@@ -39,26 +39,33 @@ def _to_judge_params(judge_config: JudgeConfig | None) -> JudgeConfigParams:
     )
 
 
-def _normalize_chunks(raw_chunks: list[Any]) -> list[dict[str, Any]]:
-    """Normalize chunks to a list of dicts, each containing at least a 'content' key.
+def _build_rag_adapter_config(rag_endpoint: dict[str, Any]) -> dict[str, Any]:
+    """Build a config dict suitable for create_rag_adapter from the evaluation's rag_endpoint."""
+    # Default to HTTP backend if no explicit backend_type is set
+    adapter_config: dict[str, Any] = {
+        "backend_type": rag_endpoint.get("backend_type", "http"),
+    }
 
-    Handles:
-    - list of dicts (pass through, ensure 'content' key exists)
-    - list of strings (wrap each in {"content": str})
-    """
-    normalized: list[dict[str, Any]] = []
-    for chunk in raw_chunks:
-        if isinstance(chunk, dict):
-            if "content" not in chunk:
-                # Try common alternatives
-                text = chunk.get("text") or chunk.get("page_content") or str(chunk)
-                chunk = {**chunk, "content": text}
-            normalized.append(chunk)
-        elif isinstance(chunk, str):
-            normalized.append({"content": chunk})
-        else:
-            normalized.append({"content": str(chunk)})
-    return normalized
+    # Pass through all keys from rag_endpoint to the adapter config
+    for key in (
+        "url",
+        "auth_header",
+        "query_field",
+        "answer_field",
+        "chunks_field",
+        "connection_string",
+        "table_name",
+        "embedding_column",
+        "content_column",
+        "top_k",
+        "generator_model",
+        "generator_api_key",
+        "generator_api_base",
+    ):
+        if key in rag_endpoint:
+            adapter_config[key] = rag_endpoint[key]
+
+    return adapter_config
 
 
 async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
@@ -106,20 +113,22 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         judge_params = _to_judge_params(judge_config)
 
-        # 5. Validate RAG endpoint config
+        # 5. Validate RAG endpoint config and create adapter
         config = evaluation.config or {}
         rag_endpoint = config.get("rag_endpoint", {})
         rag_url = rag_endpoint.get("url")
-        if not rag_url:
+
+        # For HTTP backend (default), URL is required
+        backend_type = rag_endpoint.get("backend_type", "http")
+        if backend_type == "http" and not rag_url:
             logger.error("No RAG endpoint URL configured for evaluation %s", evaluation_id)
             evaluation.status = "failed"
             await db.commit()
             return
 
-        rag_query_field = rag_endpoint.get("query_field", "query")
-        rag_answer_field = rag_endpoint.get("answer_field", "answer")
-        rag_chunks_field = rag_endpoint.get("chunks_field", "source_documents")
-        rag_auth_header = rag_endpoint.get("auth_header")
+        rag_adapter_config = _build_rag_adapter_config(rag_endpoint)
+        rag_adapter = create_rag_adapter(rag_adapter_config)
+
         rag_metrics = rag_endpoint.get("metrics", ["faithfulness", "relevancy"])
 
         # 6. Resolve judge model (same pattern as QA service)
@@ -169,23 +178,15 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         completed_counter = 0
         counter_lock = asyncio.Lock()
 
-        async def process_item(idx: int, item: DatasetItem, client: httpx.AsyncClient) -> Result:
+        async def process_item(idx: int, item: DatasetItem) -> Result:
             nonlocal completed_counter
 
-            # Step A: Call the RAG endpoint
-            headers: dict[str, str] = {}
-            if rag_auth_header:
-                headers.update(rag_auth_header)
+            # Step A: Call the RAG backend via adapter
+            rag_response = await rag_adapter.retrieve_and_generate(item.question)
 
-            request_body = {rag_query_field: item.question}
-            response = await client.post(rag_url, json=request_body, headers=headers)
-            response.raise_for_status()
-            response_json = response.json()
-
-            # Step B: Extract answer and chunks
-            actual_answer = response_json.get(rag_answer_field, "")
-            raw_chunks = response_json.get(rag_chunks_field, [])
-            chunks = _normalize_chunks(raw_chunks)
+            # Step B: Extract answer and chunks from adapter response
+            actual_answer = rag_response.answer
+            chunks = rag_response.chunks
             chunk_contents = [c.get("content", "") for c in chunks]
 
             # Step C: Score with adapter (catch NotImplementedError gracefully)
@@ -245,15 +246,14 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         max_concurrency = config.get("max_concurrency", 10)
         semaphore = asyncio.Semaphore(max_concurrency)
 
-        async def bounded_process(idx: int, item: DatasetItem, client: httpx.AsyncClient) -> Result | Exception:
+        async def bounded_process(idx: int, item: DatasetItem) -> Result | Exception:
             async with semaphore:
-                return await process_item(idx, item, client)
+                return await process_item(idx, item)
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            results = await asyncio.gather(
-                *[bounded_process(i, item, client) for i, item in enumerate(items)],
-                return_exceptions=True,
-            )
+        results = await asyncio.gather(
+            *[bounded_process(i, item) for i, item in enumerate(items)],
+            return_exceptions=True,
+        )
 
         # 8. Collect results into the session sequentially
         error_count = 0

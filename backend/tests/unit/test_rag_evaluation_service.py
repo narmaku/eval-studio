@@ -1,6 +1,5 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import httpx
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +8,7 @@ from app.adapters.base import Score
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation
 from app.models.result import Result
+from app.rag_backends.base import RAGResponse
 from app.services.rag_evaluation_service import run_rag_evaluation
 
 
@@ -54,30 +54,25 @@ async def rag_evaluation_with_dataset(db_session: AsyncSession):
     return evaluation, dataset, items
 
 
-def _mock_rag_response(answer: str = "Red Hat Enterprise Linux", chunks: list | None = None):
-    """Create a mock httpx response for a RAG endpoint."""
+def _mock_rag_adapter(answer: str = "Red Hat Enterprise Linux", chunks: list | None = None):
+    """Create a mock RAG adapter that returns a RAGResponse."""
     if chunks is None:
         chunks = [
             {"content": "RHEL is Red Hat Enterprise Linux.", "source": "docs/rhel.md"},
             {"content": "It is an enterprise-grade Linux distribution.", "source": "docs/overview.md"},
         ]
-    response = MagicMock(spec=httpx.Response)
-    response.status_code = 200
-    response.raise_for_status = MagicMock()
-    response.json.return_value = {
-        "answer": answer,
-        "source_documents": chunks,
-    }
-    return response
+
+    adapter = AsyncMock()
+    adapter.retrieve_and_generate = AsyncMock(return_value=RAGResponse(answer=answer, chunks=chunks))
+    return adapter
 
 
 @pytest.mark.asyncio
 async def test_run_rag_evaluation_success(db_session: AsyncSession, rag_evaluation_with_dataset):
-    """Full RAG evaluation flow with mocked RAG endpoint and judge."""
+    """Full RAG evaluation flow with mocked RAG adapter and judge."""
     evaluation, _dataset, _items = rag_evaluation_with_dataset
 
-    mock_rag_response = _mock_rag_response()
-    mock_post = AsyncMock(return_value=mock_rag_response)
+    mock_adapter = _mock_rag_adapter()
 
     mock_evaluate_rag = AsyncMock(
         return_value={
@@ -87,16 +82,10 @@ async def test_run_rag_evaluation_success(db_session: AsyncSession, rag_evaluati
     )
 
     with (
-        patch("app.services.rag_evaluation_service.httpx.AsyncClient") as mock_client_cls,
+        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
         patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
-        mock_client = AsyncMock()
-        mock_client.post = mock_post
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
-
         await run_rag_evaluation(evaluation.id, db_session)
 
     # Verify status is completed
@@ -123,21 +112,16 @@ async def test_run_rag_evaluation_success(db_session: AsyncSession, rag_evaluati
 
 @pytest.mark.asyncio
 async def test_rag_endpoint_error(db_session: AsyncSession, rag_evaluation_with_dataset):
-    """httpx error should be handled and evaluation marked failed."""
+    """RAG adapter error should be handled and evaluation marked failed."""
     evaluation, _dataset, _items = rag_evaluation_with_dataset
 
-    mock_post = AsyncMock(side_effect=httpx.HTTPStatusError("Server Error", request=MagicMock(), response=MagicMock()))
+    mock_adapter = AsyncMock()
+    mock_adapter.retrieve_and_generate = AsyncMock(side_effect=Exception("Connection refused"))
 
     with (
-        patch("app.services.rag_evaluation_service.httpx.AsyncClient") as mock_client_cls,
+        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
         patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
-        mock_client = AsyncMock()
-        mock_client.post = mock_post
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
-
         await run_rag_evaluation(evaluation.id, db_session)
 
     # All items failed so evaluation should be failed
@@ -159,9 +143,7 @@ async def test_rag_empty_response(db_session: AsyncSession, rag_evaluation_with_
     """No chunks returned should be handled gracefully."""
     evaluation, _dataset, _items = rag_evaluation_with_dataset
 
-    mock_rag_response = _mock_rag_response(answer="Some answer", chunks=[])
-
-    mock_post = AsyncMock(return_value=mock_rag_response)
+    mock_adapter = _mock_rag_adapter(answer="Some answer", chunks=[])
 
     mock_evaluate_rag = AsyncMock(
         return_value={
@@ -170,16 +152,10 @@ async def test_rag_empty_response(db_session: AsyncSession, rag_evaluation_with_
     )
 
     with (
-        patch("app.services.rag_evaluation_service.httpx.AsyncClient") as mock_client_cls,
+        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
         patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
-        mock_client = AsyncMock()
-        mock_client.post = mock_post
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
-
         await run_rag_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
@@ -195,8 +171,8 @@ async def test_rag_empty_response(db_session: AsyncSession, rag_evaluation_with_
 
 
 @pytest.mark.asyncio
-async def test_rag_custom_field_mapping(db_session: AsyncSession, db_session_factory=None):
-    """Custom query/answer/chunks field names should work."""
+async def test_rag_custom_field_mapping(db_session: AsyncSession):
+    """Custom query/answer/chunks field names should work via adapter config."""
     dataset = Dataset(name="custom-fields-dataset", item_count=1)
     db_session.add(dataset)
     await db_session.flush()
@@ -227,18 +203,11 @@ async def test_rag_custom_field_mapping(db_session: AsyncSession, db_session_fac
     db_session.add(evaluation)
     await db_session.commit()
 
-    # Mock with custom field names in the response
-    response = MagicMock(spec=httpx.Response)
-    response.status_code = 200
-    response.raise_for_status = MagicMock()
-    response.json.return_value = {
-        "result": "systemd is an init system",
-        "contexts": [
-            "systemd is a system and service manager for Linux operating systems.",
-        ],
-    }
-
-    mock_post = AsyncMock(return_value=response)
+    # Mock adapter returns normalized chunks (adapter handles field mapping internally)
+    mock_adapter = _mock_rag_adapter(
+        answer="systemd is an init system",
+        chunks=[{"content": "systemd is a system and service manager for Linux operating systems."}],
+    )
 
     mock_evaluate_rag = AsyncMock(
         return_value={
@@ -247,23 +216,17 @@ async def test_rag_custom_field_mapping(db_session: AsyncSession, db_session_fac
     )
 
     with (
-        patch("app.services.rag_evaluation_service.httpx.AsyncClient") as mock_client_cls,
+        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter) as mock_factory,
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
         patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
-        mock_client = AsyncMock()
-        mock_client.post = mock_post
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
-
         await run_rag_evaluation(evaluation.id, db_session)
 
-    # Verify the POST was called with the custom query field
-    call_kwargs = mock_post.call_args
-    request_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
-    assert "input_text" in request_body
-    assert request_body["input_text"] == "What is systemd?"
+    # Verify the factory was called with the custom field config
+    factory_call_config = mock_factory.call_args[0][0]
+    assert factory_call_config["query_field"] == "input_text"
+    assert factory_call_config["answer_field"] == "result"
+    assert factory_call_config["chunks_field"] == "contexts"
 
     # Verify results
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
@@ -287,22 +250,15 @@ async def test_rag_evaluate_not_implemented_graceful(db_session: AsyncSession, r
     """If adapter.evaluate_rag raises NotImplementedError, handle gracefully."""
     evaluation, _dataset, _items = rag_evaluation_with_dataset
 
-    mock_rag_response = _mock_rag_response()
-    mock_post = AsyncMock(return_value=mock_rag_response)
+    mock_adapter = _mock_rag_adapter()
 
     mock_evaluate_rag = AsyncMock(side_effect=NotImplementedError("RAG evaluation not yet implemented"))
 
     with (
-        patch("app.services.rag_evaluation_service.httpx.AsyncClient") as mock_client_cls,
+        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
         patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
-        mock_client = AsyncMock()
-        mock_client.post = mock_post
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client_cls.return_value = mock_client
-
         await run_rag_evaluation(evaluation.id, db_session)
 
     # Should still complete -- just no scoring
