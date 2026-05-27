@@ -6,23 +6,22 @@ answer + context chunks, and scores them with the LiteLLM judge adapter.
 """
 
 import asyncio
-import logging
 from typing import Any
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import JudgeConfigParams, Score
 from app.adapters.factory import create_evaluation_adapter
-from app.core.config import settings
-from app.core.providers import provider_registry
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.rag_backends.factory import create_rag_adapter
+from app.services.provider_utils import resolve_judge_config
 from app.websocket.progress import broadcast_progress
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 def _to_judge_params(judge_config: JudgeConfig | None) -> JudgeConfigParams:
@@ -75,10 +74,10 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         eval_result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
         evaluation = eval_result.scalar_one_or_none()
         if not evaluation:
-            logger.error("Evaluation %s not found", evaluation_id)
+            logger.error("evaluation.not_found", evaluation_id=evaluation_id)
             return
         if evaluation.status != "pending":
-            logger.warning("Evaluation %s has status '%s', skipping", evaluation_id, evaluation.status)
+            logger.warning("evaluation.skipped", evaluation_id=evaluation_id, status=evaluation.status)
             return
 
         # 2. Update status to running
@@ -87,7 +86,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         # 3. Load dataset
         if not evaluation.dataset_id:
-            logger.error("Evaluation %s has no dataset_id", evaluation_id)
+            logger.error("evaluation.no_dataset", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
             return
@@ -95,7 +94,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         dataset_result = await db.execute(select(Dataset).where(Dataset.id == evaluation.dataset_id))
         dataset = dataset_result.scalar_one_or_none()
         if not dataset:
-            logger.error("Dataset %s not found for evaluation %s", evaluation.dataset_id, evaluation_id)
+            logger.error("dataset.not_found", dataset_id=evaluation.dataset_id, evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
             return
@@ -106,7 +105,11 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             jc_result = await db.execute(select(JudgeConfig).where(JudgeConfig.id == evaluation.judge_config_id))
             judge_config = jc_result.scalar_one_or_none()
             if not judge_config:
-                logger.error("JudgeConfig %s not found for evaluation %s", evaluation.judge_config_id, evaluation_id)
+                logger.error(
+                    "judge_config.not_found",
+                    judge_config_id=evaluation.judge_config_id,
+                    evaluation_id=evaluation_id,
+                )
                 evaluation.status = "failed"
                 await db.commit()
                 return
@@ -121,7 +124,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         # For HTTP backend (default), URL is required
         backend_type = rag_endpoint.get("backend_type", "http")
         if backend_type == "http" and not rag_url:
-            logger.error("No RAG endpoint URL configured for evaluation %s", evaluation_id)
+            logger.error("rag_evaluation.no_endpoint_url", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
             return
@@ -132,43 +135,25 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         rag_metrics = rag_endpoint.get("metrics", ["faithfulness", "relevancy"])
 
         # 6. Resolve judge model (same pattern as QA service)
-        judge_api_key: str | None = None
-        judge_api_base: str | None = None
-        judge_model: str | None = None
-
-        judge_ref = config.get("judge_config", {})
-        judge_provider_id = judge_ref.get("provider_id") if isinstance(judge_ref, dict) else None
-        judge_provider = provider_registry.get_provider(judge_provider_id) if judge_provider_id else None
-
-        if judge_provider:
-            judge_model = judge_provider.litellm_model
-            judge_api_key = judge_provider.api_key
-            judge_api_base = judge_provider.api_base
-        elif judge_params.model:
-            judge_model = judge_params.model
-            judge_api_key = settings.litellm_api_key if settings.litellm_api_key else None
-        elif settings.litellm_model:
-            judge_model = settings.litellm_model
-            judge_api_key = settings.litellm_api_key if settings.litellm_api_key else None
-
-        if not judge_model:
-            logger.error("No judge model configured for evaluation %s", evaluation_id)
+        try:
+            judge_resolved = resolve_judge_config(config, judge_params)
+        except ValueError:
+            logger.error("rag_evaluation.no_judge_model", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
             return
 
         logger.info(
-            "Judge resolved for RAG eval: model=%s, api_base=%s, has_key=%s, provider=%s",
-            judge_model,
-            judge_api_base,
-            bool(judge_api_key),
-            judge_provider_id or "none",
+            "rag_evaluation.judge_resolved",
+            model=judge_resolved.model,
+            api_base=judge_resolved.api_base,
+            has_key=bool(judge_resolved.api_key),
         )
 
         adapter = create_evaluation_adapter(
-            model=judge_model,
-            api_key=judge_api_key,
-            api_base=judge_api_base,
+            model=judge_resolved.model,
+            api_key=judge_resolved.api_key,
+            api_base=judge_resolved.api_base,
             max_concurrency=config.get("max_concurrency", 10),
         )
 
@@ -213,8 +198,8 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                     reasoning = "; ".join(reasoning_parts) if reasoning_parts else None
             except NotImplementedError:
                 logger.warning(
-                    "evaluate_rag not implemented in adapter; skipping scoring for evaluation %s",
-                    evaluation_id,
+                    "rag_evaluation.scoring_not_implemented",
+                    evaluation_id=evaluation_id,
                 )
                 # Leave score/breakdown as None -- we still store the answer + chunks
 
@@ -260,7 +245,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         for i, r in enumerate(results):
             if isinstance(r, Exception):
                 error_count += 1
-                logger.error("Error processing item %d for RAG evaluation %s: %s", i, evaluation_id, r)
+                logger.error("rag_evaluation.item_error", item_index=i, evaluation_id=evaluation_id, error=str(r))
                 error_result = Result(
                     evaluation_id=evaluation_id,
                     dataset_item_id=items[i].id if i < len(items) else None,
@@ -281,7 +266,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         await db.commit()
 
     except Exception:
-        logger.exception("Unhandled error in RAG evaluation %s", evaluation_id)
+        logger.exception("rag_evaluation.unhandled_error", evaluation_id=evaluation_id)
         try:
             eval_result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
             evaluation = eval_result.scalar_one_or_none()
@@ -289,4 +274,4 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 evaluation.status = "failed"
                 await db.commit()
         except Exception:
-            logger.exception("Failed to update evaluation %s status to failed", evaluation_id)
+            logger.exception("rag_evaluation.status_update_failed", evaluation_id=evaluation_id)

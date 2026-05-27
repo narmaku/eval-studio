@@ -1,5 +1,6 @@
 import math
 
+import structlog
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,8 @@ from app.schemas.dataset import (
     DatasetResponse,
     DatasetUpdate,
 )
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
@@ -60,6 +63,7 @@ async def create_dataset(payload: DatasetCreate, db: AsyncSession = Depends(get_
         for item in items
     ]
 
+    logger.info("dataset.created", id=dataset.id, name=dataset.name, item_count=len(payload.items))
     return DatasetDetailResponse(
         id=dataset.id,
         name=dataset.name,
@@ -156,6 +160,7 @@ async def update_dataset(
 
     await db.commit()
     await db.refresh(dataset)
+    logger.info("dataset.updated", id=dataset_id)
     return DatasetResponse.model_validate(dataset)
 
 
@@ -169,4 +174,5 @@ async def delete_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)) ->
 
     await db.delete(dataset)
     await db.commit()
+    logger.info("dataset.deleted", id=dataset_id)
     return Response(status_code=204)

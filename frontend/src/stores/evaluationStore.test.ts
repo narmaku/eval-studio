@@ -52,19 +52,18 @@ describe('evaluationStore', () => {
         {
           id: 'e1',
           name: 'Test Eval',
-          description: 'A test evaluation',
           mode: 'qa' as const,
           status: 'completed' as const,
           dataset_id: 'd1',
-          judge_id: 'j1',
+          environment_id: null,
+          judge_config_id: 'j1',
           config: {
             model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
             judge_config: { preset: 'default' },
           },
+          result_count: 5,
           created_at: '2026-01-01T00:00:00Z',
           updated_at: '2026-01-01T01:00:00Z',
-          completed_at: '2026-01-01T01:00:00Z',
-          error: null,
         },
       ];
       mockedApi.listEvaluations.mockResolvedValue({

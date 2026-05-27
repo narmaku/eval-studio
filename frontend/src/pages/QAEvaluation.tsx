@@ -77,11 +77,11 @@ export default function QAEvaluation() {
       void fetchResults(evaluation.id);
       setPhase('complete');
     } else if (evaluation?.status === 'failed') {
-      toast.error(`Evaluation failed: ${evaluation.error ?? 'Unknown error'}`);
+      toast.error('Evaluation failed');
       addNotification({
         type: 'error',
         title: 'Evaluation Failed',
-        message: evaluation.error ?? 'Unknown error',
+        message: `"${evaluation.name}" failed`,
         evaluationId: evaluation.id,
       });
       setPhase('configure');
