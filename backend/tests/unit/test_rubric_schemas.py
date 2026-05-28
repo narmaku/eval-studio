@@ -99,9 +99,7 @@ class TestRubricUpdate:
 
     def test_negative_weight_in_update_rejected(self):
         with pytest.raises(ValidationError):
-            RubricUpdate(
-                dimensions=[RubricDimension(name="accuracy", weight=-1.0, description="bad")]
-            )
+            RubricUpdate(dimensions=[RubricDimension(name="accuracy", weight=-1.0, description="bad")])
 
     def test_empty_dimensions_in_update_rejected(self):
         with pytest.raises(ValidationError):

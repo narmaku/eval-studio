@@ -2,7 +2,6 @@
 
 import pytest
 
-
 RUBRIC_PAYLOAD = {
     "name": "Test Rubric",
     "description": "A test rubric",
