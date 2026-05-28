@@ -1,15 +1,23 @@
 """Evaluator registry loaded from YAML configuration."""
 
+from __future__ import annotations
+
 import importlib
 import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
+if TYPE_CHECKING:
+    from app.adapters.base import EvaluationAdapter
+
 logger = logging.getLogger(__name__)
+
+# Only adapter_class values under these module prefixes are allowed.
+_ALLOWED_ADAPTER_PREFIXES = ("app.adapters.",)
 
 
 @dataclass
@@ -77,8 +85,24 @@ class EvaluatorRegistry:
             )
             self._evaluators[info.id] = info
 
+    @staticmethod
+    def _validate_adapter_namespace(adapter_class: str) -> bool:
+        """Check that adapter_class is under an allowed module prefix."""
+        return any(adapter_class.startswith(prefix) for prefix in _ALLOWED_ADAPTER_PREFIXES)
+
     def _check_adapter_available(self, adapter_class: str) -> bool:
-        """Check if an adapter class can be imported."""
+        """Check if an adapter class can be imported.
+
+        Returns False for classes outside the allowed namespace or those
+        that cannot be resolved at import time.
+        """
+        if not self._validate_adapter_namespace(adapter_class):
+            logger.warning(
+                "Adapter class %s is outside allowed namespaces %s",
+                adapter_class,
+                _ALLOWED_ADAPTER_PREFIXES,
+            )
+            return False
         try:
             module_path, _class_name = adapter_class.rsplit(".", 1)
             module = importlib.import_module(module_path)
@@ -98,7 +122,7 @@ class EvaluatorRegistry:
         """Return a single evaluator by ID, or None if not found."""
         return self._evaluators.get(evaluator_id)
 
-    def create_adapter(self, evaluator_id: str, **config: Any):
+    def create_adapter(self, evaluator_id: str, **config: Any) -> EvaluationAdapter:
         """Create an adapter instance for the given evaluator ID.
 
         Args:
@@ -109,18 +133,27 @@ class EvaluatorRegistry:
             An initialized EvaluationAdapter instance.
 
         Raises:
-            ValueError: If the evaluator ID is unknown or unavailable.
+            ValueError: If the evaluator ID is unknown, unavailable,
+                or outside the allowed namespace.
         """
+        from app.adapters.base import EvaluationAdapter
+
         info = self._evaluators.get(evaluator_id)
         if info is None:
             raise ValueError(f"Unknown evaluator: {evaluator_id}")
         if not info.available:
             raise ValueError(f"Evaluator '{evaluator_id}' is not available (adapter class cannot be imported)")
+        if not self._validate_adapter_namespace(info.adapter_class):
+            raise ValueError(f"Evaluator '{evaluator_id}' has adapter_class outside allowed namespaces")
 
         # Lazy import at creation time
         module_path, class_name = info.adapter_class.rsplit(".", 1)
         module = importlib.import_module(module_path)
         adapter_cls = getattr(module, class_name)
+
+        if not issubclass(adapter_cls, EvaluationAdapter):
+            raise ValueError(f"Evaluator '{evaluator_id}': {info.adapter_class} is not a subclass of EvaluationAdapter")
+
         return adapter_cls(**config)
 
 

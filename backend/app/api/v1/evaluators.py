@@ -1,12 +1,13 @@
 """API endpoints for evaluator discovery."""
 
 import importlib
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from app.adapters.registry import evaluator_registry
+from app.adapters.registry import _ALLOWED_ADAPTER_PREFIXES, evaluator_registry
 from app.core.exceptions import NotFoundException
 
 logger = structlog.get_logger()
@@ -23,20 +24,22 @@ class EvaluatorResponse(BaseModel):
     modes: list[str] = []
     builtin: bool = False
     available: bool = True
-    defaults: dict = {}
-    config_schema: dict = {}
+    defaults: dict[str, Any] = {}
+    config_schema: dict[str, Any] = {}
 
 
-def _resolve_config_schema(adapter_class: str, available: bool) -> dict:
+def _resolve_config_schema(adapter_class: str, available: bool) -> dict[str, Any]:
     """Resolve the config schema from the adapter class, if available."""
     if not available:
+        return {}
+    if not any(adapter_class.startswith(prefix) for prefix in _ALLOWED_ADAPTER_PREFIXES):
         return {}
     try:
         module_path, class_name = adapter_class.rsplit(".", 1)
         module = importlib.import_module(module_path)
         cls = getattr(module, class_name)
         return cls.get_config_schema()
-    except Exception:
+    except (ImportError, AttributeError, ValueError):
         return {}
 
 
