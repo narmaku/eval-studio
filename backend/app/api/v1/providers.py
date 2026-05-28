@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenException, NotFoundException
-from app.core.providers import provider_registry
+from app.core.providers import ProviderProfile, provider_registry
 from app.models.provider import Provider
 from app.schemas.provider import ProviderCreate, ProviderModelResponse, ProviderResponse, ProviderUpdate
 
@@ -19,7 +19,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/providers", tags=["providers"])
 
 
-def _yaml_provider_to_response(p) -> ProviderResponse:
+def _yaml_provider_to_response(p: ProviderProfile) -> ProviderResponse:
     """Convert a YAML ProviderProfile to a ProviderResponse."""
     return ProviderResponse(
         id=p.id,
