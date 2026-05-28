@@ -1,9 +1,11 @@
 """Unit tests for the evaluator registry and related features."""
 
+import pytest
 import yaml
 
 from app.adapters.base import EvaluationAdapter
 from app.adapters.litellm_judge import LiteLLMJudgeAdapter
+from app.adapters.registry import EvaluatorInfo, EvaluatorRegistry
 
 
 class TestEvaluationAdapterClassMethods:
@@ -38,3 +40,184 @@ class TestLiteLLMJudgeAdapterConfig:
         assert "pass_threshold" in props
         assert "prompt_template" in props
         assert "dimensions" in props
+
+
+class TestEvaluatorRegistry:
+    """Tests for EvaluatorRegistry YAML loading and querying."""
+
+    def _make_yaml(self, tmp_path, data):
+        """Write a YAML config file and return its path."""
+        config_file = tmp_path / "evaluators.yaml"
+        config_file.write_text(yaml.dump(data))
+        return config_file
+
+    def test_registry_loads_valid_yaml(self, tmp_path):
+        """Registry loads evaluator definitions from a valid YAML file."""
+        config = {
+            "evaluators": [
+                {
+                    "id": "litellm-judge",
+                    "name": "LLM-as-Judge",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa", "agent", "rag"],
+                    "description": "Direct LLM-as-judge.",
+                    "builtin": True,
+                    "defaults": {"pass_threshold": 0.7, "temperature": 0.0},
+                }
+            ]
+        }
+        config_file = self._make_yaml(tmp_path, config)
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+
+        evaluators = registry.list_evaluators()
+        assert len(evaluators) == 1
+        assert evaluators[0].id == "litellm-judge"
+        assert evaluators[0].name == "LLM-as-Judge"
+        assert evaluators[0].builtin is True
+        assert evaluators[0].available is True
+
+    def test_registry_malformed_entry_skipped(self, tmp_path):
+        """Malformed entries (missing required fields) are skipped, not crash."""
+        config = {
+            "evaluators": [
+                {"id": "good", "name": "Good", "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter", "modes": ["qa"]},
+                {"name": "Missing ID"},  # missing 'id'
+                {"id": "no-name"},  # missing 'name'
+            ]
+        }
+        config_file = self._make_yaml(tmp_path, config)
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+
+        evaluators = registry.list_evaluators()
+        assert len(evaluators) == 1
+        assert evaluators[0].id == "good"
+
+    def test_registry_missing_adapter_class_marked_unavailable(self, tmp_path):
+        """Evaluators with non-importable adapter_class are marked unavailable."""
+        config = {
+            "evaluators": [
+                {
+                    "id": "fake-eval",
+                    "name": "Fake Evaluator",
+                    "adapter_class": "app.adapters.nonexistent.FakeAdapter",
+                    "modes": ["qa"],
+                }
+            ]
+        }
+        config_file = self._make_yaml(tmp_path, config)
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+
+        evaluator = registry.get_evaluator("fake-eval")
+        assert evaluator is not None
+        assert evaluator.available is False
+
+    def test_registry_list_by_mode(self, tmp_path):
+        """list_evaluators(mode=...) filters by supported mode."""
+        config = {
+            "evaluators": [
+                {"id": "qa-only", "name": "QA Only", "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter", "modes": ["qa"]},
+                {"id": "rag-only", "name": "RAG Only", "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter", "modes": ["rag"]},
+                {"id": "both", "name": "Both", "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter", "modes": ["qa", "rag"]},
+            ]
+        }
+        config_file = self._make_yaml(tmp_path, config)
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+
+        qa_evals = registry.list_evaluators(mode="qa")
+        assert len(qa_evals) == 2
+        ids = {e.id for e in qa_evals}
+        assert ids == {"qa-only", "both"}
+
+        rag_evals = registry.list_evaluators(mode="rag")
+        assert len(rag_evals) == 2
+        ids = {e.id for e in rag_evals}
+        assert ids == {"rag-only", "both"}
+
+    def test_registry_get_evaluator(self, tmp_path):
+        """get_evaluator returns the correct EvaluatorInfo by ID."""
+        config = {
+            "evaluators": [
+                {
+                    "id": "litellm-judge",
+                    "name": "LLM Judge",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                    "description": "A judge.",
+                }
+            ]
+        }
+        config_file = self._make_yaml(tmp_path, config)
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+
+        evaluator = registry.get_evaluator("litellm-judge")
+        assert evaluator is not None
+        assert evaluator.description == "A judge."
+
+    def test_registry_get_evaluator_not_found(self):
+        """get_evaluator returns None for unknown ID."""
+        registry = EvaluatorRegistry()
+        assert registry.get_evaluator("nonexistent") is None
+
+    def test_registry_create_adapter(self, tmp_path):
+        """create_adapter creates a working adapter instance."""
+        config = {
+            "evaluators": [
+                {
+                    "id": "litellm-judge",
+                    "name": "LLM Judge",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                }
+            ]
+        }
+        config_file = self._make_yaml(tmp_path, config)
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+
+        adapter = registry.create_adapter("litellm-judge", model="gpt-4")
+        assert isinstance(adapter, LiteLLMJudgeAdapter)
+        assert adapter.model == "gpt-4"
+
+    def test_registry_create_adapter_unknown_id_raises(self):
+        """create_adapter raises ValueError for unknown evaluator ID."""
+        registry = EvaluatorRegistry()
+        with pytest.raises(ValueError, match="Unknown evaluator"):
+            registry.create_adapter("nonexistent")
+
+    def test_registry_create_adapter_unavailable_raises(self, tmp_path):
+        """create_adapter raises ValueError for unavailable (bad class) evaluator."""
+        config = {
+            "evaluators": [
+                {
+                    "id": "broken",
+                    "name": "Broken",
+                    "adapter_class": "app.adapters.nonexistent.FakeAdapter",
+                    "modes": ["qa"],
+                }
+            ]
+        }
+        config_file = self._make_yaml(tmp_path, config)
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+
+        with pytest.raises(ValueError, match="not available"):
+            registry.create_adapter("broken")
+
+    def test_registry_loads_from_nonexistent_file(self, tmp_path):
+        """Loading from a missing file does not raise."""
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(tmp_path / "missing.yaml")
+        assert registry.list_evaluators() == []
+
+    def test_registry_loads_from_empty_yaml(self, tmp_path):
+        """Loading from an empty YAML file results in no evaluators."""
+        config_file = tmp_path / "evaluators.yaml"
+        config_file.write_text("")
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+        assert registry.list_evaluators() == []
