@@ -126,7 +126,10 @@ Respond with ONLY a JSON object:
                 },
                 "prompt_template": {
                     "type": "string",
-                    "description": "Custom prompt template for the judge. Supports {question}, {expected_answer}, {actual_answer} placeholders.",
+                    "description": (
+                        "Custom prompt template for the judge."
+                        " Supports {question}, {expected_answer}, {actual_answer} placeholders."
+                    ),
                 },
                 "dimensions": {
                     "type": "array",

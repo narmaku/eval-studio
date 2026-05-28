@@ -6,7 +6,7 @@ import yaml
 from app.adapters.base import EvaluationAdapter
 from app.adapters.factory import create_evaluation_adapter
 from app.adapters.litellm_judge import LiteLLMJudgeAdapter
-from app.adapters.registry import EvaluatorInfo, EvaluatorRegistry
+from app.adapters.registry import EvaluatorRegistry
 
 
 class TestEvaluationAdapterClassMethods:
@@ -82,7 +82,12 @@ class TestEvaluatorRegistry:
         """Malformed entries (missing required fields) are skipped, not crash."""
         config = {
             "evaluators": [
-                {"id": "good", "name": "Good", "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter", "modes": ["qa"]},
+                {
+                    "id": "good",
+                    "name": "Good",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                },
                 {"name": "Missing ID"},  # missing 'id'
                 {"id": "no-name"},  # missing 'name'
             ]
@@ -119,9 +124,24 @@ class TestEvaluatorRegistry:
         """list_evaluators(mode=...) filters by supported mode."""
         config = {
             "evaluators": [
-                {"id": "qa-only", "name": "QA Only", "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter", "modes": ["qa"]},
-                {"id": "rag-only", "name": "RAG Only", "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter", "modes": ["rag"]},
-                {"id": "both", "name": "Both", "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter", "modes": ["qa", "rag"]},
+                {
+                    "id": "qa-only",
+                    "name": "QA Only",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                },
+                {
+                    "id": "rag-only",
+                    "name": "RAG Only",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["rag"],
+                },
+                {
+                    "id": "both",
+                    "name": "Both",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa", "rag"],
+                },
             ]
         }
         config_file = self._make_yaml(tmp_path, config)
