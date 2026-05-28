@@ -1,4 +1,4 @@
-"""Integration tests for the providers API endpoints."""
+"""Integration tests for the providers API endpoints (YAML + DB CRUD)."""
 
 import pytest
 
@@ -46,9 +46,12 @@ def _seed_test_providers():
     provider_registry._providers.update(original_providers)
 
 
+# ── Existing YAML-based tests ──
+
+
 @pytest.mark.asyncio
 async def test_list_providers(client):
-    """GET /api/v1/providers returns all providers."""
+    """GET /api/v1/providers returns all providers (YAML + DB)."""
     response = await client.get("/api/v1/providers")
     assert response.status_code == 200
     data = response.json()
@@ -92,6 +95,7 @@ async def test_get_provider_by_id(client):
     assert data["litellm_model"] == "gpt-4"
     assert data["api_base"] == "http://localhost:8000"
     assert data["purpose"] == "test"
+    assert data["source"] == "yaml"
 
 
 @pytest.mark.asyncio
@@ -163,3 +167,196 @@ async def test_provider_response_proxy_null_when_not_configured(client):
     assert response.status_code == 200
     data = response.json()
     assert data["proxy"] is None
+
+
+# ── DB CRUD tests ──
+
+PROVIDER_PAYLOAD = {
+    "name": "User Provider",
+    "litellm_model": "openai/gpt-4",
+    "api_base": "https://api.example.com/v1",
+    "api_key_env": "USER_PROVIDER_KEY",
+    "proxy": "http://myproxy:3128",
+    "tags": ["custom", "fast"],
+    "purpose": "test",
+}
+
+
+@pytest.mark.asyncio
+async def test_create_provider(client):
+    """POST /providers creates a DB provider and returns 201."""
+    response = await client.post("/api/v1/providers", json=PROVIDER_PAYLOAD)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "User Provider"
+    assert data["litellm_model"] == "openai/gpt-4"
+    assert data["api_base"] == "https://api.example.com/v1"
+    assert data["proxy"] == "http://myproxy:3128"
+    assert data["tags"] == ["custom", "fast"]
+    assert data["purpose"] == "test"
+    assert data["source"] == "user"
+    assert data["id"] is not None
+    assert data["created_at"] is not None
+    assert data["updated_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_create_provider_minimal(client):
+    """POST /providers with minimal payload uses correct defaults."""
+    payload = {"name": "Minimal", "litellm_model": "ollama/llama3"}
+    response = await client.post("/api/v1/providers", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Minimal"
+    assert data["api_base"] is None
+    assert data["proxy"] is None
+    assert data["tags"] == []
+    assert data["purpose"] == "test"
+    assert data["source"] == "user"
+    assert data["has_api_key"] is False
+
+
+@pytest.mark.asyncio
+async def test_create_provider_empty_name_rejected(client):
+    """POST /providers with empty name returns 422."""
+    payload = {"name": "", "litellm_model": "m"}
+    response = await client.post("/api/v1/providers", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_provider_empty_model_rejected(client):
+    """POST /providers with empty litellm_model returns 422."""
+    payload = {"name": "Prov", "litellm_model": ""}
+    response = await client.post("/api/v1/providers", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_includes_db_providers(client):
+    """GET /providers returns both YAML and DB providers."""
+    await client.post("/api/v1/providers", json=PROVIDER_PAYLOAD)
+    response = await client.get("/api/v1/providers")
+    assert response.status_code == 200
+    data = response.json()
+    # 3 YAML + 1 DB
+    assert len(data) == 4
+    sources = {p["source"] for p in data}
+    assert "yaml" in sources
+    assert "user" in sources
+
+
+@pytest.mark.asyncio
+async def test_list_filter_includes_db_providers(client):
+    """GET /providers?purpose=test includes DB providers with matching purpose."""
+    payload = {**PROVIDER_PAYLOAD, "name": "DB Test Provider", "purpose": "test"}
+    await client.post("/api/v1/providers", json=payload)
+    response = await client.get("/api/v1/providers?purpose=test")
+    assert response.status_code == 200
+    data = response.json()
+    names = [p["name"] for p in data]
+    assert "DB Test Provider" in names
+
+
+@pytest.mark.asyncio
+async def test_get_db_provider_by_id(client):
+    """GET /providers/{id} returns a DB provider."""
+    create_resp = await client.post("/api/v1/providers", json=PROVIDER_PAYLOAD)
+    provider_id = create_resp.json()["id"]
+
+    response = await client.get(f"/api/v1/providers/{provider_id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == provider_id
+    assert data["source"] == "user"
+    assert data["name"] == "User Provider"
+
+
+@pytest.mark.asyncio
+async def test_update_db_provider(client):
+    """PUT /providers/{id} updates a DB provider."""
+    create_resp = await client.post("/api/v1/providers", json=PROVIDER_PAYLOAD)
+    provider_id = create_resp.json()["id"]
+
+    update_payload = {"name": "Updated Provider", "purpose": "judge"}
+    response = await client.put(f"/api/v1/providers/{provider_id}", json=update_payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Updated Provider"
+    assert data["purpose"] == "judge"
+    # Unchanged fields should remain
+    assert data["litellm_model"] == "openai/gpt-4"
+
+
+@pytest.mark.asyncio
+async def test_update_provider_not_found(client):
+    """PUT /providers/{nonexistent} returns 404."""
+    response = await client.put("/api/v1/providers/nonexistent-id", json={"name": "Fail"})
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_update_yaml_provider_forbidden(client):
+    """PUT /providers/{yaml_id} returns 403 for YAML providers."""
+    response = await client.put("/api/v1/providers/test-model", json={"name": "Hacked"})
+    assert response.status_code == 403
+    data = response.json()
+    assert data["title"] == "Forbidden"
+
+
+@pytest.mark.asyncio
+async def test_delete_db_provider(client):
+    """DELETE /providers/{id} removes a DB provider."""
+    create_resp = await client.post("/api/v1/providers", json=PROVIDER_PAYLOAD)
+    provider_id = create_resp.json()["id"]
+
+    response = await client.delete(f"/api/v1/providers/{provider_id}")
+    assert response.status_code == 204
+
+    # Verify it's gone
+    get_resp = await client.get(f"/api/v1/providers/{provider_id}")
+    assert get_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_provider_not_found(client):
+    """DELETE /providers/{nonexistent} returns 404."""
+    response = await client.delete("/api/v1/providers/nonexistent-id")
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_yaml_provider_forbidden(client):
+    """DELETE /providers/{yaml_id} returns 403 for YAML providers."""
+    response = await client.delete("/api/v1/providers/test-model")
+    assert response.status_code == 403
+    data = response.json()
+    assert data["title"] == "Forbidden"
+
+
+@pytest.mark.asyncio
+async def test_db_provider_has_api_key(client, monkeypatch):
+    """DB provider shows has_api_key=true when env var is set."""
+    monkeypatch.setenv("USER_PROVIDER_KEY", "my-secret")
+    create_resp = await client.post("/api/v1/providers", json=PROVIDER_PAYLOAD)
+    provider_id = create_resp.json()["id"]
+
+    response = await client.get(f"/api/v1/providers/{provider_id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["has_api_key"] is True
+
+
+@pytest.mark.asyncio
+async def test_db_provider_never_exposes_key(client, monkeypatch):
+    """DB provider response never contains actual key value."""
+    monkeypatch.setenv("USER_PROVIDER_KEY", "top-secret-key-xyz")
+    create_resp = await client.post("/api/v1/providers", json=PROVIDER_PAYLOAD)
+    provider_id = create_resp.json()["id"]
+
+    response = await client.get(f"/api/v1/providers/{provider_id}")
+    body_text = response.text
+    assert "top-secret-key-xyz" not in body_text
+    data = response.json()
+    assert "api_key" not in data
+    assert "api_key_env" not in data

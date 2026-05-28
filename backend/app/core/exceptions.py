@@ -22,6 +22,13 @@ class ConflictException(AppException):
         super().__init__(409, "Conflict", detail)
 
 
+class ForbiddenException(AppException):
+    """Raised when an operation is not permitted on a resource."""
+
+    def __init__(self, detail: str):
+        super().__init__(403, "Forbidden", detail)
+
+
 class NotImplementedException(AppException):
     """Raised when a feature is not yet implemented."""
 
