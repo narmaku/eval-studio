@@ -1,5 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EvaluatorList } from '@/components/settings/EvaluatorList';
+import { RubricList } from '@/components/settings/RubricList';
+import { ProviderList } from '@/components/settings/ProviderList';
 
 export default function Settings() {
   return (
@@ -7,41 +10,26 @@ export default function Settings() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
-          Configure application settings including LLM providers, judge defaults, and environment
-          defaults.
+          Manage evaluators, scoring rubrics, and LLM provider configuration.
         </p>
       </div>
       <Separator />
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">LLM Provider Configuration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground">
-            LLM provider settings and API key management will appear here.
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Judge Defaults</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground">
-            Default judge configuration will appear here.
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Environment Defaults</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground">
-            Default environment settings will appear here.
-          </p>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="evaluators">
+        <TabsList>
+          <TabsTrigger value="evaluators">Evaluators</TabsTrigger>
+          <TabsTrigger value="rubrics">Rubrics</TabsTrigger>
+          <TabsTrigger value="providers">Providers</TabsTrigger>
+        </TabsList>
+        <TabsContent value="evaluators" className="mt-4">
+          <EvaluatorList />
+        </TabsContent>
+        <TabsContent value="rubrics" className="mt-4">
+          <RubricList />
+        </TabsContent>
+        <TabsContent value="providers" className="mt-4">
+          <ProviderList />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
