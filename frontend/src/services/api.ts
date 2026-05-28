@@ -18,6 +18,8 @@ import type {
   CreateJudgeRequest,
   JudgePreset,
   Provider,
+  CreateProviderRequest,
+  UpdateProviderRequest,
   Rubric,
   CreateRubricRequest,
   UpdateRubricRequest,
@@ -185,6 +187,12 @@ export const api = {
     return request<Provider[]>(`/api/v1/providers${qs ? `?${qs}` : ''}`);
   },
   getProvider: (id: string) => request<Provider>(`/api/v1/providers/${id}`),
+  createProvider: (data: CreateProviderRequest) =>
+    request<Provider>('/api/v1/providers', { method: 'POST', body: JSON.stringify(data) }),
+  updateProvider: (id: string, data: UpdateProviderRequest) =>
+    request<Provider>(`/api/v1/providers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteProvider: (id: string) =>
+    request<void>(`/api/v1/providers/${id}`, { method: 'DELETE' }),
   listProviderModels: (providerId: string) =>
     request<{ id: string; owned_by: string }[]>(`/api/v1/providers/${providerId}/models`),
 

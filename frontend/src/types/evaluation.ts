@@ -66,6 +66,9 @@ export interface Provider {
   proxy: string | null;
   tags: string[];
   purpose: string;
+  source?: 'yaml' | 'user';
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface ProviderModel {
