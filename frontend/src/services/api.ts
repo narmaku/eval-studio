@@ -212,10 +212,6 @@ export const api = {
     return request<EvaluatorInfo[]>(`/api/v1/evaluators${qs ? `?${qs}` : ''}`);
   },
   getEvaluator: (id: string) => request<EvaluatorInfo>(`/api/v1/evaluators/${id}`),
-
-  // --- Adapters & Config ---
-  listAdapters: () => request<{ name: string; modes: string[] }[]>('/api/v1/adapters'),
-  getConfig: () => request<Record<string, unknown>>('/api/v1/config'),
 };
 
 export { ApiClientError };

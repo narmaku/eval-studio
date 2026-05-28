@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Any
 
 import litellm
 
@@ -90,6 +91,53 @@ Respond with ONLY a JSON object:
 "response_quality": <float>, "overall": <float>, "reasoning": "<explanation>"}}"""
 
     _CONVERSATION_DIMENSIONS = ("relevance", "tool_use_accuracy", "resolution", "response_quality")
+
+    @classmethod
+    def get_default_config(cls) -> dict[str, Any]:
+        """Return default configuration values for the LiteLLM judge adapter."""
+        return {
+            "pass_threshold": 0.7,
+            "temperature": 0.0,
+        }
+
+    @classmethod
+    def get_config_schema(cls) -> dict[str, Any]:
+        """Return JSON Schema for configurable fields of the LiteLLM judge adapter."""
+        return {
+            "type": "object",
+            "properties": {
+                "model": {
+                    "type": "string",
+                    "description": "LiteLLM model identifier for the judge (e.g. 'gpt-4.1', 'ollama/llama3.2:3b').",
+                },
+                "temperature": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 2.0,
+                    "default": 0.0,
+                    "description": "Sampling temperature for the judge LLM.",
+                },
+                "pass_threshold": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "default": 0.7,
+                    "description": "Minimum score to consider an evaluation as passed.",
+                },
+                "prompt_template": {
+                    "type": "string",
+                    "description": (
+                        "Custom prompt template for the judge."
+                        " Supports {question}, {expected_answer}, {actual_answer} placeholders."
+                    ),
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Custom scoring dimensions with weights.",
+                },
+            },
+        }
 
     def __init__(
         self,

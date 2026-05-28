@@ -56,6 +56,22 @@ class EvaluationAdapter(ABC):
     def __init__(self, max_concurrency: int = 10):
         self._semaphore = asyncio.Semaphore(max_concurrency)
 
+    @classmethod
+    def get_default_config(cls) -> dict[str, Any]:
+        """Return default configuration values for this adapter.
+
+        Subclasses should override to provide adapter-specific defaults.
+        """
+        return {}
+
+    @classmethod
+    def get_config_schema(cls) -> dict[str, Any]:
+        """Return a JSON Schema describing configurable fields for this adapter.
+
+        Subclasses should override to provide adapter-specific schema.
+        """
+        return {}
+
     @abstractmethod
     async def evaluate_qa(
         self,
