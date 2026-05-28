@@ -18,6 +18,9 @@ import type {
   CreateJudgeRequest,
   JudgePreset,
   Provider,
+  Rubric,
+  CreateRubricRequest,
+  UpdateRubricRequest,
   EvaluatorInfo,
 } from '@/types';
 
@@ -184,6 +187,22 @@ export const api = {
   getProvider: (id: string) => request<Provider>(`/api/v1/providers/${id}`),
   listProviderModels: (providerId: string) =>
     request<{ id: string; owned_by: string }[]>(`/api/v1/providers/${providerId}/models`),
+
+  // --- Rubrics ---
+  listRubrics: (params?: { name?: string; offset?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.name) query.set('name', params.name);
+    if (params?.offset !== undefined) query.set('offset', String(params.offset));
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    const qs = query.toString();
+    return request<Rubric[]>(`/api/v1/rubrics${qs ? `?${qs}` : ''}`);
+  },
+  getRubric: (id: string) => request<Rubric>(`/api/v1/rubrics/${id}`),
+  createRubric: (data: CreateRubricRequest) =>
+    request<Rubric>('/api/v1/rubrics', { method: 'POST', body: JSON.stringify(data) }),
+  updateRubric: (id: string, data: UpdateRubricRequest) =>
+    request<Rubric>(`/api/v1/rubrics/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRubric: (id: string) => request<void>(`/api/v1/rubrics/${id}`, { method: 'DELETE' }),
 
   // --- Evaluators ---
   listEvaluators: (mode?: string) => {
