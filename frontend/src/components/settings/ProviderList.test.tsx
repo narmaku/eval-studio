@@ -1,16 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Provider } from '@/types';
 
-const mockListProviders = vi.fn();
-
-vi.mock('@/services/api', () => ({
-  api: {
-    listProviders: (...args: unknown[]) => mockListProviders(...args),
-  },
-}));
-
-import { ProviderList } from './ProviderList';
+const mockFetchProviders = vi.fn();
+const mockDeleteProvider = vi.fn();
 
 const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   id: 'p-1',
@@ -21,63 +15,183 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   proxy: null,
   tags: ['general'],
   purpose: 'test',
+  source: 'user',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
   ...overrides,
 });
+
+let storeState: {
+  providers: Provider[];
+  isLoading: boolean;
+  error: string | null;
+  fetchProviders: typeof mockFetchProviders;
+  deleteProvider: typeof mockDeleteProvider;
+  createProvider: ReturnType<typeof vi.fn>;
+  updateProvider: ReturnType<typeof vi.fn>;
+};
+
+const defaultStore = {
+  providers: [] as Provider[],
+  isLoading: false,
+  error: null,
+  fetchProviders: mockFetchProviders,
+  deleteProvider: mockDeleteProvider,
+  createProvider: vi.fn(),
+  updateProvider: vi.fn(),
+};
+
+vi.mock('@/stores/providerStore', () => ({
+  useProviderStore: (selector?: unknown) => {
+    if (typeof selector === 'function') {
+      return (selector as (s: typeof storeState) => unknown)(storeState);
+    }
+    return storeState;
+  },
+}));
+
+// Stub ProviderForm to avoid Sheet rendering complexity in this test
+vi.mock('./ProviderForm', () => ({
+  ProviderForm: ({
+    open,
+    provider,
+  }: {
+    open: boolean;
+    provider?: Provider;
+    onOpenChange: (v: boolean) => void;
+    onSaved?: () => void;
+  }) =>
+    open ? (
+      <div data-testid="provider-form">
+        {provider ? `editing ${provider.name}` : 'creating new'}
+      </div>
+    ) : null,
+}));
+
+import { ProviderList } from './ProviderList';
 
 describe('ProviderList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    storeState = { ...defaultStore };
   });
 
-  it('fetches providers on mount', () => {
-    mockListProviders.mockResolvedValue([]);
+  it('calls fetchProviders on mount', () => {
     render(<ProviderList />);
-    expect(mockListProviders).toHaveBeenCalledTimes(1);
+    expect(mockFetchProviders).toHaveBeenCalledTimes(1);
   });
 
-  it('shows empty state when no providers', async () => {
-    mockListProviders.mockResolvedValue([]);
+  it('shows empty state when no providers', () => {
     render(<ProviderList />);
-    await waitFor(() => {
-      expect(screen.getByText(/no providers configured/i)).toBeInTheDocument();
-    });
+    expect(screen.getByText(/no providers configured/i)).toBeInTheDocument();
   });
 
-  it('renders provider rows', async () => {
-    mockListProviders.mockResolvedValue([
-      makeProvider({ id: 'p-1', name: 'OpenAI', litellm_model: 'gpt-4' }),
-      makeProvider({ id: 'p-2', name: 'Anthropic', litellm_model: 'claude-3' }),
-    ]);
-
+  it('renders provider rows', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [
+        makeProvider({ id: 'p-1', name: 'OpenAI' }),
+        makeProvider({ id: 'p-2', name: 'Anthropic' }),
+      ],
+    };
     render(<ProviderList />);
-
-    await waitFor(() => {
-      expect(screen.getByText('OpenAI')).toBeInTheDocument();
-      expect(screen.getByText('Anthropic')).toBeInTheDocument();
-    });
+    expect(screen.getByText('OpenAI')).toBeInTheDocument();
+    expect(screen.getByText('Anthropic')).toBeInTheDocument();
   });
 
-  it('shows model name', async () => {
-    mockListProviders.mockResolvedValue([
-      makeProvider({ litellm_model: 'gpt-4-turbo' }),
-    ]);
+  it('shows model name', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ litellm_model: 'gpt-4-turbo' })],
+    };
 
     render(<ProviderList />);
-
-    await waitFor(() => {
-      expect(screen.getByText('gpt-4-turbo')).toBeInTheDocument();
-    });
+    expect(screen.getByText('gpt-4-turbo')).toBeInTheDocument();
   });
 
-  it('shows purpose badge', async () => {
-    mockListProviders.mockResolvedValue([
-      makeProvider({ purpose: 'judge' }),
-    ]);
+  it('shows purpose badge', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ purpose: 'judge' })],
+    };
 
     render(<ProviderList />);
+    expect(screen.getByText('judge')).toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText('judge')).toBeInTheDocument();
-    });
+  it('shows YAML badge for YAML providers', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ id: 'p-1', source: 'yaml' })],
+    };
+    render(<ProviderList />);
+    expect(screen.getByText('YAML')).toBeInTheDocument();
+  });
+
+  it('does not show edit/delete buttons for YAML providers', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ id: 'p-1', source: 'yaml' })],
+    };
+    render(<ProviderList />);
+    expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+  });
+
+  it('shows edit/delete buttons for user providers', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ id: 'p-1', source: 'user' })],
+    };
+    render(<ProviderList />);
+    expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
+  });
+
+  it('renders New Provider button', () => {
+    render(<ProviderList />);
+    expect(screen.getByRole('button', { name: /new provider/i })).toBeInTheDocument();
+  });
+
+  it('filters providers by name', async () => {
+    const user = userEvent.setup();
+    storeState = {
+      ...defaultStore,
+      providers: [
+        makeProvider({ id: 'p-1', name: 'OpenAI Model' }),
+        makeProvider({ id: 'p-2', name: 'Anthropic Model' }),
+      ],
+    };
+    render(<ProviderList />);
+
+    const filterInput = screen.getByPlaceholderText(/filter/i);
+    await user.type(filterInput, 'OpenAI');
+
+    expect(screen.getByText('OpenAI Model')).toBeInTheDocument();
+    expect(screen.queryByText('Anthropic Model')).not.toBeInTheDocument();
+  });
+
+  it('opens form on New Provider click', async () => {
+    const user = userEvent.setup();
+    render(<ProviderList />);
+
+    await user.click(screen.getByRole('button', { name: /new provider/i }));
+
+    expect(screen.getByTestId('provider-form')).toBeInTheDocument();
+    expect(screen.getByText('creating new')).toBeInTheDocument();
+  });
+
+  it('opens form in edit mode on Edit click', async () => {
+    const user = userEvent.setup();
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ id: 'p-1', name: 'My Provider', source: 'user' })],
+    };
+    render(<ProviderList />);
+
+    await user.click(screen.getByRole('button', { name: /edit/i }));
+
+    expect(screen.getByTestId('provider-form')).toBeInTheDocument();
+    expect(screen.getByText('editing My Provider')).toBeInTheDocument();
   });
 });

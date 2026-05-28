@@ -1,93 +1,176 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { api } from '@/services/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useProviderStore } from '@/stores/providerStore';
+import { ProviderForm } from './ProviderForm';
 import type { Provider } from '@/types';
 
 export function ProviderList() {
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const providers = useProviderStore((s) => s.providers);
+  const isLoading = useProviderStore((s) => s.isLoading);
+  const fetchProviders = useProviderStore((s) => s.fetchProviders);
+  const deleteProvider = useProviderStore((s) => s.deleteProvider);
+
+  const [filter, setFilter] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<Provider | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<Provider | null>(null);
 
   useEffect(() => {
-    const fetchProviders = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await api.listProviders();
-        setProviders(data);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to fetch providers';
-        setError(message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchProviders();
-  }, []);
+  }, [fetchProviders]);
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-8">
-        <p className="text-sm text-muted-foreground">Loading providers...</p>
-      </div>
-    );
-  }
+  const filteredProviders = filter
+    ? providers.filter((p) => p.name.toLowerCase().includes(filter.toLowerCase()))
+    : providers;
 
-  if (error) {
-    return (
-      <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">{error}</div>
-    );
-  }
+  const handleEdit = (provider: Provider) => {
+    setEditingProvider(provider);
+    setFormOpen(true);
+  };
 
-  if (providers.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
-        <p className="text-sm text-muted-foreground">
-          No providers configured. Add provider profiles to config/providers.yaml
-        </p>
-      </div>
-    );
-  }
+  const handleNew = () => {
+    setEditingProvider(undefined);
+    setFormOpen(true);
+  };
+
+  const handleSaved = () => {
+    fetchProviders();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteProvider(deleteTarget.id);
+    } catch {
+      await fetchProviders();
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
-      {providers.map((provider) => (
+      <div className="flex items-center justify-between gap-4">
+        <Input
+          placeholder="Filter providers..."
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="max-w-sm"
+        />
+        <Button onClick={handleNew}>
+          <Plus className="mr-1 h-4 w-4" />
+          New Provider
+        </Button>
+      </div>
+
+      {isLoading && (
+        <div className="flex justify-center py-8">
+          <p className="text-sm text-muted-foreground">Loading providers...</p>
+        </div>
+      )}
+
+      {!isLoading && filteredProviders.length === 0 && (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
+          <p className="text-sm text-muted-foreground">
+            No providers configured. Add providers via config/providers.yaml or create one here.
+          </p>
+        </div>
+      )}
+
+      {filteredProviders.map((provider) => (
         <Card key={provider.id}>
-          <CardContent className="py-4">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium">{provider.name}</h3>
-                  <Badge variant="secondary">{provider.purpose}</Badge>
-                </div>
-                <p className="text-xs text-muted-foreground font-mono">{provider.litellm_model}</p>
-                {provider.api_base && (
-                  <p className="text-xs text-muted-foreground">
-                    API Base: {provider.api_base}
-                  </p>
-                )}
-                {provider.tags.length > 0 && (
-                  <div className="flex gap-1 pt-1">
-                    {provider.tags.map((tag) => (
-                      <Badge key={tag} variant="outline" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {provider.has_api_key && (
+          <CardContent className="flex items-start justify-between py-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium">{provider.name}</h3>
+                <Badge variant="secondary">{provider.purpose}</Badge>
+                {provider.source === 'yaml' && (
                   <Badge variant="outline" className="text-xs">
-                    API Key Set
+                    YAML
                   </Badge>
                 )}
               </div>
+              <p className="text-xs text-muted-foreground font-mono">{provider.litellm_model}</p>
+              {provider.api_base && (
+                <p className="text-xs text-muted-foreground">API Base: {provider.api_base}</p>
+              )}
+              {provider.tags.length > 0 && (
+                <div className="flex gap-1 pt-1">
+                  {provider.tags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              {provider.has_api_key && (
+                <Badge variant="outline" className="text-xs mr-2">
+                  API Key Set
+                </Badge>
+              )}
+              {provider.source === 'user' && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEdit(provider)}
+                    aria-label="Edit"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDeleteTarget(provider)}
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
       ))}
+
+      <ProviderForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        provider={editingProvider}
+        onSaved={handleSaved}
+      />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Provider</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? This action cannot
+              be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

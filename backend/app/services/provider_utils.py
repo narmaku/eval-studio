@@ -8,9 +8,13 @@ import os
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.adapters.base import JudgeConfigParams
 from app.core.config import settings
-from app.core.providers import ProviderRegistry, provider_registry
+from app.core.providers import ProviderProfile, ProviderRegistry, provider_registry
+from app.models.provider import Provider
 
 
 @dataclass
@@ -150,3 +154,48 @@ def proxy_env(proxy: str | None):
             os.environ.pop("HTTPS_PROXY", None)
         else:
             os.environ["HTTPS_PROXY"] = old_https
+
+
+async def resolve_provider(
+    provider_id: str,
+    db: AsyncSession,
+    *,
+    registry: ProviderRegistry | None = None,
+) -> ProviderProfile | None:
+    """Resolve a provider by ID from YAML registry first, then DB.
+
+    Converts DB providers to ProviderProfile for compatibility with
+    existing code that expects the dataclass interface.
+
+    Args:
+        provider_id: The provider ID to look up.
+        db: Async database session.
+        registry: Provider registry to check first. Defaults to global singleton.
+
+    Returns:
+        ProviderProfile if found, None otherwise.
+    """
+    if registry is None:
+        registry = provider_registry
+
+    # Check YAML registry first
+    yaml_provider = registry.get_provider(provider_id)
+    if yaml_provider:
+        return yaml_provider
+
+    # Check DB
+    result = await db.execute(select(Provider).where(Provider.id == provider_id))
+    db_provider = result.scalar_one_or_none()
+    if db_provider:
+        return ProviderProfile(
+            id=db_provider.id,
+            name=db_provider.name,
+            litellm_model=db_provider.litellm_model,
+            api_base=db_provider.api_base,
+            api_key_env=db_provider.api_key_env,
+            proxy=db_provider.proxy,
+            tags=db_provider.tags or [],
+            purpose=db_provider.purpose,
+        )
+
+    return None
