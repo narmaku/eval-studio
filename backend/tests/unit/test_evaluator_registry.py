@@ -243,3 +243,84 @@ class TestFactoryRegistryIntegration:
         """Factory still raises ValueError for truly unknown adapter types."""
         with pytest.raises(ValueError):
             create_evaluation_adapter(adapter_type="completely-unknown")
+
+
+class TestEvaluatorsAPI:
+    """Tests for the /api/v1/evaluators REST endpoints."""
+
+    @pytest.fixture(autouse=True)
+    def _setup_registry(self, tmp_path, monkeypatch):
+        """Set up a test registry with known evaluators."""
+        config = {
+            "evaluators": [
+                {
+                    "id": "litellm-judge",
+                    "name": "LLM-as-Judge (LiteLLM)",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa", "agent", "rag"],
+                    "description": "Direct LLM-as-judge scoring via LiteLLM.",
+                    "builtin": True,
+                    "defaults": {"pass_threshold": 0.7, "temperature": 0.0},
+                },
+                {
+                    "id": "rag-only-eval",
+                    "name": "RAG Only Evaluator",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["rag"],
+                    "description": "Only supports RAG mode.",
+                    "builtin": False,
+                },
+            ]
+        }
+        config_file = tmp_path / "evaluators.yaml"
+        config_file.write_text(yaml.dump(config))
+
+        # Replace the singleton registry in all modules that import it
+        from app.adapters import registry as reg_module
+        from app.api.v1 import evaluators as api_module
+
+        test_registry = EvaluatorRegistry()
+        test_registry.load_from_yaml(config_file)
+        monkeypatch.setattr(reg_module, "evaluator_registry", test_registry)
+        monkeypatch.setattr(api_module, "evaluator_registry", test_registry)
+
+    async def test_list_evaluators(self, client):
+        """GET /api/v1/evaluators returns all evaluators."""
+        resp = await client.get("/api/v1/evaluators")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        ids = {e["id"] for e in data}
+        assert ids == {"litellm-judge", "rag-only-eval"}
+
+    async def test_list_evaluators_filter_mode(self, client):
+        """GET /api/v1/evaluators?mode=qa returns only evaluators supporting qa."""
+        resp = await client.get("/api/v1/evaluators", params={"mode": "qa"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["id"] == "litellm-judge"
+
+    async def test_list_evaluators_filter_mode_rag(self, client):
+        """GET /api/v1/evaluators?mode=rag returns evaluators supporting rag."""
+        resp = await client.get("/api/v1/evaluators", params={"mode": "rag"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+
+    async def test_get_evaluator_single(self, client):
+        """GET /api/v1/evaluators/{id} returns evaluator with config schema."""
+        resp = await client.get("/api/v1/evaluators/litellm-judge")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["id"] == "litellm-judge"
+        assert data["name"] == "LLM-as-Judge (LiteLLM)"
+        assert data["builtin"] is True
+        assert data["available"] is True
+        assert "config_schema" in data
+        assert data["config_schema"]["type"] == "object"
+
+    async def test_get_evaluator_not_found(self, client):
+        """GET /api/v1/evaluators/nonexistent returns 404."""
+        resp = await client.get("/api/v1/evaluators/nonexistent")
+        assert resp.status_code == 404
