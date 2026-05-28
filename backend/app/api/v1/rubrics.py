@@ -97,8 +97,6 @@ async def update_rubric(
 
     update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
-        if field == "dimensions" and value is not None:
-            value = [dim if isinstance(dim, dict) else dim.model_dump() for dim in value]
         setattr(rubric, field, value)
 
     await db.commit()

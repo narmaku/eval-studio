@@ -21,6 +21,18 @@ class TestRubricDimension:
         with pytest.raises(ValidationError):
             RubricDimension(name="accuracy", weight=0.0, description="zero weight")
 
+    def test_empty_name_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricDimension(name="", weight=1.0, description="valid description")
+
+    def test_name_too_long_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricDimension(name="a" * 256, weight=1.0, description="valid description")
+
+    def test_empty_description_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricDimension(name="accuracy", weight=1.0, description="")
+
 
 class TestRubricCreate:
     def test_valid_create(self):
@@ -39,6 +51,13 @@ class TestRubricCreate:
         with pytest.raises(ValidationError):
             RubricCreate(
                 name="",
+                dimensions=[RubricDimension(name="accuracy", weight=1.0, description="Accuracy")],
+            )
+
+    def test_name_too_long_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricCreate(
+                name="a" * 256,
                 dimensions=[RubricDimension(name="accuracy", weight=1.0, description="Accuracy")],
             )
 
