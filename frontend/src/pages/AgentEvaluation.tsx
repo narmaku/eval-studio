@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
 import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
 import { ToolInspector } from '@/components/chat/ToolInspector';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { useEvaluationStore } from '@/stores/evaluationStore';
+import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import {
@@ -37,6 +39,7 @@ export default function AgentEvaluation() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const { isLoading: evalLoading, setLoading: setEvalLoading } = useEvaluationStore();
+  const { selectedEvaluatorId } = useEvaluatorStore();
 
   const {
     currentSession,
@@ -54,7 +57,7 @@ export default function AgentEvaluation() {
     resetSession,
   } = useSessionStore();
 
-  const isConfigValid = Boolean(modelEndpoint && judgeConfig);
+  const isConfigValid = Boolean(modelEndpoint && judgeConfig && selectedEvaluatorId);
 
   // Session timer
   useEffect(() => {
@@ -112,6 +115,7 @@ export default function AgentEvaluation() {
           litellm_model: modelEndpoint.litellm_model,
           api_base: modelEndpoint.api_base,
           ...(systemPrompt.trim() && { system_prompt: systemPrompt.trim() }),
+          ...(selectedEvaluatorId && { evaluator_id: selectedEvaluatorId }),
         },
         judge_config: {
           provider_id: judgeConfig.provider_id,
@@ -136,7 +140,7 @@ export default function AgentEvaluation() {
     } finally {
       setEvalLoading(false);
     }
-  }, [modelEndpoint, judgeConfig, systemPrompt, setEvalLoading, createSession, connectWebSocket]);
+  }, [modelEndpoint, judgeConfig, systemPrompt, selectedEvaluatorId, setEvalLoading, createSession, connectWebSocket]);
 
   const handleEndSession = useCallback(async () => {
     try {
@@ -161,6 +165,7 @@ export default function AgentEvaluation() {
     setJudgeConfig(undefined);
     setSystemPrompt('');
     setElapsedSeconds(0);
+    useEvaluatorStore.getState().resetSelection();
   }, [resetSession]);
 
   const formatElapsed = (seconds: number): string => {
@@ -182,6 +187,7 @@ export default function AgentEvaluation() {
       {/* Configure Phase */}
       {phase === 'configure' && (
         <>
+          <EvaluatorSelector mode="agent" />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-4">
               <ProviderSelector
