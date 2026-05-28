@@ -18,6 +18,7 @@ import type {
   CreateJudgeRequest,
   JudgePreset,
   Provider,
+  EvaluatorInfo,
 } from '@/types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
@@ -184,9 +185,14 @@ export const api = {
   listProviderModels: (providerId: string) =>
     request<{ id: string; owned_by: string }[]>(`/api/v1/providers/${providerId}/models`),
 
-  // --- Adapters & Config ---
-  listAdapters: () => request<{ name: string; modes: string[] }[]>('/api/v1/adapters'),
-  getConfig: () => request<Record<string, unknown>>('/api/v1/config'),
+  // --- Evaluators ---
+  listEvaluators: (mode?: string) => {
+    const query = new URLSearchParams();
+    if (mode) query.set('mode', mode);
+    const qs = query.toString();
+    return request<EvaluatorInfo[]>(`/api/v1/evaluators${qs ? `?${qs}` : ''}`);
+  },
+  getEvaluator: (id: string) => request<EvaluatorInfo>(`/api/v1/evaluators/${id}`),
 };
 
 export { ApiClientError };
