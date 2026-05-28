@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
 import { DatasetSelector } from '@/components/evaluation/DatasetSelector';
 import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
@@ -9,6 +10,7 @@ import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { QAResultsTable } from '@/components/evaluation/QAResultsTable';
 import { ResultDetailDrawer } from '@/components/evaluation/ResultDetailDrawer';
 import { useEvaluationStore } from '@/stores/evaluationStore';
+import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import type {
@@ -30,9 +32,10 @@ export default function QAEvaluation() {
 
   const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading } =
     useEvaluationStore();
+  const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults } = useResultStore();
 
-  const isConfigValid = Boolean(selectedDatasetId && modelEndpoint && judgeConfig);
+  const isConfigValid = Boolean(selectedDatasetId && modelEndpoint && judgeConfig && selectedEvaluatorId);
 
   const handleStart = async () => {
     if (!selectedDatasetId || !modelEndpoint || !judgeConfig) return;
@@ -44,6 +47,7 @@ export default function QAEvaluation() {
       config: {
         model_endpoint: modelEndpoint,
         judge_config: judgeConfig,
+        evaluator_id: selectedEvaluatorId ?? undefined,
       },
     };
 
@@ -109,6 +113,7 @@ export default function QAEvaluation() {
     setJudgeConfig(undefined);
     setSelectedResult(null);
     setDrawerOpen(false);
+    useEvaluatorStore.getState().resetSelection();
   };
 
   return (
@@ -124,6 +129,7 @@ export default function QAEvaluation() {
       {/* Configure Phase */}
       {phase === 'configure' && (
         <>
+          <EvaluatorSelector mode="qa" />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-2">
