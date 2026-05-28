@@ -1,5 +1,8 @@
 """Integration tests for the Rubrics CRUD API."""
 
+import textwrap
+from unittest.mock import patch
+
 import pytest
 
 RUBRIC_PAYLOAD = {
@@ -184,3 +187,194 @@ async def test_delete_rubric_not_found(client):
     """DELETE /rubrics/nonexistent returns 404."""
     response = await client.delete("/api/v1/rubrics/nonexistent-id")
     assert response.status_code == 404
+
+
+# --- Import endpoint tests ---
+
+
+VALID_YAML = textwrap.dedent("""\
+    rubric:
+      name: "Imported Rubric"
+      description: "Imported from YAML"
+      dimensions:
+        - name: accuracy
+          weight: 0.6
+          description: "Factual accuracy"
+        - name: completeness
+          weight: 0.4
+          description: "Answer completeness"
+      pass_threshold: 0.8
+      aggregation: weighted_average
+""")
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_success(client):
+    """POST /rubrics/import creates a rubric from valid YAML."""
+    response = await client.post("/api/v1/rubrics/import", json={"yaml_content": VALID_YAML})
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Imported Rubric"
+    assert data["description"] == "Imported from YAML"
+    assert len(data["dimensions"]) == 2
+    assert data["dimensions"][0]["name"] == "accuracy"
+    assert data["pass_threshold"] == 0.8
+    assert data["id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_flat_format(client):
+    """POST /rubrics/import accepts flat YAML format."""
+    yaml_content = textwrap.dedent("""\
+        name: "Flat Import"
+        dimensions:
+          - name: quality
+            weight: 1.0
+            description: "Overall quality"
+    """)
+    response = await client.post("/api/v1/rubrics/import", json={"yaml_content": yaml_content})
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Flat Import"
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_invalid_yaml(client):
+    """POST /rubrics/import returns 400 for invalid YAML."""
+    response = await client.post("/api/v1/rubrics/import", json={"yaml_content": "key: [unclosed"})
+    assert response.status_code == 400
+    data = response.json()
+    assert "Invalid YAML" in data["detail"]
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_no_dimensions(client):
+    """POST /rubrics/import returns 400 when no dimensions in YAML."""
+    response = await client.post("/api/v1/rubrics/import", json={"yaml_content": "name: No Dims"})
+    assert response.status_code == 400
+    assert "No dimensions" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_empty_body(client):
+    """POST /rubrics/import returns 422 for empty yaml_content."""
+    response = await client.post("/api/v1/rubrics/import", json={"yaml_content": ""})
+    assert response.status_code == 422
+
+
+# --- Generate endpoint tests ---
+
+
+@pytest.mark.asyncio
+async def test_generate_rubric_success(client):
+    """POST /rubrics/generate creates a rubric via LLM."""
+    from rubric_kit import Criterion, Dimension, GenerationResult, Rubric
+
+    mock_rubric = Rubric(
+        dimensions=[
+            Dimension(name="quality", description="Quality assessment", grading_type="score", scores={1: "Bad", 5: "Good"}),
+        ],
+        criteria=[
+            Criterion(name="q1", weight=3, dimension="quality", criterion="Is it good?"),
+        ],
+    )
+    mock_result = GenerationResult(
+        rubric=mock_rubric, model="test-model", input_type="qna", input_source="<in-memory>"
+    )
+
+    with patch("app.services.rubric_service.rubric_kit_generate", return_value=mock_result):
+        response = await client.post(
+            "/api/v1/rubrics/generate",
+            json={"description": "Evaluate Q&A accuracy", "provider_id": "__test__"},
+        )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Generated Rubric"
+    assert data["description"] == "Evaluate Q&A accuracy"
+    assert len(data["dimensions"]) == 1
+    assert data["id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_generate_rubric_unknown_provider(client):
+    """POST /rubrics/generate returns 400 for unknown provider."""
+    response = await client.post(
+        "/api/v1/rubrics/generate",
+        json={"description": "Test", "provider_id": "nonexistent-provider"},
+    )
+    assert response.status_code == 400
+    assert "Provider" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_generate_rubric_empty_description(client):
+    """POST /rubrics/generate returns 422 for empty description."""
+    response = await client.post(
+        "/api/v1/rubrics/generate",
+        json={"description": "", "provider_id": "__test__"},
+    )
+    assert response.status_code == 422
+
+
+# --- Refine endpoint tests ---
+
+
+@pytest.mark.asyncio
+async def test_refine_rubric_success(client):
+    """POST /rubrics/{id}/refine refines an existing rubric."""
+    # First create a rubric
+    create_resp = await client.post("/api/v1/rubrics", json=RUBRIC_PAYLOAD)
+    rubric_id = create_resp.json()["id"]
+
+    from rubric_kit import Criterion, Dimension, RefinementResult, Rubric
+
+    mock_rubric = Rubric(
+        dimensions=[
+            Dimension(name="accuracy", description="Factual accuracy", grading_type="score", scores={1: "1", 5: "5"}),
+            Dimension(name="clarity", description="Response clarity", grading_type="score", scores={1: "1", 5: "5"}),
+        ],
+        criteria=[
+            Criterion(name="c1", weight=2, dimension="accuracy", criterion="Accurate?"),
+            Criterion(name="c2", weight=1, dimension="clarity", criterion="Clear?"),
+        ],
+    )
+    mock_result = RefinementResult(
+        rubric=mock_rubric, original_rubric=mock_rubric, model="test-model", had_feedback=True
+    )
+
+    with patch("app.services.rubric_service.rubric_kit_refine", return_value=mock_result):
+        response = await client.post(
+            f"/api/v1/rubrics/{rubric_id}/refine",
+            json={"feedback": "Add a clarity dimension", "provider_id": "__test__"},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == rubric_id
+    assert len(data["dimensions"]) == 2
+    # Should keep original name
+    assert data["name"] == "Test Rubric"
+
+
+@pytest.mark.asyncio
+async def test_refine_rubric_not_found(client):
+    """POST /rubrics/nonexistent/refine returns 404."""
+    response = await client.post(
+        "/api/v1/rubrics/nonexistent-id/refine",
+        json={"feedback": "test", "provider_id": "__test__"},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_refine_rubric_unknown_provider(client):
+    """POST /rubrics/{id}/refine returns 400 for unknown provider."""
+    create_resp = await client.post("/api/v1/rubrics", json=RUBRIC_PAYLOAD)
+    rubric_id = create_resp.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/rubrics/{rubric_id}/refine",
+        json={"feedback": "test", "provider_id": "nonexistent-provider"},
+    )
+    assert response.status_code == 400

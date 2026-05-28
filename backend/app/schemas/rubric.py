@@ -49,3 +49,24 @@ class RubricResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RubricImportRequest(BaseModel):
+    """Schema for importing a rubric from YAML content."""
+
+    yaml_content: str = Field(min_length=1)
+
+
+class RubricGenerateRequest(BaseModel):
+    """Schema for generating a rubric via LLM."""
+
+    description: str = Field(min_length=1)
+    sample_data: str | None = None
+    provider_id: str = Field(min_length=1)
+
+
+class RubricRefineRequest(BaseModel):
+    """Schema for refining a rubric via LLM."""
+
+    feedback: str = Field(min_length=1)
+    provider_id: str = Field(min_length=1)
