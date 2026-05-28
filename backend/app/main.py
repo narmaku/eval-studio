@@ -95,6 +95,7 @@ from app.api.v1.health import router as health_router  # noqa: E402
 from app.api.v1.judges import router as judges_router  # noqa: E402
 from app.api.v1.providers import router as providers_router  # noqa: E402
 from app.api.v1.results import router as results_router  # noqa: E402
+from app.api.v1.rubrics import router as rubrics_router  # noqa: E402
 from app.api.v1.sessions import router as sessions_router  # noqa: E402
 from app.websocket.chat import router as ws_chat_router  # noqa: E402
 from app.websocket.progress import router as ws_progress_router  # noqa: E402
@@ -107,6 +108,7 @@ app.include_router(sessions_router, prefix="/api/v1")
 app.include_router(environments_router, prefix="/api/v1")
 app.include_router(judges_router, prefix="/api/v1")
 app.include_router(providers_router, prefix="/api/v1")
+app.include_router(rubrics_router, prefix="/api/v1")
 app.include_router(results_router, prefix="/api/v1")
 app.include_router(ws_chat_router)
 app.include_router(ws_progress_router)
