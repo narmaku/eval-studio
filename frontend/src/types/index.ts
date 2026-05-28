@@ -5,3 +5,5 @@ export * from './result';
 export * from './session';
 export * from './environment';
 export * from './judge';
+export * from './rubric';
+export * from './evaluator';
