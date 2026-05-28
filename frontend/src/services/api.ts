@@ -239,8 +239,21 @@ export const api = {
     request<void>(`/api/v1/evaluators/${evaluatorId}/config-files/${filename}`, {
       method: 'DELETE',
     }),
-  getEvaluatorConfigFile: (evaluatorId: string, filename: string) =>
-    request<string>(`/api/v1/evaluators/${evaluatorId}/config-files/${filename}`),
+  getEvaluatorConfigFile: async (evaluatorId: string, filename: string): Promise<string> => {
+    const url = `${BASE_URL}/api/v1/evaluators/${evaluatorId}/config-files/${filename}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      const errorBody = (await response.json().catch(() => ({
+        type: 'about:blank',
+        title: 'Request failed',
+        status: response.status,
+        detail: response.statusText,
+        instance: url,
+      }))) as ApiError;
+      throw new ApiClientError(response.status, errorBody);
+    }
+    return response.text();
+  },
 };
 
 export { ApiClientError };

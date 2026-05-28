@@ -1,7 +1,7 @@
 """API endpoints for evaluator discovery and config file management."""
 
 import importlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -95,6 +95,9 @@ class ConfigFileInfo(BaseModel):
     modified_at: str = ""
 
 
+MAX_CONFIG_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
 def _sanitize_filename(name: str) -> str:
     """Extract the bare filename, rejecting path traversal attempts.
 
@@ -109,8 +112,17 @@ def _sanitize_filename(name: str) -> str:
 
 
 def _config_dir_for(evaluator_id: str) -> Path:
-    """Return the config directory for an evaluator, without creating it."""
-    return Path(settings.evaluator_config_dir) / evaluator_id
+    """Return the config directory for an evaluator, without creating it.
+
+    Also validates that evaluator_id does not contain path traversal sequences.
+    """
+    if not evaluator_id or ".." in evaluator_id or "/" in evaluator_id or "\\" in evaluator_id:
+        raise AppException(400, "Bad Request", f"Invalid evaluator id: {evaluator_id}")
+    base = Path(settings.evaluator_config_dir).resolve()
+    target = (base / evaluator_id).resolve()
+    if not target.is_relative_to(base):
+        raise AppException(400, "Bad Request", "Path traversal detected")
+    return target
 
 
 def _ensure_evaluator_exists(evaluator_id: str) -> None:
@@ -126,14 +138,16 @@ async def upload_config_file(evaluator_id: str, file: UploadFile) -> ConfigFileI
     filename = _sanitize_filename(file.filename or "")
     target_dir = _config_dir_for(evaluator_id)
     target_dir.mkdir(parents=True, exist_ok=True)
-    target_path = target_dir / filename
+    target_path = (target_dir / filename).resolve()
 
     # Verify resolved path is within the expected directory
-    resolved = target_path.resolve()
-    if not str(resolved).startswith(str(target_dir.resolve())):
+    if not target_path.is_relative_to(target_dir):
         raise AppException(400, "Bad Request", "Path traversal detected")
 
     content = await file.read()
+    if len(content) > MAX_CONFIG_FILE_SIZE:
+        max_mb = MAX_CONFIG_FILE_SIZE // (1024 * 1024)
+        raise AppException(400, "Bad Request", f"File too large. Maximum size is {max_mb} MB")
     target_path.write_bytes(content)
 
     logger.info("config_file_uploaded", evaluator_id=evaluator_id, filename=filename, size=len(content))
@@ -152,7 +166,7 @@ async def list_config_files(evaluator_id: str) -> list[ConfigFileInfo]:
     for p in sorted(target_dir.iterdir()):
         if p.is_file():
             stat = p.stat()
-            modified_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+            modified_at = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
             files.append(ConfigFileInfo(filename=p.name, size=stat.st_size, modified_at=modified_at))
     return files
 
@@ -162,12 +176,11 @@ async def get_config_file(evaluator_id: str, filename: str) -> PlainTextResponse
     """Retrieve the content of a config file as plain text."""
     _ensure_evaluator_exists(evaluator_id)
     sanitized = _sanitize_filename(filename)
-    target_path = _config_dir_for(evaluator_id) / sanitized
+    target_dir = _config_dir_for(evaluator_id)
+    target_path = (target_dir / sanitized).resolve()
 
     # Verify resolved path is within the expected directory
-    resolved = target_path.resolve()
-    expected_dir = _config_dir_for(evaluator_id).resolve()
-    if not str(resolved).startswith(str(expected_dir)):
+    if not target_path.is_relative_to(target_dir):
         raise AppException(400, "Bad Request", "Path traversal detected")
 
     if not target_path.exists():
@@ -182,12 +195,11 @@ async def delete_config_file(evaluator_id: str, filename: str) -> None:
     """Delete a config file."""
     _ensure_evaluator_exists(evaluator_id)
     sanitized = _sanitize_filename(filename)
-    target_path = _config_dir_for(evaluator_id) / sanitized
+    target_dir = _config_dir_for(evaluator_id)
+    target_path = (target_dir / sanitized).resolve()
 
     # Verify resolved path is within the expected directory
-    resolved = target_path.resolve()
-    expected_dir = _config_dir_for(evaluator_id).resolve()
-    if not str(resolved).startswith(str(expected_dir)):
+    if not target_path.is_relative_to(target_dir):
         raise AppException(400, "Bad Request", "Path traversal detected")
 
     if not target_path.exists():

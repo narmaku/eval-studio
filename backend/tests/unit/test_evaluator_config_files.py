@@ -161,6 +161,28 @@ class TestEvaluatorConfigFiles:
         resp = await client.delete("/api/v1/evaluators/litellm-judge/config-files/..secret.txt")
         assert resp.status_code == 400
 
+    async def test_upload_config_file_too_large(self, client):
+        """POST /evaluators/{id}/config-files rejects files exceeding the size limit."""
+        from app.api.v1 import evaluators as api_module
+
+        # Temporarily set a small max size for testing
+        original = api_module.MAX_CONFIG_FILE_SIZE
+        api_module.MAX_CONFIG_FILE_SIZE = 100  # 100 bytes
+        try:
+            resp = await client.post(
+                "/api/v1/evaluators/litellm-judge/config-files",
+                files={"file": ("big.txt", b"x" * 200, "text/plain")},
+            )
+            assert resp.status_code == 400
+            assert "too large" in resp.json()["detail"].lower()
+        finally:
+            api_module.MAX_CONFIG_FILE_SIZE = original
+
+    async def test_evaluator_id_path_traversal_rejected(self, client):
+        """Config file endpoints reject evaluator IDs with path traversal."""
+        resp = await client.get("/api/v1/evaluators/../../etc/config-files")
+        assert resp.status_code in (400, 404)
+
     async def test_upload_overwrites_existing_file(self, client):
         """Uploading a file with the same name overwrites the existing file."""
         await client.post(
