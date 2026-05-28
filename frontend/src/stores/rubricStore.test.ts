@@ -119,7 +119,9 @@ describe('rubricStore', () => {
       const result = await useRubricStore.getState().updateRubric('r-1', { name: 'New Name' });
 
       expect(result).toEqual(updated);
-      expect(useRubricStore.getState().rubrics[0].name).toBe('New Name');
+      const rubrics = useRubricStore.getState().rubrics;
+      expect(rubrics).toHaveLength(1);
+      expect(rubrics[0]!.name).toBe('New Name');
       expect(mockedApi.updateRubric).toHaveBeenCalledWith('r-1', { name: 'New Name' });
     });
   });

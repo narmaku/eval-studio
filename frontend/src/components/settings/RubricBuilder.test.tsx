@@ -96,7 +96,8 @@ describe('RubricBuilder', () => {
 
     const removeButtons = screen.getAllByTestId('remove-dimension');
     expect(removeButtons).toHaveLength(2);
-    await user.click(removeButtons[0]);
+    const firstRemove = removeButtons[0]!;
+    await user.click(firstRemove);
 
     expect(screen.getAllByTestId('dimension-row')).toHaveLength(1);
   });
@@ -109,7 +110,7 @@ describe('RubricBuilder', () => {
     await user.click(screen.getByRole('button', { name: /add dimension/i }));
     const row = screen.getByTestId('dimension-row');
     const inputs = within(row).getAllByRole('textbox');
-    await user.type(inputs[0], 'quality');
+    await user.type(inputs[0]!, 'quality');
 
     // Try to save without a name
     await user.click(screen.getByRole('button', { name: /save/i }));
@@ -146,7 +147,7 @@ describe('RubricBuilder', () => {
 
     const row = screen.getByTestId('dimension-row');
     const inputs = within(row).getAllByRole('textbox');
-    await user.type(inputs[0], 'quality');
+    await user.type(inputs[0]!, 'quality');
 
     await user.click(screen.getByRole('button', { name: /save/i }));
 
