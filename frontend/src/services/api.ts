@@ -212,6 +212,35 @@ export const api = {
     return request<EvaluatorInfo[]>(`/api/v1/evaluators${qs ? `?${qs}` : ''}`);
   },
   getEvaluator: (id: string) => request<EvaluatorInfo>(`/api/v1/evaluators/${id}`),
+
+  // --- Evaluator Config Files ---
+  listEvaluatorConfigFiles: (evaluatorId: string) =>
+    request<{ filename: string; size: number; modified_at: string }[]>(
+      `/api/v1/evaluators/${evaluatorId}/config-files`
+    ),
+  uploadEvaluatorConfigFile: async (evaluatorId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const url = `${BASE_URL}/api/v1/evaluators/${evaluatorId}/config-files`;
+    const response = await fetch(url, { method: 'POST', body: formData });
+    if (!response.ok) {
+      const errorBody = (await response.json().catch(() => ({
+        type: 'about:blank',
+        title: 'Upload failed',
+        status: response.status,
+        detail: response.statusText,
+        instance: url,
+      }))) as ApiError;
+      throw new ApiClientError(response.status, errorBody);
+    }
+    return response.json() as Promise<{ filename: string; size: number }>;
+  },
+  deleteEvaluatorConfigFile: (evaluatorId: string, filename: string) =>
+    request<void>(`/api/v1/evaluators/${evaluatorId}/config-files/${filename}`, {
+      method: 'DELETE',
+    }),
+  getEvaluatorConfigFile: (evaluatorId: string, filename: string) =>
+    request<string>(`/api/v1/evaluators/${evaluatorId}/config-files/${filename}`),
 };
 
 export { ApiClientError };
