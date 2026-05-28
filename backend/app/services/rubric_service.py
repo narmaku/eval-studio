@@ -87,11 +87,13 @@ def _normalize_simple_dimensions(raw_dims: list[dict]) -> list[dict]:
     for d in raw_dims:
         if not isinstance(d, dict):
             continue
-        dims.append({
-            "name": d.get("name", "unnamed"),
-            "weight": float(d.get("weight", 1.0)),
-            "description": d.get("description", d.get("name", "unnamed")),
-        })
+        dims.append(
+            {
+                "name": d.get("name", "unnamed"),
+                "weight": float(d.get("weight", 1.0)),
+                "description": d.get("description", d.get("name", "unnamed")),
+            }
+        )
     return dims
 
 
@@ -116,11 +118,13 @@ def _convert_rubric_kit_dims_and_criteria(raw_dims: list[dict], raw_criteria: li
             continue
         name = d.get("name", "unnamed")
         raw_w = dim_weights.get(name, 1.0)
-        dims.append({
-            "name": name,
-            "weight": round(raw_w / total_weight, 4),
-            "description": d.get("description", name),
-        })
+        dims.append(
+            {
+                "name": name,
+                "weight": round(raw_w / total_weight, 4),
+                "description": d.get("description", name),
+            }
+        )
 
     return dims
 
@@ -146,11 +150,13 @@ def convert_rubric_kit_to_internal(rubric: Rubric, name: str = "Generated Rubric
     dimensions = []
     for dim in rubric.dimensions:
         raw_w = dim_weights.get(dim.name, 1.0)
-        dimensions.append({
-            "name": dim.name,
-            "weight": round(raw_w / total_weight, 4),
-            "description": dim.description,
-        })
+        dimensions.append(
+            {
+                "name": dim.name,
+                "weight": round(raw_w / total_weight, 4),
+                "description": dim.description,
+            }
+        )
 
     return {
         "name": name,

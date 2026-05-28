@@ -272,15 +272,15 @@ async def test_generate_rubric_success(client):
 
     mock_rubric = Rubric(
         dimensions=[
-            Dimension(name="quality", description="Quality assessment", grading_type="score", scores={1: "Bad", 5: "Good"}),
+            Dimension(
+                name="quality", description="Quality assessment", grading_type="score", scores={1: "Bad", 5: "Good"}
+            ),
         ],
         criteria=[
             Criterion(name="q1", weight=3, dimension="quality", criterion="Is it good?"),
         ],
     )
-    mock_result = GenerationResult(
-        rubric=mock_rubric, model="test-model", input_type="qna", input_source="<in-memory>"
-    )
+    mock_result = GenerationResult(rubric=mock_rubric, model="test-model", input_type="qna", input_source="<in-memory>")
 
     with patch("app.services.rubric_service.rubric_kit_generate", return_value=mock_result):
         response = await client.post(

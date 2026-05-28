@@ -1,7 +1,7 @@
 """Unit tests for rubric service (import, generate, refine)."""
 
 import textwrap
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -271,7 +271,7 @@ class TestGenerateRubric:
             input_source="<in-memory>",
         )
 
-        result = generate_rubric(
+        generate_rubric(
             description="Test description",
             sample_data="Q: What? A: This.",
             model="test-model",
@@ -305,7 +305,9 @@ class TestRefineRubric:
 
         mock_rubric = Rubric(
             dimensions=[
-                Dimension(name="quality", description="Improved quality", grading_type="score", scores={1: "1", 5: "5"}),
+                Dimension(
+                    name="quality", description="Improved quality", grading_type="score", scores={1: "1", 5: "5"}
+                ),
             ],
             criteria=[
                 Criterion(name="q1", weight=3, dimension="quality", criterion="Is it good?"),

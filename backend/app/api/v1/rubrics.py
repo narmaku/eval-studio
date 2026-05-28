@@ -39,7 +39,7 @@ async def import_rubric(
     try:
         rubric_data = parse_rubric_yaml(payload.yaml_content)
     except ValueError as exc:
-        raise AppException(400, "Bad Request", str(exc))
+        raise AppException(400, "Bad Request", str(exc)) from None
 
     rubric = Rubric(
         name=rubric_data["name"],
@@ -75,7 +75,7 @@ async def generate_rubric_endpoint(
         )
     except Exception as exc:
         logger.error("rubric.generate.failed", error=str(exc))
-        raise AppException(502, "Generation Failed", f"Rubric generation failed: {exc}")
+        raise AppException(502, "Generation Failed", f"Rubric generation failed: {exc}") from None
 
     rubric = Rubric(
         name=rubric_data["name"],
@@ -216,7 +216,7 @@ async def refine_rubric_endpoint(
         )
     except Exception as exc:
         logger.error("rubric.refine.failed", error=str(exc), rubric_id=rubric_id)
-        raise AppException(502, "Refinement Failed", f"Rubric refinement failed: {exc}")
+        raise AppException(502, "Refinement Failed", f"Rubric refinement failed: {exc}") from None
 
     rubric.dimensions = refined["dimensions"]
     if refined.get("description"):
