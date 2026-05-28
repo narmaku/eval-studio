@@ -21,6 +21,9 @@ import type {
   Rubric,
   CreateRubricRequest,
   UpdateRubricRequest,
+  ImportRubricRequest,
+  GenerateRubricRequest,
+  RefineRubricRequest,
   EvaluatorInfo,
 } from '@/types';
 
@@ -203,6 +206,15 @@ export const api = {
   updateRubric: (id: string, data: UpdateRubricRequest) =>
     request<Rubric>(`/api/v1/rubrics/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteRubric: (id: string) => request<void>(`/api/v1/rubrics/${id}`, { method: 'DELETE' }),
+  importRubric: (data: ImportRubricRequest) =>
+    request<Rubric>('/api/v1/rubrics/import', { method: 'POST', body: JSON.stringify(data) }),
+  generateRubric: (data: GenerateRubricRequest) =>
+    request<Rubric>('/api/v1/rubrics/generate', { method: 'POST', body: JSON.stringify(data) }),
+  refineRubric: (id: string, data: RefineRubricRequest) =>
+    request<Rubric>(`/api/v1/rubrics/${id}/refine`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // --- Evaluators ---
   listEvaluators: (mode?: string) => {

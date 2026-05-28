@@ -26,3 +26,18 @@ export interface CreateRubricRequest {
 }
 
 export type UpdateRubricRequest = Partial<CreateRubricRequest>;
+
+export interface ImportRubricRequest {
+  yaml_content: string;
+}
+
+export interface GenerateRubricRequest {
+  description: string;
+  sample_data?: string;
+  provider_id: string;
+}
+
+export interface RefineRubricRequest {
+  feedback: string;
+  provider_id: string;
+}
