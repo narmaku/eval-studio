@@ -1,0 +1,13 @@
+# Evaluator definitions for eval-studio
+# Each evaluator maps to an EvaluationAdapter implementation.
+
+evaluators:
+  - id: litellm-judge
+    name: "LLM-as-Judge (LiteLLM)"
+    adapter_class: "app.adapters.litellm_judge.LiteLLMJudgeAdapter"
+    modes: [qa, agent, rag]
+    description: "Direct LLM-as-judge scoring via LiteLLM. No external tools needed."
+    builtin: true
+    defaults:
+      pass_threshold: 0.7
+      temperature: 0.0
