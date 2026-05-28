@@ -27,6 +27,9 @@ let storeState: {
   deleteRubric: typeof mockDeleteRubric;
   createRubric: ReturnType<typeof vi.fn>;
   updateRubric: ReturnType<typeof vi.fn>;
+  importRubric: ReturnType<typeof vi.fn>;
+  generateRubric: ReturnType<typeof vi.fn>;
+  refineRubric: ReturnType<typeof vi.fn>;
 };
 
 const defaultStore = {
@@ -37,6 +40,9 @@ const defaultStore = {
   deleteRubric: mockDeleteRubric,
   createRubric: vi.fn(),
   updateRubric: vi.fn(),
+  importRubric: vi.fn(),
+  generateRubric: vi.fn(),
+  refineRubric: vi.fn(),
 };
 
 vi.mock('@/stores/rubricStore', () => ({
@@ -63,6 +69,24 @@ vi.mock('./RubricBuilder', () => ({
       <div data-testid="rubric-builder">
         {rubric ? `editing ${rubric.name}` : 'creating new'}
       </div>
+    ) : null,
+}));
+
+// Stub dialog components
+vi.mock('./RubricImportDialog', () => ({
+  RubricImportDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="import-dialog">import dialog</div> : null,
+}));
+
+vi.mock('./RubricGenerateDialog', () => ({
+  RubricGenerateDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="generate-dialog">generate dialog</div> : null,
+}));
+
+vi.mock('./RubricRefineDialog', () => ({
+  RubricRefineDialog: ({ open, rubric }: { open: boolean; rubric: Rubric }) =>
+    open ? (
+      <div data-testid="refine-dialog">refining {rubric.name}</div>
     ) : null,
 }));
 
@@ -120,6 +144,21 @@ describe('RubricList', () => {
     expect(screen.getByRole('button', { name: /new rubric/i })).toBeInTheDocument();
   });
 
+  it('renders Import and Generate buttons', () => {
+    render(<RubricList />);
+    expect(screen.getByRole('button', { name: /import/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /generate/i })).toBeInTheDocument();
+  });
+
+  it('renders Refine button per rubric', () => {
+    storeState = {
+      ...defaultStore,
+      rubrics: [makeRubric({ id: 'r-1', name: 'My Rubric' })],
+    };
+    render(<RubricList />);
+    expect(screen.getByRole('button', { name: /refine/i })).toBeInTheDocument();
+  });
+
   it('filters rubrics by name', async () => {
     const user = userEvent.setup();
     storeState = {
@@ -160,5 +199,37 @@ describe('RubricList', () => {
 
     expect(screen.getByTestId('rubric-builder')).toBeInTheDocument();
     expect(screen.getByText('editing My Rubric')).toBeInTheDocument();
+  });
+
+  it('opens import dialog on Import click', async () => {
+    const user = userEvent.setup();
+    render(<RubricList />);
+
+    await user.click(screen.getByRole('button', { name: /import/i }));
+
+    expect(screen.getByTestId('import-dialog')).toBeInTheDocument();
+  });
+
+  it('opens generate dialog on Generate click', async () => {
+    const user = userEvent.setup();
+    render(<RubricList />);
+
+    await user.click(screen.getByRole('button', { name: /generate/i }));
+
+    expect(screen.getByTestId('generate-dialog')).toBeInTheDocument();
+  });
+
+  it('opens refine dialog on Refine click', async () => {
+    const user = userEvent.setup();
+    storeState = {
+      ...defaultStore,
+      rubrics: [makeRubric({ id: 'r-1', name: 'My Rubric' })],
+    };
+    render(<RubricList />);
+
+    await user.click(screen.getByRole('button', { name: /refine/i }));
+
+    expect(screen.getByTestId('refine-dialog')).toBeInTheDocument();
+    expect(screen.getByText('refining My Rubric')).toBeInTheDocument();
   });
 });

@@ -13,9 +13,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Upload, Sparkles, RefreshCw } from 'lucide-react';
 import { useRubricStore } from '@/stores/rubricStore';
 import { RubricBuilder } from './RubricBuilder';
+import { RubricImportDialog } from './RubricImportDialog';
+import { RubricGenerateDialog } from './RubricGenerateDialog';
+import { RubricRefineDialog } from './RubricRefineDialog';
 import type { Rubric } from '@/types';
 
 export function RubricList() {
@@ -28,6 +31,9 @@ export function RubricList() {
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editingRubric, setEditingRubric] = useState<Rubric | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<Rubric | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [refineTarget, setRefineTarget] = useState<Rubric | null>(null);
 
   useEffect(() => {
     fetchRubrics();
@@ -74,10 +80,20 @@ export function RubricList() {
           onChange={(e) => setFilter(e.target.value)}
           className="max-w-sm"
         />
-        <Button onClick={handleNew}>
-          <Plus className="mr-1 h-4 w-4" />
-          New Rubric
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-1 h-4 w-4" />
+            Import
+          </Button>
+          <Button variant="outline" onClick={() => setGenerateOpen(true)}>
+            <Sparkles className="mr-1 h-4 w-4" />
+            Generate
+          </Button>
+          <Button onClick={handleNew}>
+            <Plus className="mr-1 h-4 w-4" />
+            New Rubric
+          </Button>
+        </div>
       </div>
 
       {isLoading && (
@@ -117,6 +133,14 @@ export function RubricList() {
               </p>
             </div>
             <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRefineTarget(rubric)}
+                aria-label="Refine"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => handleEdit(rubric)} aria-label="Edit">
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -139,6 +163,27 @@ export function RubricList() {
         rubric={editingRubric}
         onSaved={handleSaved}
       />
+
+      <RubricImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={handleSaved}
+      />
+
+      <RubricGenerateDialog
+        open={generateOpen}
+        onOpenChange={setGenerateOpen}
+        onGenerated={handleSaved}
+      />
+
+      {refineTarget && (
+        <RubricRefineDialog
+          open={!!refineTarget}
+          onOpenChange={(open) => !open && setRefineTarget(null)}
+          rubric={refineTarget}
+          onRefined={handleSaved}
+        />
+      )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

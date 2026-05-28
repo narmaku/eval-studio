@@ -7,6 +7,9 @@ vi.mock('@/services/api', () => ({
     createRubric: vi.fn(),
     updateRubric: vi.fn(),
     deleteRubric: vi.fn(),
+    importRubric: vi.fn(),
+    generateRubric: vi.fn(),
+    refineRubric: vi.fn(),
   },
 }));
 
@@ -136,6 +139,98 @@ describe('rubricStore', () => {
 
       expect(useRubricStore.getState().rubrics).toEqual([]);
       expect(mockedApi.deleteRubric).toHaveBeenCalledWith('r-1');
+    });
+  });
+
+  describe('importRubric', () => {
+    it('calls API and adds imported rubric to store', async () => {
+      const imported = makeRubric({ id: 'r-imported', name: 'Imported Rubric' });
+      mockedApi.importRubric.mockResolvedValue(imported);
+
+      const result = await useRubricStore.getState().importRubric({
+        yaml_content: 'name: Imported Rubric\ndimensions: []',
+      });
+
+      expect(result).toEqual(imported);
+      expect(useRubricStore.getState().rubrics).toContainEqual(imported);
+      expect(mockedApi.importRubric).toHaveBeenCalledWith({
+        yaml_content: 'name: Imported Rubric\ndimensions: []',
+      });
+    });
+
+    it('throws on API error', async () => {
+      mockedApi.importRubric.mockRejectedValue(new Error('Invalid YAML'));
+
+      await expect(
+        useRubricStore.getState().importRubric({ yaml_content: 'bad' })
+      ).rejects.toThrow('Invalid YAML');
+    });
+  });
+
+  describe('generateRubric', () => {
+    it('calls API and adds generated rubric to store', async () => {
+      const generated = makeRubric({ id: 'r-gen', name: 'Generated Rubric' });
+      mockedApi.generateRubric.mockResolvedValue(generated);
+
+      const result = await useRubricStore.getState().generateRubric({
+        description: 'Evaluate accuracy',
+        provider_id: 'openai-gpt4',
+      });
+
+      expect(result).toEqual(generated);
+      expect(useRubricStore.getState().rubrics).toContainEqual(generated);
+      expect(mockedApi.generateRubric).toHaveBeenCalledWith({
+        description: 'Evaluate accuracy',
+        provider_id: 'openai-gpt4',
+      });
+    });
+
+    it('passes sample_data when provided', async () => {
+      const generated = makeRubric({ id: 'r-gen' });
+      mockedApi.generateRubric.mockResolvedValue(generated);
+
+      await useRubricStore.getState().generateRubric({
+        description: 'Test',
+        sample_data: 'Q: What? A: This.',
+        provider_id: 'p1',
+      });
+
+      expect(mockedApi.generateRubric).toHaveBeenCalledWith({
+        description: 'Test',
+        sample_data: 'Q: What? A: This.',
+        provider_id: 'p1',
+      });
+    });
+  });
+
+  describe('refineRubric', () => {
+    it('calls API and updates refined rubric in store', async () => {
+      const existing = makeRubric({ id: 'r-1', name: 'Old Rubric' });
+      useRubricStore.setState({ rubrics: [existing] });
+
+      const refined = makeRubric({
+        id: 'r-1',
+        name: 'Old Rubric',
+        dimensions: [
+          { name: 'accuracy', weight: 0.5, description: 'Accuracy' },
+          { name: 'clarity', weight: 0.5, description: 'Clarity' },
+        ],
+      });
+      mockedApi.refineRubric.mockResolvedValue(refined);
+
+      const result = await useRubricStore.getState().refineRubric('r-1', {
+        feedback: 'Add clarity dimension',
+        provider_id: 'openai-gpt4',
+      });
+
+      expect(result).toEqual(refined);
+      const rubrics = useRubricStore.getState().rubrics;
+      expect(rubrics).toHaveLength(1);
+      expect(rubrics[0]!.dimensions).toHaveLength(2);
+      expect(mockedApi.refineRubric).toHaveBeenCalledWith('r-1', {
+        feedback: 'Add clarity dimension',
+        provider_id: 'openai-gpt4',
+      });
     });
   });
 });

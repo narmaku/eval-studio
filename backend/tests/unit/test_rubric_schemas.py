@@ -3,7 +3,15 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.rubric import RubricCreate, RubricDimension, RubricResponse, RubricUpdate
+from app.schemas.rubric import (
+    RubricCreate,
+    RubricDimension,
+    RubricGenerateRequest,
+    RubricImportRequest,
+    RubricRefineRequest,
+    RubricResponse,
+    RubricUpdate,
+)
 
 
 class TestRubricDimension:
@@ -128,3 +136,50 @@ class TestRubricUpdate:
 class TestRubricResponse:
     def test_from_attributes(self):
         assert RubricResponse.model_config.get("from_attributes") is True
+
+
+class TestRubricImportRequest:
+    def test_valid_import(self):
+        req = RubricImportRequest(yaml_content="name: test\ndimensions: []")
+        assert req.yaml_content == "name: test\ndimensions: []"
+
+    def test_empty_yaml_content_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricImportRequest(yaml_content="")
+
+
+class TestRubricGenerateRequest:
+    def test_valid_generate(self):
+        req = RubricGenerateRequest(description="Evaluate accuracy", provider_id="openai-gpt4")
+        assert req.description == "Evaluate accuracy"
+        assert req.provider_id == "openai-gpt4"
+        assert req.sample_data is None
+
+    def test_with_sample_data(self):
+        req = RubricGenerateRequest(
+            description="Evaluate accuracy", provider_id="openai-gpt4", sample_data="Q: What? A: This."
+        )
+        assert req.sample_data == "Q: What? A: This."
+
+    def test_empty_description_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricGenerateRequest(description="", provider_id="openai-gpt4")
+
+    def test_empty_provider_id_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricGenerateRequest(description="test", provider_id="")
+
+
+class TestRubricRefineRequest:
+    def test_valid_refine(self):
+        req = RubricRefineRequest(feedback="Add completeness", provider_id="openai-gpt4")
+        assert req.feedback == "Add completeness"
+        assert req.provider_id == "openai-gpt4"
+
+    def test_empty_feedback_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricRefineRequest(feedback="", provider_id="openai-gpt4")
+
+    def test_empty_provider_id_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricRefineRequest(feedback="test", provider_id="")

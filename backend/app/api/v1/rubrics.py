@@ -1,5 +1,6 @@
-"""CRUD API endpoints for Rubrics."""
+"""CRUD API endpoints for Rubrics, plus import, generate, and refine."""
 
+import asyncio
 import math
 
 import structlog
@@ -8,14 +9,92 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import AppException, NotFoundException
+from app.core.providers import provider_registry
 from app.models.rubric import Rubric
 from app.schemas.common import PaginatedResponse
-from app.schemas.rubric import RubricCreate, RubricResponse, RubricUpdate
+from app.schemas.rubric import (
+    RubricCreate,
+    RubricGenerateRequest,
+    RubricImportRequest,
+    RubricRefineRequest,
+    RubricResponse,
+    RubricUpdate,
+)
+from app.services.rubric_service import generate_rubric, parse_rubric_yaml, refine_rubric
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/rubrics", tags=["rubrics"])
+
+
+# --- Fixed-path routes MUST come before /{rubric_id} routes ---
+
+
+@router.post("/import", response_model=RubricResponse, status_code=201)
+async def import_rubric(
+    payload: RubricImportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> RubricResponse:
+    """Import a rubric from YAML content (rubric-kit format)."""
+    try:
+        rubric_data = parse_rubric_yaml(payload.yaml_content)
+    except ValueError as exc:
+        raise AppException(400, "Bad Request", str(exc)) from None
+
+    rubric = Rubric(
+        name=rubric_data["name"],
+        description=rubric_data.get("description"),
+        dimensions=rubric_data["dimensions"],
+        pass_threshold=rubric_data.get("pass_threshold", 0.7),
+        aggregation=rubric_data.get("aggregation", "weighted_average"),
+        prompt_template=rubric_data.get("prompt_template"),
+    )
+    db.add(rubric)
+    await db.commit()
+    await db.refresh(rubric)
+    logger.info("rubric.imported", id=rubric.id, name=rubric.name)
+    return RubricResponse.model_validate(rubric)
+
+
+@router.post("/generate", response_model=RubricResponse, status_code=201)
+async def generate_rubric_endpoint(
+    payload: RubricGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> RubricResponse:
+    """Generate a rubric from a text description using an LLM provider."""
+    provider = provider_registry.get_provider(payload.provider_id)
+    if not provider:
+        raise AppException(400, "Bad Request", f"Provider '{payload.provider_id}' not found")
+
+    try:
+        rubric_data = await asyncio.to_thread(
+            generate_rubric,
+            description=payload.description,
+            sample_data=payload.sample_data,
+            model=provider.litellm_model,
+            api_base=provider.api_base,
+        )
+    except Exception as exc:
+        logger.error("rubric.generate.failed", error=str(exc))
+        raise AppException(502, "Generation Failed", f"Rubric generation failed: {exc}") from None
+
+    rubric = Rubric(
+        name=rubric_data["name"],
+        description=rubric_data.get("description"),
+        dimensions=rubric_data["dimensions"],
+        pass_threshold=rubric_data.get("pass_threshold", 0.7),
+        aggregation=rubric_data.get("aggregation", "weighted_average"),
+        prompt_template=rubric_data.get("prompt_template"),
+    )
+    db.add(rubric)
+    await db.commit()
+    await db.refresh(rubric)
+    logger.info("rubric.generated", id=rubric.id, name=rubric.name)
+    return RubricResponse.model_validate(rubric)
+
+
+# --- Standard CRUD routes ---
 
 
 @router.post("", response_model=RubricResponse, status_code=201)
@@ -102,6 +181,59 @@ async def update_rubric(
     await db.commit()
     await db.refresh(rubric)
     logger.info("rubric.updated", id=rubric_id)
+    return RubricResponse.model_validate(rubric)
+
+
+@router.post("/{rubric_id}/refine", response_model=RubricResponse)
+async def refine_rubric_endpoint(
+    rubric_id: str,
+    payload: RubricRefineRequest,
+    db: AsyncSession = Depends(get_db),
+) -> RubricResponse:
+    """Refine an existing rubric using LLM-powered feedback."""
+    result = await db.execute(select(Rubric).where(Rubric.id == rubric_id))
+    rubric = result.scalar_one_or_none()
+    if not rubric:
+        raise NotFoundException("Rubric", rubric_id)
+
+    provider = provider_registry.get_provider(payload.provider_id)
+    if not provider:
+        raise AppException(400, "Bad Request", f"Provider '{payload.provider_id}' not found")
+
+    existing_data = {
+        "name": rubric.name,
+        "description": rubric.description,
+        "dimensions": rubric.dimensions,
+        "pass_threshold": rubric.pass_threshold,
+        "aggregation": rubric.aggregation,
+        "prompt_template": rubric.prompt_template,
+    }
+
+    try:
+        refined = await asyncio.to_thread(
+            refine_rubric,
+            existing_rubric=existing_data,
+            feedback=payload.feedback,
+            model=provider.litellm_model,
+            api_base=provider.api_base,
+        )
+    except Exception as exc:
+        logger.error("rubric.refine.failed", error=str(exc), rubric_id=rubric_id)
+        raise AppException(502, "Refinement Failed", f"Rubric refinement failed: {exc}") from None
+
+    rubric.dimensions = refined["dimensions"]
+    if refined.get("description"):
+        rubric.description = refined["description"]
+    if refined.get("pass_threshold") is not None:
+        rubric.pass_threshold = refined["pass_threshold"]
+    if refined.get("aggregation"):
+        rubric.aggregation = refined["aggregation"]
+    if refined.get("prompt_template") is not None:
+        rubric.prompt_template = refined["prompt_template"]
+
+    await db.commit()
+    await db.refresh(rubric)
+    logger.info("rubric.refined", id=rubric_id)
     return RubricResponse.model_validate(rubric)
 
 
