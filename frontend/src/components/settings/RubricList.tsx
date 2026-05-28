@@ -52,8 +52,15 @@ export function RubricList() {
   };
 
   const handleDelete = async () => {
-    if (deleteTarget) {
+    if (!deleteTarget) return;
+    try {
       await deleteRubric(deleteTarget.id);
+    } catch {
+      // deleteRubric propagates API errors; swallow here since store.error
+      // is not set by deleteRubric -- surface feedback via a re-fetch so
+      // the list stays consistent with the server state.
+      await fetchRubrics();
+    } finally {
       setDeleteTarget(null);
     }
   };
