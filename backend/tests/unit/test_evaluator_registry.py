@@ -4,6 +4,7 @@ import pytest
 import yaml
 
 from app.adapters.base import EvaluationAdapter
+from app.adapters.factory import create_evaluation_adapter
 from app.adapters.litellm_judge import LiteLLMJudgeAdapter
 from app.adapters.registry import EvaluatorInfo, EvaluatorRegistry
 
@@ -221,3 +222,24 @@ class TestEvaluatorRegistry:
         registry = EvaluatorRegistry()
         registry.load_from_yaml(config_file)
         assert registry.list_evaluators() == []
+
+
+class TestFactoryRegistryIntegration:
+    """Tests for factory backward compat and registry integration."""
+
+    def test_factory_backward_compat_litellm(self):
+        """create_evaluation_adapter(adapter_type='litellm') still works."""
+        adapter = create_evaluation_adapter(adapter_type="litellm", model="gpt-4")
+        assert isinstance(adapter, LiteLLMJudgeAdapter)
+        assert adapter.model == "gpt-4"
+
+    def test_factory_uses_registry_for_known_evaluator(self):
+        """create_evaluation_adapter(adapter_type='litellm-judge') uses registry."""
+        adapter = create_evaluation_adapter(adapter_type="litellm-judge", model="gpt-4")
+        assert isinstance(adapter, LiteLLMJudgeAdapter)
+        assert adapter.model == "gpt-4"
+
+    def test_factory_unknown_type_raises(self):
+        """Factory still raises ValueError for truly unknown adapter types."""
+        with pytest.raises(ValueError):
+            create_evaluation_adapter(adapter_type="completely-unknown")
