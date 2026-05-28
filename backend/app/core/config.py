@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     auth_enabled: bool = False
 
+    evaluator_config_dir: str = "config/evaluators"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

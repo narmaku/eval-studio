@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { api } from '@/services/api';
+import { EvaluatorDetail } from './EvaluatorDetail';
 import type { EvaluatorInfo } from '@/types';
 
 export function EvaluatorList() {
   const [evaluators, setEvaluators] = useState<EvaluatorInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEvaluator, setSelectedEvaluator] = useState<EvaluatorInfo | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
     const fetchEvaluators = async () => {
@@ -25,6 +29,11 @@ export function EvaluatorList() {
     };
     fetchEvaluators();
   }, []);
+
+  const handleConfigure = (evaluator: EvaluatorInfo) => {
+    setSelectedEvaluator(evaluator);
+    setDetailOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -79,10 +88,25 @@ export function EvaluatorList() {
                   </p>
                 )}
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleConfigure(evaluator)}
+              >
+                Configure
+              </Button>
             </div>
           </CardContent>
         </Card>
       ))}
+
+      {selectedEvaluator && (
+        <EvaluatorDetail
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          evaluator={selectedEvaluator}
+        />
+      )}
     </div>
   );
 }
