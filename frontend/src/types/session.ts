@@ -61,6 +61,7 @@ export interface CreateSessionRequest {
     litellm_model?: string;
     api_base?: string;
     system_prompt?: string;
+    evaluator_id?: string;
   };
   judge_config?: {
     provider_id?: string;
