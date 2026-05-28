@@ -133,6 +133,20 @@ class TestParseRubricYaml:
         result = parse_rubric_yaml(yaml_content)
         assert result["prompt_template"] == "Rate: {response}"
 
+    def test_yaml_wrapped_in_code_fence(self):
+        """parse_rubric_yaml strips markdown code fences before parsing."""
+        yaml_content = textwrap.dedent("""\
+            ```yaml
+            name: "Fenced Rubric"
+            dimensions:
+              - name: quality
+                weight: 1.0
+                description: "Quality"
+            ```""")
+        result = parse_rubric_yaml(yaml_content)
+        assert result["name"] == "Fenced Rubric"
+        assert len(result["dimensions"]) == 1
+
     def test_rubric_kit_format_with_criteria(self):
         """Test parsing rubric-kit native format with dimensions and criteria."""
         yaml_content = textwrap.dedent("""\

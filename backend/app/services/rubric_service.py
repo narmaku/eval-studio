@@ -46,6 +46,8 @@ def parse_rubric_yaml(yaml_content: str) -> dict:
     Raises:
         ValueError: If YAML is invalid or no dimensions are found.
     """
+    yaml_content = clean_yaml_block(yaml_content)
+
     try:
         data = yaml.safe_load(yaml_content)
     except yaml.YAMLError as exc:

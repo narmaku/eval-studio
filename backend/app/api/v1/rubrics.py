@@ -1,5 +1,6 @@
 """CRUD API endpoints for Rubrics, plus import, generate, and refine."""
 
+import asyncio
 import math
 
 import structlog
@@ -67,7 +68,8 @@ async def generate_rubric_endpoint(
         raise AppException(400, "Bad Request", f"Provider '{payload.provider_id}' not found")
 
     try:
-        rubric_data = generate_rubric(
+        rubric_data = await asyncio.to_thread(
+            generate_rubric,
             description=payload.description,
             sample_data=payload.sample_data,
             model=provider.litellm_model,
@@ -208,7 +210,8 @@ async def refine_rubric_endpoint(
     }
 
     try:
-        refined = refine_rubric(
+        refined = await asyncio.to_thread(
+            refine_rubric,
             existing_rubric=existing_data,
             feedback=payload.feedback,
             model=provider.litellm_model,
