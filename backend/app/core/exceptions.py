@@ -34,3 +34,10 @@ class NotImplementedException(AppException):
 
     def __init__(self, feature: str):
         super().__init__(501, "Not Implemented", f"{feature} is not yet implemented")
+
+
+class ValidationException(AppException):
+    """Raised when request data fails business-level validation."""
+
+    def __init__(self, detail: str):
+        super().__init__(422, "Validation Error", detail)

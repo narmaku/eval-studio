@@ -10,6 +10,7 @@ class Result(Base):
     evaluation_id: Mapped[str] = mapped_column(String(36), ForeignKey("evaluations.id"), nullable=False, index=True)
     dataset_item_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("dataset_items.id"), nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("sessions.id"), nullable=True)
+    contestant_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     actual_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
