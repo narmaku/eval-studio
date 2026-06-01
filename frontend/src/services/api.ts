@@ -8,6 +8,7 @@ import type {
   CreateDatasetRequest,
   Result,
   ResultComparison,
+  ArenaLeaderboardResponse,
   Session,
   CreateSessionRequest,
   SendMessageRequest,
@@ -181,6 +182,8 @@ export const api = {
     evaluationIds.forEach((id) => query.append('evaluation_id', id));
     return request<ResultComparison>(`/api/v1/results/compare?${query.toString()}`);
   },
+  getArenaLeaderboard: (evaluationId: string) =>
+    request<ArenaLeaderboardResponse>(`/api/v1/results/arena/${evaluationId}`),
 
   // --- Providers ---
   listProviders: (purpose?: string) => {
