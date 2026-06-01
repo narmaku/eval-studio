@@ -129,20 +129,22 @@ export function SmartImportDialog({ open, onOpenChange }: SmartImportDialogProps
   const addFiles = useCallback(
     (newFiles: FileList | File[]) => {
       const fileArray = Array.from(newFiles).filter((f) => isValidExtension(f.name));
-      if (fileArray.length > 0) {
-        setFiles((prev) => {
-          const existingNames = new Set(prev.map((f) => f.name));
-          const unique = fileArray.filter((f) => !existingNames.has(f.name));
-          const updated = [...prev, ...unique];
-          // Pre-populate name from first file (only once)
-          if (!nameWasAutoSet.current && updated.length > 0) {
-            const firstFile = updated[0]!;
-            const baseName = firstFile.name.replace(/\.[^.]+$/, '');
-            setName(baseName);
-            nameWasAutoSet.current = true;
-          }
-          return updated;
-        });
+      if (fileArray.length === 0) return;
+
+      setFiles((prev) => {
+        const existingNames = new Set(prev.map((f) => f.name));
+        const unique = fileArray.filter((f) => !existingNames.has(f.name));
+        return [...prev, ...unique];
+      });
+
+      // Pre-populate name from first valid file (only once)
+      if (!nameWasAutoSet.current) {
+        const firstFile = fileArray[0];
+        if (firstFile) {
+          const baseName = firstFile.name.replace(/\.[^.]+$/, '');
+          setName(baseName);
+          nameWasAutoSet.current = true;
+        }
       }
     },
     [isValidExtension],
@@ -211,6 +213,7 @@ export function SmartImportDialog({ open, onOpenChange }: SmartImportDialogProps
       });
       toast.success('Dataset imported successfully');
       fetchDatasets();
+      resetState();
       onOpenChange(false);
     } catch {
       toast.error('Failed to import dataset');
@@ -224,6 +227,7 @@ export function SmartImportDialog({ open, onOpenChange }: SmartImportDialogProps
     mergeMode,
     smartImport,
     fetchDatasets,
+    resetState,
     onOpenChange,
   ]);
 
@@ -275,11 +279,20 @@ export function SmartImportDialog({ open, onOpenChange }: SmartImportDialogProps
     );
   }, [analysisResult, mapping]);
 
+  const STEP_LABELS = ['Upload', 'Map Fields', 'Preview & Confirm'] as const;
+
   const stepIndicator = (
-    <div className="flex items-center justify-center gap-2 mb-4" data-testid="step-indicator">
+    <div
+      className="flex items-center justify-center gap-2 mb-4"
+      data-testid="step-indicator"
+      role="group"
+      aria-label={`Step ${step} of 3: ${STEP_LABELS[step - 1]}`}
+    >
       {[1, 2, 3].map((s) => (
         <div
           key={s}
+          role="presentation"
+          aria-hidden="true"
           className={`h-2 w-2 rounded-full ${s === step ? 'bg-primary' : 'bg-muted'}`}
         />
       ))}
@@ -343,8 +356,9 @@ export function SmartImportDialog({ open, onOpenChange }: SmartImportDialogProps
             <input
               ref={dirInputRef}
               type="file"
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              {...({ webkitdirectory: '', directory: '' } as Record<string, unknown> as any)}
+              // @ts-expect-error -- webkitdirectory is a non-standard attribute not in React's HTMLInputElement types
+              webkitdirectory=""
+              directory=""
               onChange={handleFileInputChange}
               className="hidden"
               data-testid="dir-input"
