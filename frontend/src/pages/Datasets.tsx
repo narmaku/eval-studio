@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/dialog';
 
 import { useDatasetStore } from '@/stores/datasetStore';
-import { DatasetUploadDialog } from '@/components/datasets/DatasetUploadDialog';
+import { SmartImportDialog } from '@/components/datasets/SmartImportDialog';
 import { DatasetDetailView } from '@/components/datasets/DatasetDetailView';
 import type { Dataset } from '@/types';
 
@@ -171,7 +171,7 @@ export default function Datasets() {
             Manage your dataset library. Upload, import, version, and browse evaluation datasets.
           </p>
         </div>
-        <Button onClick={() => setUploadDialogOpen(true)}>Upload Dataset</Button>
+        <Button onClick={() => setUploadDialogOpen(true)}>Import Dataset</Button>
       </div>
 
       <Separator />
@@ -188,7 +188,7 @@ export default function Datasets() {
             <p className="text-sm text-muted-foreground mt-1 mb-4">
               Upload a dataset to get started with your evaluations.
             </p>
-            <Button onClick={() => setUploadDialogOpen(true)}>Upload Dataset</Button>
+            <Button onClick={() => setUploadDialogOpen(true)}>Import Dataset</Button>
           </CardContent>
         </Card>
       ) : (
@@ -260,8 +260,8 @@ export default function Datasets() {
         </DialogContent>
       </Dialog>
 
-      {/* Upload Dialog */}
-      <DatasetUploadDialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen} />
+      {/* Import Dialog */}
+      <SmartImportDialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen} />
 
       {/* Detail Sheet */}
       <DatasetDetailView
