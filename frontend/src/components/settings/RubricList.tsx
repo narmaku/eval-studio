@@ -123,9 +123,7 @@ export function RubricList() {
                 <Badge variant="outline">{rubric.aggregation}</Badge>
               </div>
               {rubric.description && (
-                <p className="text-xs text-muted-foreground line-clamp-1">
-                  {rubric.description}
-                </p>
+                <p className="text-xs text-muted-foreground line-clamp-1">{rubric.description}</p>
               )}
               <p className="text-xs text-muted-foreground">
                 Threshold: {rubric.pass_threshold} | Created:{' '}
@@ -141,7 +139,12 @@ export function RubricList() {
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleEdit(rubric)} aria-label="Edit">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEdit(rubric)}
+                aria-label="Edit"
+              >
                 <Pencil className="h-4 w-4" />
               </Button>
               <Button
@@ -164,11 +167,7 @@ export function RubricList() {
         onSaved={handleSaved}
       />
 
-      <RubricImportDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImported={handleSaved}
-      />
+      <RubricImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={handleSaved} />
 
       <RubricGenerateDialog
         open={generateOpen}

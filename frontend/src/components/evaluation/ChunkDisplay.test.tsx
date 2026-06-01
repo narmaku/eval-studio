@@ -37,9 +37,7 @@ describe('ChunkDisplay', () => {
   it('displays chunk content', () => {
     render(<ChunkDisplay chunks={mockChunks} />);
 
-    expect(
-      screen.getByText('This is a short chunk about systemd services.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('This is a short chunk about systemd services.')).toBeInTheDocument();
   });
 
   it('displays source when present', () => {

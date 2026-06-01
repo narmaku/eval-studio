@@ -113,7 +113,7 @@ describe('ProviderForm', () => {
       expect.objectContaining({
         name: 'New Provider',
         litellm_model: 'openai/gpt-4',
-      })
+      }),
     );
   });
 
@@ -128,7 +128,7 @@ describe('ProviderForm', () => {
         onOpenChange={vi.fn()}
         provider={makeProvider()}
         onSaved={onSaved}
-      />
+      />,
     );
 
     const nameInput = screen.getByLabelText(/name/i);
@@ -140,7 +140,7 @@ describe('ProviderForm', () => {
     expect(mockUpdateProvider).toHaveBeenCalledTimes(1);
     expect(mockUpdateProvider).toHaveBeenCalledWith(
       'p-1',
-      expect.objectContaining({ name: 'Updated' })
+      expect.objectContaining({ name: 'Updated' }),
     );
   });
 });

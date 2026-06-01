@@ -48,10 +48,7 @@ export function ConversationPanel({
             <ChatMessage key={message.id} message={message} />
           ))}
           {isProcessing && (
-            <div
-              data-testid="typing-indicator"
-              className="flex items-start gap-1.5"
-            >
+            <div data-testid="typing-indicator" className="flex items-start gap-1.5">
               <div className="flex items-center gap-1 rounded-lg bg-muted px-3 py-2">
                 <span
                   className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60"

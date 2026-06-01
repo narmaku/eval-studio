@@ -38,10 +38,12 @@ export default function SessionDetail() {
       }
     };
     void fetchSession();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId]);
 
-  const messages: Message[] = (session?.transcript as Record<string, unknown>[] | undefined ?? [])
+  const messages: Message[] = ((session?.transcript as Record<string, unknown>[] | undefined) ?? [])
     .filter((m) => m.role === 'user' || m.role === 'assistant' || m.role === 'system')
     .map((m, i) => ({
       id: String(i),
@@ -50,16 +52,17 @@ export default function SessionDetail() {
       timestamp: (m.timestamp as string) ?? '',
     }));
 
-  const toolCalls: ToolCall[] = (session?.transcript as Record<string, unknown>[] | undefined ?? []).flatMap(
-    (m) =>
-      ((m.tool_calls as Record<string, unknown>[]) ?? []).map((tc, i) => ({
-        id: (tc.id as string) ?? String(i),
-        tool_name: (tc.tool_name as string) ?? '',
-        arguments: (tc.arguments as Record<string, unknown>) ?? {},
-        result: tc.result ?? null,
-        duration_ms: (tc.duration_ms as number) ?? 0,
-        timestamp: (tc.timestamp as string) ?? '',
-      })),
+  const toolCalls: ToolCall[] = (
+    (session?.transcript as Record<string, unknown>[] | undefined) ?? []
+  ).flatMap((m) =>
+    ((m.tool_calls as Record<string, unknown>[]) ?? []).map((tc, i) => ({
+      id: (tc.id as string) ?? String(i),
+      tool_name: (tc.tool_name as string) ?? '',
+      arguments: (tc.arguments as Record<string, unknown>) ?? {},
+      result: tc.result ?? null,
+      duration_ms: (tc.duration_ms as number) ?? 0,
+      timestamp: (tc.timestamp as string) ?? '',
+    })),
   );
 
   const scores: SessionScore[] = session?.scores
@@ -121,14 +124,10 @@ export default function SessionDetail() {
           </h1>
           <div className="mt-1 flex items-center gap-2">
             <Badge variant="outline">{session.mode}</Badge>
-            <Badge
-              variant={session.status === 'completed' ? 'default' : 'secondary'}
-            >
+            <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
               {session.status}
             </Badge>
-            <span className="text-muted-foreground text-sm">
-              {messages.length} messages
-            </span>
+            <span className="text-muted-foreground text-sm">{messages.length} messages</span>
           </div>
         </div>
         {isEnded && !hasScores && !showScoreConfig && (

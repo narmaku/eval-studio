@@ -180,9 +180,7 @@ describe('datasetStore', () => {
       useDatasetStore.setState({ datasets: [makeDataset({ id: 'ds-1' })] });
       mockedApi.deleteDataset.mockRejectedValue(new Error('Forbidden'));
 
-      await expect(useDatasetStore.getState().removeDataset('ds-1')).rejects.toThrow(
-        'Forbidden',
-      );
+      await expect(useDatasetStore.getState().removeDataset('ds-1')).rejects.toThrow('Forbidden');
 
       expect(useDatasetStore.getState().error).toBe('Forbidden');
     });

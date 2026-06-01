@@ -71,10 +71,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <span className="text-xs text-muted-foreground">{formattedTime}</span>
       </div>
       <div
-        className={cn(
-          'max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap',
-          config.bg,
-        )}
+        className={cn('max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap', config.bg)}
       >
         {message.content}
       </div>

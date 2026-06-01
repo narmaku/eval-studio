@@ -91,7 +91,7 @@ describe('RubricBuilder', () => {
             { name: 'dim2', weight: 0.5, description: 'Second' },
           ],
         })}
-      />
+      />,
     );
 
     const removeButtons = screen.getAllByTestId('remove-dimension');
@@ -138,9 +138,7 @@ describe('RubricBuilder', () => {
     const onOpenChange = vi.fn();
     mockCreateRubric.mockResolvedValue(makeRubric());
 
-    render(
-      <RubricBuilder open={true} onOpenChange={onOpenChange} onSaved={onSaved} />
-    );
+    render(<RubricBuilder open={true} onOpenChange={onOpenChange} onSaved={onSaved} />);
 
     await user.type(screen.getByLabelText(/name/i), 'New Rubric');
     await user.click(screen.getByRole('button', { name: /add dimension/i }));
@@ -155,10 +153,8 @@ describe('RubricBuilder', () => {
     expect(mockCreateRubric).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'New Rubric',
-        dimensions: expect.arrayContaining([
-          expect.objectContaining({ name: 'quality' }),
-        ]),
-      })
+        dimensions: expect.arrayContaining([expect.objectContaining({ name: 'quality' })]),
+      }),
     );
   });
 
@@ -168,12 +164,7 @@ describe('RubricBuilder', () => {
     mockUpdateRubric.mockResolvedValue(makeRubric({ name: 'Updated' }));
 
     render(
-      <RubricBuilder
-        open={true}
-        onOpenChange={vi.fn()}
-        rubric={makeRubric()}
-        onSaved={onSaved}
-      />
+      <RubricBuilder open={true} onOpenChange={vi.fn()} rubric={makeRubric()} onSaved={onSaved} />,
     );
 
     const nameInput = screen.getByLabelText(/name/i);
@@ -185,7 +176,7 @@ describe('RubricBuilder', () => {
     expect(mockUpdateRubric).toHaveBeenCalledTimes(1);
     expect(mockUpdateRubric).toHaveBeenCalledWith(
       'r-1',
-      expect.objectContaining({ name: 'Updated' })
+      expect.objectContaining({ name: 'Updated' }),
     );
   });
 });

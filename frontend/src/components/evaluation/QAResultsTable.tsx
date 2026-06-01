@@ -117,9 +117,7 @@ export function QAResultsTable({ results, datasetItems, onRowClick }: QAResultsT
         ),
         accessorFn: (row) => row.score ?? 0,
         cell: ({ getValue }) => (
-          <span className="text-right tabular-nums">
-            {(getValue<number>() * 100).toFixed(0)}%
-          </span>
+          <span className="text-right tabular-nums">{(getValue<number>() * 100).toFixed(0)}%</span>
         ),
         enableSorting: true,
       },
@@ -183,10 +181,7 @@ export function QAResultsTable({ results, datasetItems, onRowClick }: QAResultsT
         ) : (
           table.getRowModel().rows.map((row) => (
             <Fragment key={row.id}>
-              <TableRow
-                className="cursor-pointer"
-                onClick={() => onRowClick?.(row.original)}
-              >
+              <TableRow className="cursor-pointer" onClick={() => onRowClick?.(row.original)}>
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -196,7 +191,14 @@ export function QAResultsTable({ results, datasetItems, onRowClick }: QAResultsT
               {row.getIsExpanded() && (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="bg-muted/30 p-4">
-                    <ExpandedRowDetail result={row.original} datasetItem={row.original.dataset_item_id ? itemMap.get(row.original.dataset_item_id) : undefined} />
+                    <ExpandedRowDetail
+                      result={row.original}
+                      datasetItem={
+                        row.original.dataset_item_id
+                          ? itemMap.get(row.original.dataset_item_id)
+                          : undefined
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               )}
@@ -208,18 +210,14 @@ export function QAResultsTable({ results, datasetItems, onRowClick }: QAResultsT
   );
 }
 
-function ExpandedRowDetail({
-  result,
-  datasetItem,
-}: {
-  result: Result;
-  datasetItem?: DatasetItem;
-}) {
+function ExpandedRowDetail({ result, datasetItem }: { result: Result; datasetItem?: DatasetItem }) {
   return (
     <div className="space-y-3 text-sm">
       <div>
         <p className="font-medium">Question</p>
-        <p className="text-muted-foreground">{datasetItem?.question ?? result.dataset_item_id ?? '--'}</p>
+        <p className="text-muted-foreground">
+          {datasetItem?.question ?? result.dataset_item_id ?? '--'}
+        </p>
       </div>
       <div>
         <p className="font-medium">Expected Answer</p>

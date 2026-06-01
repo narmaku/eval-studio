@@ -91,9 +91,7 @@ export function DatasetDetailView({ datasetId, open, onOpenChange }: DatasetDeta
             </div>
 
             <div className="px-4 space-y-3">
-              <h3 className="text-sm font-medium">
-                Items ({currentDataset.items?.length ?? 0})
-              </h3>
+              <h3 className="text-sm font-medium">Items ({currentDataset.items?.length ?? 0})</h3>
 
               {currentDataset.items && currentDataset.items.length > 0 ? (
                 <div className="max-h-[60vh] overflow-y-auto space-y-3">
@@ -108,9 +106,7 @@ export function DatasetDetailView({ datasetId, open, onOpenChange }: DatasetDeta
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Load full dataset to view items
-                </p>
+                <p className="text-sm text-muted-foreground">Load full dataset to view items</p>
               )}
             </div>
           </>

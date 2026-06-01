@@ -15,19 +15,8 @@ import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import {
-  Play,
-  Square,
-  RefreshCw,
-  Wifi,
-  WifiOff,
-  Clock,
-  ExternalLink,
-} from 'lucide-react';
-import type {
-  ModelEndpoint,
-  JudgeReference,
-} from '@/types';
+import { Play, Square, RefreshCw, Wifi, WifiOff, Clock, ExternalLink } from 'lucide-react';
+import type { ModelEndpoint, JudgeReference } from '@/types';
 
 type PagePhase = 'configure' | 'active' | 'ended';
 
@@ -140,7 +129,15 @@ export default function AgentEvaluation() {
     } finally {
       setEvalLoading(false);
     }
-  }, [modelEndpoint, judgeConfig, systemPrompt, selectedEvaluatorId, setEvalLoading, createSession, connectWebSocket]);
+  }, [
+    modelEndpoint,
+    judgeConfig,
+    systemPrompt,
+    selectedEvaluatorId,
+    setEvalLoading,
+    createSession,
+    connectWebSocket,
+  ]);
 
   const handleEndSession = useCallback(async () => {
     try {
@@ -190,10 +187,7 @@ export default function AgentEvaluation() {
           <EvaluatorSelector mode="agent" />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-4">
-              <ProviderSelector
-                value={modelEndpoint}
-                onChange={setModelEndpoint}
-              />
+              <ProviderSelector value={modelEndpoint} onChange={setModelEndpoint} />
               <div className="space-y-2">
                 <Label htmlFor="system-prompt">System Prompt (optional)</Label>
                 <Textarea
@@ -206,10 +200,7 @@ export default function AgentEvaluation() {
               </div>
             </div>
             <div>
-              <JudgeConfigPanel
-                value={judgeConfig}
-                onChange={setJudgeConfig}
-              />
+              <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
             </div>
           </div>
           <Button
@@ -229,15 +220,8 @@ export default function AgentEvaluation() {
           {/* Header bar */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Badge
-                variant={isConnected ? 'default' : 'destructive'}
-                className="gap-1"
-              >
-                {isConnected ? (
-                  <Wifi className="h-3 w-3" />
-                ) : (
-                  <WifiOff className="h-3 w-3" />
-                )}
+              <Badge variant={isConnected ? 'default' : 'destructive'} className="gap-1">
+                {isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
                 {isConnected ? 'Connected' : 'Disconnected'}
               </Badge>
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -245,11 +229,7 @@ export default function AgentEvaluation() {
                 {formatElapsed(elapsedSeconds)}
               </div>
             </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => void handleEndSession()}
-            >
+            <Button variant="destructive" size="sm" onClick={() => void handleEndSession()}>
               <Square className="mr-1.5 h-3.5 w-3.5" />
               End Session
             </Button>
@@ -259,11 +239,7 @@ export default function AgentEvaluation() {
           {error && !isConnected && currentSession?.status === 'active' && (
             <div className="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2">
               <p className="text-sm text-destructive">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReconnect}
-              >
+              <Button variant="outline" size="sm" onClick={handleReconnect}>
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                 Reconnect
               </Button>
@@ -304,10 +280,7 @@ export default function AgentEvaluation() {
               New Session
             </Button>
             {currentSession && (
-              <Button
-                variant="ghost"
-                asChild
-              >
+              <Button variant="ghost" asChild>
                 <a href={`/results/${currentSession.evaluation_id}`}>
                   <ExternalLink className="mr-2 h-4 w-4" />
                   View in Results

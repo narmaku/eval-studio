@@ -22,7 +22,11 @@ interface ResultDetailViewProps {
   evaluationMode?: string;
 }
 
-function ScoreBreakdownBadges({ breakdown }: { breakdown: Record<string, number> | null | undefined }) {
+function ScoreBreakdownBadges({
+  breakdown,
+}: {
+  breakdown: Record<string, number> | null | undefined;
+}) {
   const entries = Object.entries(breakdown ?? {});
   if (entries.length === 0) {
     return <span className="text-muted-foreground">--</span>;
@@ -73,12 +77,20 @@ const EMPTY_METRICS: AggregateMetrics = {
   score_distribution: {},
 };
 
-export function ResultDetailView({ results, aggregateMetrics, evaluationName, evaluationMode }: ResultDetailViewProps) {
+export function ResultDetailView({
+  results,
+  aggregateMetrics,
+  evaluationName,
+  evaluationMode,
+}: ResultDetailViewProps) {
   const metrics = aggregateMetrics ?? EMPTY_METRICS;
 
   return (
     <div className="space-y-6">
-      <Link to="/results" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        to="/results"
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-4 w-4" />
         Back to Results
       </Link>
@@ -130,7 +142,9 @@ export function ResultDetailView({ results, aggregateMetrics, evaluationName, ev
         </CardHeader>
         <CardContent>
           {results.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-center">No individual results available.</p>
+            <p className="text-muted-foreground py-4 text-center">
+              No individual results available.
+            </p>
           ) : (
             <div className="rounded-md border">
               <Table>
@@ -146,7 +160,9 @@ export function ResultDetailView({ results, aggregateMetrics, evaluationName, ev
                 <TableBody>
                   {results.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-mono text-sm">{r.dataset_item_id?.slice(0, 8) ?? '--'}</TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {r.dataset_item_id?.slice(0, 8) ?? '--'}
+                      </TableCell>
                       <TableCell>{r.score != null ? r.score.toFixed(3) : '--'}</TableCell>
                       <TableCell>
                         {r.passed === true ? (

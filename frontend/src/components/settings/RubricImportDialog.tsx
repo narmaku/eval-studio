@@ -17,11 +17,7 @@ interface RubricImportDialogProps {
   onImported?: () => void;
 }
 
-export function RubricImportDialog({
-  open,
-  onOpenChange,
-  onImported,
-}: RubricImportDialogProps) {
+export function RubricImportDialog({ open, onOpenChange, onImported }: RubricImportDialogProps) {
   const importRubric = useRubricStore((s) => s.importRubric);
 
   const [yamlContent, setYamlContent] = useState('');
@@ -125,10 +121,7 @@ export function RubricImportDialog({
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={handleImport}
-            disabled={!yamlContent.trim() || isLoading}
-          >
+          <Button onClick={handleImport} disabled={!yamlContent.trim() || isLoading}>
             {isLoading ? 'Importing...' : 'Import'}
           </Button>
         </DialogFooter>

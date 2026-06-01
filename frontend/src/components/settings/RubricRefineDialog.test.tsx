@@ -60,42 +60,32 @@ describe('RubricRefineDialog', () => {
   });
 
   it('renders nothing when closed', () => {
-    render(
-      <RubricRefineDialog open={false} onOpenChange={vi.fn()} rubric={makeRubric()} />
-    );
+    render(<RubricRefineDialog open={false} onOpenChange={vi.fn()} rubric={makeRubric()} />);
     expect(screen.queryByText(/refine rubric/i)).not.toBeInTheDocument();
   });
 
   it('renders dialog content when open', () => {
-    render(
-      <RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />
-    );
+    render(<RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />);
     expect(screen.getByText('Refine Rubric')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/what should be improved/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^refine$/i })).toBeInTheDocument();
   });
 
   it('displays rubric name and dimension count', () => {
-    render(
-      <RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />
-    );
+    render(<RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />);
     expect(screen.getByText(/test rubric/i)).toBeInTheDocument();
     expect(screen.getByText(/2 dimensions/i)).toBeInTheDocument();
   });
 
   it('disables refine button when feedback is empty', () => {
-    render(
-      <RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />
-    );
+    render(<RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />);
     const btn = screen.getByRole('button', { name: /^refine$/i });
     expect(btn).toBeDisabled();
   });
 
   it('enables refine button after entering feedback', async () => {
     const user = userEvent.setup();
-    render(
-      <RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />
-    );
+    render(<RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />);
 
     const textarea = screen.getByPlaceholderText(/what should be improved/i);
     await user.type(textarea, 'Add a clarity dimension');
@@ -106,18 +96,14 @@ describe('RubricRefineDialog', () => {
   });
 
   it('loads providers on open', async () => {
-    render(
-      <RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />
-    );
+    render(<RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />);
     await waitFor(() => {
       expect(mockListProviders).toHaveBeenCalled();
     });
   });
 
   it('renders provider selector and form controls', () => {
-    render(
-      <RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />
-    );
+    render(<RubricRefineDialog open={true} onOpenChange={vi.fn()} rubric={makeRubric()} />);
     expect(screen.getByText('Provider')).toBeInTheDocument();
     expect(screen.getByRole('combobox')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();

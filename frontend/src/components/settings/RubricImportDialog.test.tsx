@@ -65,13 +65,7 @@ describe('RubricImportDialog', () => {
     const onImported = vi.fn();
     mockImportRubric.mockResolvedValue({ id: 'r-1', name: 'Imported' });
 
-    render(
-      <RubricImportDialog
-        open={true}
-        onOpenChange={onOpenChange}
-        onImported={onImported}
-      />
-    );
+    render(<RubricImportDialog open={true} onOpenChange={onOpenChange} onImported={onImported} />);
 
     const textarea = screen.getByPlaceholderText(/paste yaml/i);
     await user.type(textarea, 'name: test');

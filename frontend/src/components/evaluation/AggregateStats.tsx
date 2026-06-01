@@ -51,9 +51,7 @@ export function AggregateStats({ metrics }: AggregateStatsProps) {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3">
-            <span className="text-2xl font-bold">
-              {(metrics.pass_rate * 100).toFixed(0)}%
-            </span>
+            <span className="text-2xl font-bold">{(metrics.pass_rate * 100).toFixed(0)}%</span>
             <div className="h-[60px] w-[60px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -84,9 +82,7 @@ export function AggregateStats({ metrics }: AggregateStatsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{metrics.mean_score.toFixed(2)}</div>
-          <p className="text-xs text-muted-foreground">
-            Median: {metrics.median_score.toFixed(2)}
-          </p>
+          <p className="text-xs text-muted-foreground">Median: {metrics.median_score.toFixed(2)}</p>
         </CardContent>
       </Card>
 

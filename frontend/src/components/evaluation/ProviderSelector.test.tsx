@@ -203,9 +203,7 @@ describe('ProviderSelector', () => {
     // pre-selected provider and verifying the model fetch call.
 
     // First render without value, wait for providers to load
-    const { rerender } = render(
-      <ProviderSelector value={undefined} onChange={onChange} />,
-    );
+    const { rerender } = render(<ProviderSelector value={undefined} onChange={onChange} />);
 
     await waitFor(() => {
       expect(screen.getByRole('combobox')).not.toBeDisabled();

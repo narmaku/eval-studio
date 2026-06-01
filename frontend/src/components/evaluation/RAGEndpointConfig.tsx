@@ -39,7 +39,9 @@ const DEFAULT_PGVECTOR_SETTINGS: RAGEndpointSettings = {
 };
 
 function getDefaults(backendType: 'http' | 'pgvector'): RAGEndpointSettings {
-  return backendType === 'pgvector' ? { ...DEFAULT_PGVECTOR_SETTINGS } : { ...DEFAULT_HTTP_SETTINGS };
+  return backendType === 'pgvector'
+    ? { ...DEFAULT_PGVECTOR_SETTINGS }
+    : { ...DEFAULT_HTTP_SETTINGS };
 }
 
 export function RAGEndpointConfig({ value, onChange, disabled }: RAGEndpointConfigProps) {
@@ -49,20 +51,14 @@ export function RAGEndpointConfig({ value, onChange, disabled }: RAGEndpointConf
     onChange(getDefaults(newType));
   };
 
-  const handleStringChange = (
-    field: keyof RAGEndpointSettings,
-    fieldValue: string,
-  ) => {
+  const handleStringChange = (field: keyof RAGEndpointSettings, fieldValue: string) => {
     onChange({
       ...settings,
       [field]: fieldValue,
     });
   };
 
-  const handleNumberChange = (
-    field: keyof RAGEndpointSettings,
-    fieldValue: string,
-  ) => {
+  const handleNumberChange = (field: keyof RAGEndpointSettings, fieldValue: string) => {
     const parsed = parseInt(fieldValue, 10);
     onChange({
       ...settings,

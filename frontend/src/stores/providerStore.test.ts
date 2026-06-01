@@ -105,7 +105,7 @@ describe('providerStore', () => {
         useProviderStore.getState().createProvider({
           name: 'Bad',
           litellm_model: 'x',
-        })
+        }),
       ).rejects.toThrow('Create failed');
     });
   });

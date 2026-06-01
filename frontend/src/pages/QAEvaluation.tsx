@@ -13,12 +13,7 @@ import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import type {
-  ModelEndpoint,
-  JudgeReference,
-  Result,
-  CreateEvaluationRequest,
-} from '@/types';
+import type { ModelEndpoint, JudgeReference, Result, CreateEvaluationRequest } from '@/types';
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
@@ -35,7 +30,9 @@ export default function QAEvaluation() {
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults } = useResultStore();
 
-  const isConfigValid = Boolean(selectedDatasetId && modelEndpoint && judgeConfig && selectedEvaluatorId);
+  const isConfigValid = Boolean(
+    selectedDatasetId && modelEndpoint && judgeConfig && selectedEvaluatorId,
+  );
 
   const handleStart = async () => {
     if (!selectedDatasetId || !modelEndpoint || !judgeConfig) return;
@@ -134,21 +131,12 @@ export default function QAEvaluation() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <h2 className="text-sm font-medium">Dataset</h2>
-                <DatasetSelector
-                  value={selectedDatasetId}
-                  onChange={setSelectedDatasetId}
-                />
+                <DatasetSelector value={selectedDatasetId} onChange={setSelectedDatasetId} />
               </div>
-              <ProviderSelector
-                value={modelEndpoint}
-                onChange={setModelEndpoint}
-              />
+              <ProviderSelector value={modelEndpoint} onChange={setModelEndpoint} />
             </div>
             <div>
-              <JudgeConfigPanel
-                value={judgeConfig}
-                onChange={setJudgeConfig}
-              />
+              <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
             </div>
           </div>
           <Button
@@ -164,10 +152,7 @@ export default function QAEvaluation() {
       {/* Running Phase */}
       {phase === 'running' && currentEvaluation && (
         <>
-          <EvaluationProgress
-            evaluationId={currentEvaluation.id}
-            onComplete={handleComplete}
-          />
+          <EvaluationProgress evaluationId={currentEvaluation.id} onComplete={handleComplete} />
           <Button
             variant="outline"
             onClick={() => {
@@ -184,10 +169,7 @@ export default function QAEvaluation() {
       {/* Complete Phase */}
       {phase === 'complete' && (
         <>
-          <QAResultsTable
-            results={results}
-            onRowClick={handleRowClick}
-          />
+          <QAResultsTable results={results} onRowClick={handleRowClick} />
 
           <ResultDetailDrawer
             result={selectedResult}

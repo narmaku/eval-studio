@@ -16,7 +16,12 @@ interface ResultDetailDrawerProps {
   onClose: () => void;
 }
 
-export function ResultDetailDrawer({ result, datasetItem, open, onClose }: ResultDetailDrawerProps) {
+export function ResultDetailDrawer({
+  result,
+  datasetItem,
+  open,
+  onClose,
+}: ResultDetailDrawerProps) {
   if (!result) return null;
 
   const breakdown = result.scores_breakdown ?? {};
@@ -28,7 +33,10 @@ export function ResultDetailDrawer({ result, datasetItem, open, onClose }: Resul
         <SheetHeader>
           <SheetTitle>Result Detail</SheetTitle>
           <SheetDescription>
-            Item: {datasetItem?.question ? datasetItem.question.slice(0, 60) : (result.dataset_item_id?.slice(0, 8) ?? '--')}
+            Item:{' '}
+            {datasetItem?.question
+              ? datasetItem.question.slice(0, 60)
+              : (result.dataset_item_id?.slice(0, 8) ?? '--')}
           </SheetDescription>
         </SheetHeader>
 
@@ -52,9 +60,7 @@ export function ResultDetailDrawer({ result, datasetItem, open, onClose }: Resul
           {/* Question */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Question</h3>
-            <p className="text-sm text-muted-foreground">
-              {datasetItem?.question ?? '--'}
-            </p>
+            <p className="text-sm text-muted-foreground">{datasetItem?.question ?? '--'}</p>
           </div>
 
           <Separator />
@@ -62,9 +68,7 @@ export function ResultDetailDrawer({ result, datasetItem, open, onClose }: Resul
           {/* Expected Answer */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Expected Answer</h3>
-            <p className="text-sm text-muted-foreground">
-              {datasetItem?.expected_answer ?? 'N/A'}
-            </p>
+            <p className="text-sm text-muted-foreground">{datasetItem?.expected_answer ?? 'N/A'}</p>
           </div>
 
           <Separator />
