@@ -61,14 +61,14 @@ export function ArenaLeaderboard({ leaderboard }: ArenaLeaderboardProps) {
                     <TableCell>
                       <Badge variant={isFirst ? 'default' : 'secondary'}>{rank}</Badge>
                     </TableCell>
-                    <TableCell className="font-medium">
-                      {contestant.contestant_model}
-                    </TableCell>
+                    <TableCell className="font-medium">{contestant.contestant_model}</TableCell>
                     <TableCell>
                       {allErrored ? (
                         <Badge variant="destructive">Error</Badge>
                       ) : (
-                        <span className={`font-semibold tabular-nums ${scoreColorClass(contestant.average_score)}`}>
+                        <span
+                          className={`font-semibold tabular-nums ${scoreColorClass(contestant.average_score)}`}
+                        >
                           {Math.round(contestant.average_score * 100)}%
                         </span>
                       )}

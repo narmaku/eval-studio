@@ -1,9 +1,11 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { ArenaResultsGrid } from './ArenaResultsGrid';
 import type { Result } from '@/types';
 
-function makeResult(overrides: Partial<Result> & { dataset_item_id: string; contestant_model: string }): Result {
+function makeResult(
+  overrides: Partial<Result> & { dataset_item_id: string; contestant_model: string },
+): Result {
   return {
     id: `result-${overrides.dataset_item_id}-${overrides.contestant_model}`,
     evaluation_id: 'eval-1',
@@ -24,10 +26,34 @@ function makeResult(overrides: Partial<Result> & { dataset_item_id: string; cont
 const twoContestants = ['openai/gpt-4o', 'anthropic/claude-3'];
 
 const twoContestantResults: Result[] = [
-  makeResult({ dataset_item_id: 'q1', contestant_model: 'openai/gpt-4o', actual_answer: 'GPT answer 1', score: 0.9, passed: true }),
-  makeResult({ dataset_item_id: 'q1', contestant_model: 'anthropic/claude-3', actual_answer: 'Claude answer 1', score: 0.7, passed: true }),
-  makeResult({ dataset_item_id: 'q2', contestant_model: 'openai/gpt-4o', actual_answer: 'GPT answer 2', score: 0.6, passed: false }),
-  makeResult({ dataset_item_id: 'q2', contestant_model: 'anthropic/claude-3', actual_answer: 'Claude answer 2', score: 0.4, passed: false }),
+  makeResult({
+    dataset_item_id: 'q1',
+    contestant_model: 'openai/gpt-4o',
+    actual_answer: 'GPT answer 1',
+    score: 0.9,
+    passed: true,
+  }),
+  makeResult({
+    dataset_item_id: 'q1',
+    contestant_model: 'anthropic/claude-3',
+    actual_answer: 'Claude answer 1',
+    score: 0.7,
+    passed: true,
+  }),
+  makeResult({
+    dataset_item_id: 'q2',
+    contestant_model: 'openai/gpt-4o',
+    actual_answer: 'GPT answer 2',
+    score: 0.6,
+    passed: false,
+  }),
+  makeResult({
+    dataset_item_id: 'q2',
+    contestant_model: 'anthropic/claude-3',
+    actual_answer: 'Claude answer 2',
+    score: 0.4,
+    passed: false,
+  }),
 ];
 
 describe('ArenaResultsGrid', () => {
@@ -66,7 +92,11 @@ describe('ArenaResultsGrid', () => {
 
   it('handles missing results for a contestant gracefully', () => {
     const partialResults: Result[] = [
-      makeResult({ dataset_item_id: 'q1', contestant_model: 'openai/gpt-4o', actual_answer: 'GPT only' }),
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'openai/gpt-4o',
+        actual_answer: 'GPT only',
+      }),
       // No result for claude on q1
     ];
 
@@ -94,7 +124,11 @@ describe('ArenaResultsGrid', () => {
   it('renders with horizontal scroll for 4+ contestants', () => {
     const fiveContestants = ['model-1', 'model-2', 'model-3', 'model-4', 'model-5'];
     const results: Result[] = fiveContestants.map((model) =>
-      makeResult({ dataset_item_id: 'q1', contestant_model: model, actual_answer: `${model} answer` }),
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: model,
+        actual_answer: `${model} answer`,
+      }),
     );
 
     render(<ArenaResultsGrid results={results} contestants={fiveContestants} />);
@@ -108,7 +142,11 @@ describe('ArenaResultsGrid', () => {
   it('truncates long answers', () => {
     const longAnswer = 'A'.repeat(200);
     const results: Result[] = [
-      makeResult({ dataset_item_id: 'q1', contestant_model: 'openai/gpt-4o', actual_answer: longAnswer }),
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'openai/gpt-4o',
+        actual_answer: longAnswer,
+      }),
     ];
 
     render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);

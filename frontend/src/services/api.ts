@@ -197,8 +197,7 @@ export const api = {
     request<Provider>('/api/v1/providers', { method: 'POST', body: JSON.stringify(data) }),
   updateProvider: (id: string, data: UpdateProviderRequest) =>
     request<Provider>(`/api/v1/providers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteProvider: (id: string) =>
-    request<void>(`/api/v1/providers/${id}`, { method: 'DELETE' }),
+  deleteProvider: (id: string) => request<void>(`/api/v1/providers/${id}`, { method: 'DELETE' }),
   listProviderModels: (providerId: string) =>
     request<{ id: string; owned_by: string }[]>(`/api/v1/providers/${providerId}/models`),
 
@@ -239,7 +238,7 @@ export const api = {
   // --- Evaluator Config Files ---
   listEvaluatorConfigFiles: (evaluatorId: string) =>
     request<{ filename: string; size: number; modified_at: string }[]>(
-      `/api/v1/evaluators/${evaluatorId}/config-files`
+      `/api/v1/evaluators/${evaluatorId}/config-files`,
     ),
   uploadEvaluatorConfigFile: async (evaluatorId: string, file: File) => {
     const formData = new FormData();

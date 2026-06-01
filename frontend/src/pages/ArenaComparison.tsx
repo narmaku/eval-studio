@@ -88,9 +88,12 @@ export default function ArenaComparison() {
         evaluationId: evaluation.id,
       });
       void fetchResults(evaluation.id);
-      void api.getArenaLeaderboard(evaluation.id).then(setLeaderboard).catch(() => {
-        // Leaderboard fetch failed — results will still show
-      });
+      void api
+        .getArenaLeaderboard(evaluation.id)
+        .then(setLeaderboard)
+        .catch(() => {
+          // Leaderboard fetch failed — results will still show
+        });
       setPhase('complete');
     } else if (evaluation?.status === 'failed') {
       toast.error('Arena failed');
@@ -144,21 +147,12 @@ export default function ArenaComparison() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <h2 className="text-sm font-medium">Dataset</h2>
-                <DatasetSelector
-                  value={selectedDatasetId}
-                  onChange={setSelectedDatasetId}
-                />
+                <DatasetSelector value={selectedDatasetId} onChange={setSelectedDatasetId} />
               </div>
-              <ContestantSelector
-                value={contestants}
-                onChange={setContestants}
-              />
+              <ContestantSelector value={contestants} onChange={setContestants} />
             </div>
             <div>
-              <JudgeConfigPanel
-                value={judgeConfig}
-                onChange={setJudgeConfig}
-              />
+              <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
             </div>
           </div>
           <Button
@@ -174,10 +168,7 @@ export default function ArenaComparison() {
       {/* Running Phase */}
       {phase === 'running' && currentEvaluation && (
         <>
-          <EvaluationProgress
-            evaluationId={currentEvaluation.id}
-            onComplete={handleComplete}
-          />
+          <EvaluationProgress evaluationId={currentEvaluation.id} onComplete={handleComplete} />
           <Button
             variant="outline"
             onClick={() => {
@@ -196,10 +187,7 @@ export default function ArenaComparison() {
         <>
           {leaderboard && <ArenaLeaderboard leaderboard={leaderboard} />}
 
-          <ArenaResultsGrid
-            results={results}
-            contestants={contestantModels}
-          />
+          <ArenaResultsGrid results={results} contestants={contestantModels} />
 
           <Button variant="outline" onClick={handleNewArena}>
             New Arena

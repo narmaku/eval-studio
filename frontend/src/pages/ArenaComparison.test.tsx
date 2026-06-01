@@ -13,7 +13,7 @@ vi.mock('@/components/evaluation/ContestantSelector', () => ({
   ContestantSelector: ({
     value,
     onChange,
-    disabled,
+    disabled: _disabled,
   }: {
     value: unknown[];
     onChange: (v: unknown[]) => void;
@@ -23,12 +23,7 @@ vi.mock('@/components/evaluation/ContestantSelector', () => ({
       Contestant Selector ({value.length} contestants)
       <button
         data-testid="mock-add-contestant"
-        onClick={() =>
-          onChange([
-            ...value,
-            { name: 'Model X', litellm_model: 'openai/gpt-4o' },
-          ])
-        }
+        onClick={() => onChange([...value, { name: 'Model X', litellm_model: 'openai/gpt-4o' }])}
       >
         Mock Add
       </button>
@@ -38,7 +33,7 @@ vi.mock('@/components/evaluation/ContestantSelector', () => ({
 
 vi.mock('@/components/evaluation/DatasetSelector', () => ({
   DatasetSelector: ({
-    value,
+    value: _value,
     onChange,
   }: {
     value: string | undefined;
@@ -54,17 +49,14 @@ vi.mock('@/components/evaluation/DatasetSelector', () => ({
 
 vi.mock('@/components/evaluation/JudgeConfigPanel', () => ({
   JudgeConfigPanel: ({
-    value,
+    value: _value,
     onChange,
   }: {
     value: unknown;
     onChange: (v: unknown) => void;
   }) => (
     <div data-testid="judge-config">
-      <button
-        data-testid="mock-select-judge"
-        onClick={() => onChange({ provider_id: 'judge-1' })}
-      >
+      <button data-testid="mock-select-judge" onClick={() => onChange({ provider_id: 'judge-1' })}>
         Select Judge
       </button>
     </div>
@@ -89,15 +81,11 @@ vi.mock('@/components/evaluation/EvaluationProgress', () => ({
 }));
 
 vi.mock('@/components/evaluation/ArenaLeaderboard', () => ({
-  ArenaLeaderboard: () => (
-    <div data-testid="arena-leaderboard">Leaderboard</div>
-  ),
+  ArenaLeaderboard: () => <div data-testid="arena-leaderboard">Leaderboard</div>,
 }));
 
 vi.mock('@/components/evaluation/ArenaResultsGrid', () => ({
-  ArenaResultsGrid: () => (
-    <div data-testid="arena-results-grid">Results Grid</div>
-  ),
+  ArenaResultsGrid: () => <div data-testid="arena-results-grid">Results Grid</div>,
 }));
 
 // Mock stores
@@ -150,11 +138,14 @@ vi.mock('@/services/api', () => ({
 }));
 
 vi.mock('@/stores/notificationStore', () => ({
-  useNotificationStore: Object.assign(vi.fn(() => ({})), {
-    getState: () => ({
-      addNotification: vi.fn(),
-    }),
-  }),
+  useNotificationStore: Object.assign(
+    vi.fn(() => ({})),
+    {
+      getState: () => ({
+        addNotification: vi.fn(),
+      }),
+    },
+  ),
 }));
 
 describe('ArenaComparison page', () => {

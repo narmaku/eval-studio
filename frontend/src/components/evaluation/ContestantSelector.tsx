@@ -17,9 +17,7 @@ interface ContestantSelectorProps {
 export function ContestantSelector({ value, onChange, disabled }: ContestantSelectorProps) {
   // Internal slot count tracks how many contestant cards to show.
   // When value is empty, we start with MIN_CONTESTANTS empty slots.
-  const [slotCount, setSlotCount] = useState(
-    Math.max(value.length, MIN_CONTESTANTS),
-  );
+  const [slotCount, setSlotCount] = useState(Math.max(value.length, MIN_CONTESTANTS));
 
   const effectiveSlotCount = Math.max(slotCount, value.length, MIN_CONTESTANTS);
   const canAdd = effectiveSlotCount < MAX_CONTESTANTS && !disabled;
@@ -83,12 +81,7 @@ export function ContestantSelector({ value, onChange, disabled }: ContestantSele
           );
         })}
 
-        <Button
-          variant="outline"
-          className="w-full"
-          disabled={!canAdd}
-          onClick={handleAdd}
-        >
+        <Button variant="outline" className="w-full" disabled={!canAdd} onClick={handleAdd}>
           Add Contestant
         </Button>
       </CardContent>
