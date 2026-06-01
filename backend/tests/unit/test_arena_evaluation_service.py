@@ -264,7 +264,7 @@ async def test_arena_websocket_progress_includes_contestant_model(
     """WebSocket progress broadcasts should include contestant_model."""
     from app.services.arena_evaluation_service import run_arena_evaluation
 
-    evaluation, _dataset, items = arena_evaluation_with_dataset
+    evaluation, _dataset, _items = arena_evaluation_with_dataset
 
     mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
@@ -280,7 +280,6 @@ async def test_arena_websocket_progress_includes_contestant_model(
     # Total should be contestants * items = 2 * 2 = 4
     for call_args in mock_progress.call_args_list:
         kwargs = call_args.kwargs if call_args.kwargs else {}
-        args = call_args.args if call_args.args else ()
         # broadcast_progress should be called with total=4 and contestant_model set
         if kwargs:
             assert kwargs.get("total") == 4

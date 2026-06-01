@@ -61,7 +61,6 @@ async def test_create_arena_evaluation_no_contestants(client):
 @pytest.mark.asyncio
 async def test_run_arena_evaluation_accepted(client, db_session):
     """POST /evaluations/{id}/run for arena mode accepts and returns pending status."""
-    from sqlalchemy import select
 
     # Create arena evaluation with a dataset
     from app.models.dataset import Dataset, DatasetItem

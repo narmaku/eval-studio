@@ -44,9 +44,7 @@ async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depend
     if payload.mode == EvaluationMode.ARENA:
         contestants = payload.config.get("contestants", [])
         if not contestants or len(contestants) < 2:
-            raise ValidationException(
-                "Arena evaluations require at least 2 contestants in config.contestants."
-            )
+            raise ValidationException("Arena evaluations require at least 2 contestants in config.contestants.")
 
     evaluation = Evaluation(
         name=payload.name,
