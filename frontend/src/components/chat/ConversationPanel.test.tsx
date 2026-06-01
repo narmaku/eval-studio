@@ -43,12 +43,7 @@ describe('ConversationPanel', () => {
 
   it('disables chat input when disabled prop is true', () => {
     render(
-      <ConversationPanel
-        messages={[]}
-        isProcessing={false}
-        onSend={vi.fn()}
-        disabled={true}
-      />,
+      <ConversationPanel messages={[]} isProcessing={false} onSend={vi.fn()} disabled={true} />,
     );
 
     const textarea = screen.getByPlaceholderText('Type a message...');
@@ -57,12 +52,7 @@ describe('ConversationPanel', () => {
 
   it('disables chat input when isProcessing is true', () => {
     render(
-      <ConversationPanel
-        messages={[]}
-        isProcessing={true}
-        onSend={vi.fn()}
-        disabled={false}
-      />,
+      <ConversationPanel messages={[]} isProcessing={true} onSend={vi.fn()} disabled={false} />,
     );
 
     const textarea = screen.getByPlaceholderText('Type a message...');
@@ -74,12 +64,7 @@ describe('ConversationPanel', () => {
     const user = userEvent.setup();
 
     render(
-      <ConversationPanel
-        messages={[]}
-        isProcessing={false}
-        onSend={onSend}
-        disabled={false}
-      />,
+      <ConversationPanel messages={[]} isProcessing={false} onSend={onSend} disabled={false} />,
     );
 
     const textarea = screen.getByPlaceholderText('Type a message...');
@@ -91,12 +76,7 @@ describe('ConversationPanel', () => {
 
   it('shows typing indicator when isProcessing is true', () => {
     render(
-      <ConversationPanel
-        messages={[]}
-        isProcessing={true}
-        onSend={vi.fn()}
-        disabled={false}
-      />,
+      <ConversationPanel messages={[]} isProcessing={true} onSend={vi.fn()} disabled={false} />,
     );
 
     expect(screen.getByTestId('typing-indicator')).toBeInTheDocument();
@@ -104,12 +84,7 @@ describe('ConversationPanel', () => {
 
   it('does not show typing indicator when isProcessing is false', () => {
     render(
-      <ConversationPanel
-        messages={[]}
-        isProcessing={false}
-        onSend={vi.fn()}
-        disabled={false}
-      />,
+      <ConversationPanel messages={[]} isProcessing={false} onSend={vi.fn()} disabled={false} />,
     );
 
     expect(screen.queryByTestId('typing-indicator')).not.toBeInTheDocument();
@@ -117,12 +92,7 @@ describe('ConversationPanel', () => {
 
   it('renders empty state when no messages', () => {
     render(
-      <ConversationPanel
-        messages={[]}
-        isProcessing={false}
-        onSend={vi.fn()}
-        disabled={false}
-      />,
+      <ConversationPanel messages={[]} isProcessing={false} onSend={vi.fn()} disabled={false} />,
     );
 
     expect(screen.getByText(/start a conversation/i)).toBeInTheDocument();

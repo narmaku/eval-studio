@@ -174,11 +174,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
 function handleWsMessage(
   envelope: WsEnvelope,
-  set: (
-    partial:
-      | Partial<SessionStore>
-      | ((state: SessionStore) => Partial<SessionStore>),
-  ) => void,
+  set: (partial: Partial<SessionStore> | ((state: SessionStore) => Partial<SessionStore>)) => void,
   get: () => SessionStore,
 ) {
   switch (envelope.type) {

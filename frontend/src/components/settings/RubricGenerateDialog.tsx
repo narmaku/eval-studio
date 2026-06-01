@@ -42,7 +42,10 @@ export function RubricGenerateDialog({
 
   useEffect(() => {
     if (open) {
-      api.listProviders().then(setProviders).catch(() => {});
+      api
+        .listProviders()
+        .then(setProviders)
+        .catch(() => {});
     }
   }, [open]);
 

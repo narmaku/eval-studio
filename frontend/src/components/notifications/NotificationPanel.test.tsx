@@ -200,9 +200,7 @@ describe('NotificationPanel', () => {
     await user.click(screen.getByText('Details'));
 
     // Details should now be visible
-    expect(
-      screen.getByText(/Error: Connection refused/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Error: Connection refused/)).toBeInTheDocument();
   });
 
   it('renders "View Results" link when evaluationId is set', () => {

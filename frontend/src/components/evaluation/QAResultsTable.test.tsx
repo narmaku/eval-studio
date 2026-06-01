@@ -10,6 +10,7 @@ const mockResults: Result[] = [
     evaluation_id: 'e1',
     dataset_item_id: 'item-1',
     session_id: null,
+    contestant_model: null,
     score: 0.9,
     passed: true,
     actual_answer: 'Use systemctl restart sshd',
@@ -23,6 +24,7 @@ const mockResults: Result[] = [
     evaluation_id: 'e1',
     dataset_item_id: 'item-2',
     session_id: null,
+    contestant_model: null,
     score: 0.3,
     passed: false,
     actual_answer: 'Just restart it',
@@ -36,6 +38,7 @@ const mockResults: Result[] = [
     evaluation_id: 'e1',
     dataset_item_id: 'item-3',
     session_id: null,
+    contestant_model: null,
     score: 0.75,
     passed: true,
     actual_answer: 'Run firewall-cmd --add-port=443/tcp --permanent',
@@ -49,6 +52,7 @@ const mockResults: Result[] = [
     evaluation_id: 'e1',
     dataset_item_id: 'item-4',
     session_id: null,
+    contestant_model: null,
     score: 0.5,
     passed: false,
     actual_answer: 'Change the port in sshd_config',
@@ -62,6 +66,7 @@ const mockResults: Result[] = [
     evaluation_id: 'e1',
     dataset_item_id: 'item-5',
     session_id: null,
+    contestant_model: null,
     score: 0.95,
     passed: true,
     actual_answer: 'Use pvcreate, vgcreate, and lvcreate in sequence.',
@@ -112,9 +117,7 @@ const mockDatasetItems: DatasetItem[] = [
 
 describe('QAResultsTable', () => {
   it('renders all score rows', () => {
-    render(
-      <QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />,
-    );
+    render(<QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />);
 
     // We should see 5 rows of data (not counting header)
     const rows = screen.getAllByRole('row');
@@ -123,9 +126,7 @@ describe('QAResultsTable', () => {
   });
 
   it('displays pass/fail badges correctly', () => {
-    render(
-      <QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />,
-    );
+    render(<QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />);
 
     const passBadges = screen.getAllByText('Pass');
     const failBadges = screen.getAllByText('Fail');
@@ -134,23 +135,15 @@ describe('QAResultsTable', () => {
   });
 
   it('displays question text from dataset items', () => {
-    render(
-      <QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />,
-    );
+    render(<QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />);
 
-    expect(
-      screen.getByText(/How do you restart the SSH service/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Explain LVM volume creation/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/How do you restart the SSH service/)).toBeInTheDocument();
+    expect(screen.getByText(/Explain LVM volume creation/)).toBeInTheDocument();
   });
 
   it('expands row on chevron click to show judge reasoning', async () => {
     const user = userEvent.setup();
-    render(
-      <QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />,
-    );
+    render(<QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />);
 
     // Find the expand buttons
     const expandButtons = screen.getAllByRole('button', { name: /expand row/i });

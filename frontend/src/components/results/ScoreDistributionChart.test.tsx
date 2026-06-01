@@ -18,6 +18,7 @@ const makeResult = (score: number): Result => ({
   evaluation_id: 'e1',
   dataset_item_id: `item-${score}`,
   session_id: null,
+  contestant_model: null,
   score,
   passed: score >= 0.5,
   actual_answer: 'test',

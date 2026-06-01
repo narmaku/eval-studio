@@ -66,9 +66,7 @@ vi.mock('./RubricBuilder', () => ({
     onSaved?: () => void;
   }) =>
     open ? (
-      <div data-testid="rubric-builder">
-        {rubric ? `editing ${rubric.name}` : 'creating new'}
-      </div>
+      <div data-testid="rubric-builder">{rubric ? `editing ${rubric.name}` : 'creating new'}</div>
     ) : null,
 }));
 
@@ -85,9 +83,7 @@ vi.mock('./RubricGenerateDialog', () => ({
 
 vi.mock('./RubricRefineDialog', () => ({
   RubricRefineDialog: ({ open, rubric }: { open: boolean; rubric: Rubric }) =>
-    open ? (
-      <div data-testid="refine-dialog">refining {rubric.name}</div>
-    ) : null,
+    open ? <div data-testid="refine-dialog">refining {rubric.name}</div> : null,
 }));
 
 import { RubricList } from './RubricList';

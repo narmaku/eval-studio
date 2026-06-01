@@ -242,9 +242,7 @@ export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogP
               Name
             </label>
             <Input id="dataset-name" placeholder="My Dataset" {...register('name')} />
-            {errors.name && (
-              <p className="text-sm text-destructive">{errors.name.message}</p>
-            )}
+            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
           </div>
 
           <div className="space-y-2">
@@ -303,11 +301,17 @@ export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogP
                 {parsedItems.slice(0, 3).map((item, idx) => (
                   <div key={idx} className="text-xs space-y-0.5">
                     <p className="font-medium text-foreground">
-                      {idx + 1}. {item.question.length > 100 ? `${item.question.slice(0, 100)}...` : item.question}
+                      {idx + 1}.{' '}
+                      {item.question.length > 100
+                        ? `${item.question.slice(0, 100)}...`
+                        : item.question}
                     </p>
                     {item.expected_answer && (
                       <p className="text-muted-foreground">
-                        A: {item.expected_answer.length > 80 ? `${item.expected_answer.slice(0, 80)}...` : item.expected_answer}
+                        A:{' '}
+                        {item.expected_answer.length > 80
+                          ? `${item.expected_answer.slice(0, 80)}...`
+                          : item.expected_answer}
                       </p>
                     )}
                   </div>

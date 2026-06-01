@@ -62,9 +62,7 @@ export function RAGResultDetailDrawer({
           {/* Question */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Question</h3>
-            <p className="text-sm text-muted-foreground">
-              {datasetItem?.question ?? '--'}
-            </p>
+            <p className="text-sm text-muted-foreground">{datasetItem?.question ?? '--'}</p>
           </div>
 
           <Separator />
@@ -72,18 +70,14 @@ export function RAGResultDetailDrawer({
           {/* Expected Answer */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Expected Answer</h3>
-            <p className="text-sm text-muted-foreground">
-              {datasetItem?.expected_answer ?? 'N/A'}
-            </p>
+            <p className="text-sm text-muted-foreground">{datasetItem?.expected_answer ?? 'N/A'}</p>
           </div>
 
           <Separator />
 
           {/* Retrieved Chunks */}
           <div className="space-y-2">
-            <h3 className="text-sm font-medium">
-              Retrieved Chunks ({chunks.length})
-            </h3>
+            <h3 className="text-sm font-medium">Retrieved Chunks ({chunks.length})</h3>
             <ChunkDisplay chunks={chunks} />
           </div>
 
@@ -92,9 +86,7 @@ export function RAGResultDetailDrawer({
           {/* Actual Answer */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Actual Answer</h3>
-            <p className="text-sm text-muted-foreground">
-              {result.actual_answer || 'N/A'}
-            </p>
+            <p className="text-sm text-muted-foreground">{result.actual_answer || 'N/A'}</p>
           </div>
 
           <Separator />
@@ -108,9 +100,7 @@ export function RAGResultDetailDrawer({
                   {Object.entries(breakdown).map(([name, value]) => (
                     <li key={name} className="flex justify-between text-sm">
                       <span className="text-muted-foreground">{name}</span>
-                      <span className="tabular-nums">
-                        {(value * 100).toFixed(0)}%
-                      </span>
+                      <span className="tabular-nums">{(value * 100).toFixed(0)}%</span>
                     </li>
                   ))}
                 </ul>

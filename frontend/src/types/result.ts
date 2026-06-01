@@ -11,6 +11,7 @@ export interface Result {
   evaluation_id: string;
   dataset_item_id: string | null;
   session_id: string | null;
+  contestant_model: string | null;
   score: number | null;
   passed: boolean | null;
   actual_answer: string | null;
@@ -18,6 +19,23 @@ export interface Result {
   scores_breakdown: Record<string, number> | null;
   retrieved_chunks: RetrievedChunk[] | null;
   created_at: string;
+}
+
+export interface ArenaContestantSummary {
+  contestant_model: string;
+  total_items: number;
+  passed_count: number;
+  failed_count: number;
+  errored_count: number;
+  average_score: number;
+  min_score: number | null;
+  max_score: number | null;
+}
+
+export interface ArenaLeaderboardResponse {
+  evaluation_id: string;
+  evaluation_name: string;
+  contestants: ArenaContestantSummary[];
 }
 
 export interface AggregateMetrics {

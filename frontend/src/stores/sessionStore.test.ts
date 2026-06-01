@@ -115,8 +115,7 @@ describe('sessionStore', () => {
         evaluation_id: 'eval-1',
         mode: 'live' as const,
         status: 'active' as const,
-        
-        
+
         agent_config: null,
         judge_config_snapshot: null,
         transcript: [],
@@ -125,7 +124,7 @@ describe('sessionStore', () => {
         error: null,
         started_at: '2026-01-01T00:00:00Z',
         ended_at: null,
-        created_at: "2026-01-01T00:00:00Z",
+        created_at: '2026-01-01T00:00:00Z',
       };
 
       mockedApi.createSession.mockResolvedValue(mockSession);
@@ -165,8 +164,7 @@ describe('sessionStore', () => {
           evaluation_id: 'eval-1',
           mode: 'live',
           status: 'active',
-          
-          
+
           agent_config: null,
           judge_config_snapshot: null,
           transcript: [],
@@ -175,7 +173,7 @@ describe('sessionStore', () => {
           error: null,
           started_at: '2026-01-01T00:00:00Z',
           ended_at: null,
-          created_at: "2026-01-01T00:00:00Z",
+          created_at: '2026-01-01T00:00:00Z',
         },
         isConnected: true,
       });
@@ -213,8 +211,7 @@ describe('sessionStore', () => {
           evaluation_id: 'eval-1',
           mode: 'live',
           status: 'active',
-          
-          
+
           agent_config: null,
           judge_config_snapshot: null,
           transcript: [],
@@ -223,7 +220,7 @@ describe('sessionStore', () => {
           error: null,
           started_at: '2026-01-01T00:00:00Z',
           ended_at: null,
-          created_at: "2026-01-01T00:00:00Z",
+          created_at: '2026-01-01T00:00:00Z',
         },
         messages: [
           {
@@ -404,8 +401,7 @@ describe('sessionStore', () => {
           evaluation_id: 'eval-1',
           mode: 'live',
           status: 'active',
-          
-          
+
           agent_config: null,
           judge_config_snapshot: null,
           transcript: [],
@@ -414,7 +410,7 @@ describe('sessionStore', () => {
           error: null,
           started_at: '2026-01-01T00:00:00Z',
           ended_at: null,
-          created_at: "2026-01-01T00:00:00Z",
+          created_at: '2026-01-01T00:00:00Z',
         },
       });
       useSessionStore.getState().connectWebSocket('sess-1');

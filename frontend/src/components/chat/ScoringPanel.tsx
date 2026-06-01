@@ -49,9 +49,7 @@ export function ScoringPanel({ scores, isSessionEnded }: ScoringPanelProps) {
 
         {scores.length === 0 && isSessionEnded && (
           <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-muted-foreground">
-              Waiting for judge scoring...
-            </p>
+            <p className="text-sm text-muted-foreground">Waiting for judge scoring...</p>
           </div>
         )}
 
@@ -59,12 +57,8 @@ export function ScoringPanel({ scores, isSessionEnded }: ScoringPanelProps) {
         {sessionScores.map((score, idx) => (
           <div key={`session-${idx}`} className="space-y-3">
             <div className="text-center">
-              <p className="text-xs font-medium text-muted-foreground mb-1">
-                Overall Score
-              </p>
-              <p className="text-4xl font-bold">
-                {Math.round(score.overall * 100)}%
-              </p>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Overall Score</p>
+              <p className="text-4xl font-bold">{Math.round(score.overall * 100)}%</p>
             </div>
 
             <Separator />
@@ -79,9 +73,7 @@ export function ScoringPanel({ scores, isSessionEnded }: ScoringPanelProps) {
               <>
                 <Separator />
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">
-                    Judge Reasoning
-                  </p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Judge Reasoning</p>
                   <blockquote className="border-l-2 pl-3 text-xs text-muted-foreground italic">
                     {score.judge_reasoning}
                   </blockquote>
@@ -96,18 +88,11 @@ export function ScoringPanel({ scores, isSessionEnded }: ScoringPanelProps) {
           <>
             {sessionScores.length > 0 && <Separator className="my-4" />}
             <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground">
-                Per-Turn Scores
-              </p>
+              <p className="text-xs font-medium text-muted-foreground">Per-Turn Scores</p>
               {turnScores.map((score, idx) => (
-                <div
-                  key={`turn-${idx}`}
-                  className="rounded-lg border p-3 space-y-2"
-                >
+                <div key={`turn-${idx}`} className="rounded-lg border p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium">
-                      Turn {score.turn_number}
-                    </span>
+                    <span className="text-xs font-medium">Turn {score.turn_number}</span>
                     <span className="text-xs text-muted-foreground">
                       {Math.round(score.overall * 100)}%
                     </span>

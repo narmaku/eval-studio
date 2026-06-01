@@ -44,7 +44,7 @@ function EvaluatorDetailContent({ evaluator }: { evaluator: EvaluatorInfo }) {
   const [configFiles, setConfigFiles] = useState<ConfigFileEntry[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<{ filename: string; content: string } | null>(
-    null
+    null,
   );
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -67,7 +67,7 @@ function EvaluatorDetailContent({ evaluator }: { evaluator: EvaluatorInfo }) {
       },
       () => {
         // silently handle
-      }
+      },
     );
     return () => {
       cancelled = true;
@@ -275,9 +275,7 @@ function StatusDot({ available }: { available: boolean }) {
   return (
     <span className="flex items-center gap-1 text-xs">
       <span
-        className={`inline-block h-2 w-2 rounded-full ${
-          available ? 'bg-green-500' : 'bg-red-500'
-        }`}
+        className={`inline-block h-2 w-2 rounded-full ${available ? 'bg-green-500' : 'bg-red-500'}`}
       />
       {available ? 'Available' : 'Unavailable'}
     </span>

@@ -28,11 +28,19 @@ function formatDate(iso: string): string {
 function statusBadge(status: string) {
   switch (status) {
     case 'active':
-      return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">Active</Badge>;
+      return (
+        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+          Active
+        </Badge>
+      );
     case 'ended':
       return <Badge variant="secondary">Ended</Badge>;
     case 'completed':
-      return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Scored</Badge>;
+      return (
+        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+          Scored
+        </Badge>
+      );
     case 'failed':
       return <Badge variant="destructive">Failed</Badge>;
     default:
@@ -50,9 +58,7 @@ export default function Sessions() {
 
   const messageCount = (transcript: Record<string, unknown>[] | null) => {
     if (!transcript) return 0;
-    return transcript.filter(
-      (m) => m.role === 'user' || m.role === 'assistant',
-    ).length;
+    return transcript.filter((m) => m.role === 'user' || m.role === 'assistant').length;
   };
 
   return (
@@ -60,7 +66,8 @@ export default function Sessions() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Sessions</h1>
         <p className="text-muted-foreground">
-          Browse agent chat sessions. View transcripts, replay conversations, and score with different rubrics.
+          Browse agent chat sessions. View transcripts, replay conversations, and score with
+          different rubrics.
         </p>
       </div>
       <Separator />

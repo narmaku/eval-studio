@@ -15,11 +15,7 @@ import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import type {
-  JudgeReference,
-  Result,
-  CreateEvaluationRequest,
-} from '@/types';
+import type { JudgeReference, Result, CreateEvaluationRequest } from '@/types';
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
@@ -47,10 +43,10 @@ export default function RAGEvaluation() {
 
   const isConfigValid = Boolean(
     selectedDatasetId &&
-      isRagEndpointValid &&
-      judgeConfig &&
-      selectedMetrics.length > 0 &&
-      selectedEvaluatorId,
+    isRagEndpointValid &&
+    judgeConfig &&
+    selectedMetrics.length > 0 &&
+    selectedEvaluatorId,
   );
 
   const handleStart = async () => {
@@ -62,9 +58,7 @@ export default function RAGEvaluation() {
         : `RAG Eval - ${ragEndpoint.endpoint_url ?? ''}`;
 
     const modelApiBase =
-      ragEndpoint.backend_type === 'pgvector'
-        ? undefined
-        : ragEndpoint.endpoint_url;
+      ragEndpoint.backend_type === 'pgvector' ? undefined : ragEndpoint.endpoint_url;
 
     const request: CreateEvaluationRequest = {
       name: evalName,
@@ -168,25 +162,13 @@ export default function RAGEvaluation() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <h2 className="text-sm font-medium">Dataset</h2>
-                <DatasetSelector
-                  value={selectedDatasetId}
-                  onChange={setSelectedDatasetId}
-                />
+                <DatasetSelector value={selectedDatasetId} onChange={setSelectedDatasetId} />
               </div>
-              <RAGEndpointConfig
-                value={ragEndpoint}
-                onChange={setRagEndpoint}
-              />
+              <RAGEndpointConfig value={ragEndpoint} onChange={setRagEndpoint} />
             </div>
             <div className="space-y-4">
-              <RAGMetricsSelector
-                value={selectedMetrics}
-                onChange={setSelectedMetrics}
-              />
-              <JudgeConfigPanel
-                value={judgeConfig}
-                onChange={setJudgeConfig}
-              />
+              <RAGMetricsSelector value={selectedMetrics} onChange={setSelectedMetrics} />
+              <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
             </div>
           </div>
           <Button
@@ -202,10 +184,7 @@ export default function RAGEvaluation() {
       {/* Running Phase */}
       {phase === 'running' && currentEvaluation && (
         <>
-          <EvaluationProgress
-            evaluationId={currentEvaluation.id}
-            onComplete={handleComplete}
-          />
+          <EvaluationProgress evaluationId={currentEvaluation.id} onComplete={handleComplete} />
           <Button
             variant="outline"
             onClick={() => {
@@ -222,10 +201,7 @@ export default function RAGEvaluation() {
       {/* Complete Phase */}
       {phase === 'complete' && (
         <>
-          <RAGResultsTable
-            results={results}
-            onRowClick={handleRowClick}
-          />
+          <RAGResultsTable results={results} onRowClick={handleRowClick} />
 
           <RAGResultDetailDrawer
             result={selectedResult}

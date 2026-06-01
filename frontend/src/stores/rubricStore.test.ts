@@ -106,7 +106,7 @@ describe('rubricStore', () => {
         useRubricStore.getState().createRubric({
           name: 'Bad',
           dimensions: [{ name: 'x', weight: 1, description: '' }],
-        })
+        }),
       ).rejects.toThrow('Create failed');
     });
   });
@@ -161,9 +161,9 @@ describe('rubricStore', () => {
     it('throws on API error', async () => {
       mockedApi.importRubric.mockRejectedValue(new Error('Invalid YAML'));
 
-      await expect(
-        useRubricStore.getState().importRubric({ yaml_content: 'bad' })
-      ).rejects.toThrow('Invalid YAML');
+      await expect(useRubricStore.getState().importRubric({ yaml_content: 'bad' })).rejects.toThrow(
+        'Invalid YAML',
+      );
     });
   });
 

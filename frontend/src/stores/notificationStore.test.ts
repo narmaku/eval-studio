@@ -55,9 +55,7 @@ describe('notificationStore', () => {
       addNotification({ type: 'info', title: 'First', message: 'msg' });
       addNotification({ type: 'info', title: 'Second', message: 'msg' });
 
-      const titles = useNotificationStore
-        .getState()
-        .notifications.map((n) => n.title);
+      const titles = useNotificationStore.getState().notifications.map((n) => n.title);
       expect(titles).toEqual(['Second', 'First']);
     });
 

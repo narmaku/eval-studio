@@ -66,33 +66,25 @@ describe('DatasetDetailView', () => {
 
   it('renders sheet when open with dataset name', () => {
     storeState.currentDataset = makeDetail();
-    render(
-      <DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />,
-    );
+    render(<DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />);
     expect(screen.getByText('Test Dataset')).toBeInTheDocument();
   });
 
   it('calls fetchDataset with the provided id', () => {
-    render(
-      <DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />,
-    );
+    render(<DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />);
     expect(mockFetchDataset).toHaveBeenCalledWith('ds-1');
   });
 
   it('displays dataset metadata fields', () => {
     storeState.currentDataset = makeDetail();
-    render(
-      <DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />,
-    );
+    render(<DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />);
     expect(screen.getByText('qa_pairs')).toBeInTheDocument();
     expect(screen.getByText('1.0')).toBeInTheDocument();
   });
 
   it('renders item list when dataset has items', () => {
     storeState.currentDataset = makeDetail();
-    render(
-      <DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />,
-    );
+    render(<DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />);
     expect(screen.getByText('What is Linux?')).toBeInTheDocument();
     expect(screen.getByText('An operating system kernel')).toBeInTheDocument();
     expect(screen.getByText('What is Bash?')).toBeInTheDocument();
@@ -100,9 +92,7 @@ describe('DatasetDetailView', () => {
 
   it('shows loading state while fetching', () => {
     storeState.isLoading = true;
-    render(
-      <DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />,
-    );
+    render(<DatasetDetailView datasetId="ds-1" open={true} onOpenChange={vi.fn()} />);
     expect(screen.getByTestId('detail-loading')).toBeInTheDocument();
   });
 });

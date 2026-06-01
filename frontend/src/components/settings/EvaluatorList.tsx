@@ -44,9 +44,7 @@ export function EvaluatorList() {
   }
 
   if (error) {
-    return (
-      <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">{error}</div>
-    );
+    return <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">{error}</div>;
   }
 
   if (evaluators.length === 0) {
@@ -88,11 +86,7 @@ export function EvaluatorList() {
                   </p>
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleConfigure(evaluator)}
-              >
+              <Button variant="outline" size="sm" onClick={() => handleConfigure(evaluator)}>
                 Configure
               </Button>
             </div>
@@ -115,9 +109,7 @@ function StatusIndicator({ available }: { available: boolean }) {
   return (
     <span className="flex items-center gap-1 text-xs">
       <span
-        className={`inline-block h-2 w-2 rounded-full ${
-          available ? 'bg-green-500' : 'bg-red-500'
-        }`}
+        className={`inline-block h-2 w-2 rounded-full ${available ? 'bg-green-500' : 'bg-red-500'}`}
       />
       {available ? 'Available' : 'Unavailable'}
     </span>

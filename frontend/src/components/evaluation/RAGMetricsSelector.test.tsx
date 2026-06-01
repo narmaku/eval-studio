@@ -54,9 +54,7 @@ describe('RAGMetricsSelector', () => {
     });
     await user.click(faithfulnessCheckbox);
 
-    expect(onChange).toHaveBeenCalledWith(
-      ALL_RAG_METRICS.filter((m) => m !== 'faithfulness'),
-    );
+    expect(onChange).toHaveBeenCalledWith(ALL_RAG_METRICS.filter((m) => m !== 'faithfulness'));
   });
 
   it('adds metric to value when checking', async () => {
@@ -74,9 +72,7 @@ describe('RAGMetricsSelector', () => {
 
   it('disables all checkboxes when disabled prop is true', () => {
     const onChange = vi.fn();
-    render(
-      <RAGMetricsSelector value={ALL_RAG_METRICS} onChange={onChange} disabled />,
-    );
+    render(<RAGMetricsSelector value={ALL_RAG_METRICS} onChange={onChange} disabled />);
 
     const checkboxes = screen.getAllByRole('checkbox');
     checkboxes.forEach((cb) => {

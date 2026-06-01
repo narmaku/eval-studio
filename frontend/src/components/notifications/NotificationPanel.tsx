@@ -58,10 +58,8 @@ function formatRelativeTime(date: Date): string {
   const diffDays = Math.floor(diffHours / 24);
 
   if (diffSeconds < 60) return 'just now';
-  if (diffMinutes < 60)
-    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
-  if (diffHours < 24)
-    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
   return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
 }
 
@@ -82,9 +80,7 @@ function NotificationCard({
     <div
       role="article"
       className={`relative rounded-md border p-3 transition-colors ${
-        notification.read
-          ? 'bg-background'
-          : `border-l-4 border-l-primary/50 ${config.bgColor}`
+        notification.read ? 'bg-background' : `border-l-4 border-l-primary/50 ${config.bgColor}`
       }`}
       onClick={() => {
         if (!notification.read) {
@@ -96,9 +92,7 @@ function NotificationCard({
         <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${config.color}`} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-medium leading-tight">
-              {notification.title}
-            </p>
+            <p className="text-sm font-medium leading-tight">{notification.title}</p>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -112,9 +106,7 @@ function NotificationCard({
               <Trash2 className="h-3 w-3" />
             </Button>
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {notification.message}
-          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{notification.message}</p>
           <p className="mt-1 text-xs text-muted-foreground/70">
             {formatRelativeTime(notification.timestamp)}
           </p>
@@ -179,12 +171,7 @@ export function NotificationPanel() {
             <SheetTitle>Notifications</SheetTitle>
             <div className="flex items-center gap-1">
               {unreadCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={markAllAsRead}
-                >
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={markAllAsRead}>
                   Mark all read
                 </Button>
               )}

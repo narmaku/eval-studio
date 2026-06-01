@@ -52,9 +52,7 @@ export function EvaluationProgress({ evaluationId, onComplete }: EvaluationProgr
           </div>
         )}
 
-        {status === 'running' && (
-          <p className="text-sm text-muted-foreground">Scoring items...</p>
-        )}
+        {status === 'running' && <p className="text-sm text-muted-foreground">Scoring items...</p>}
 
         {status === 'pending' && (
           <p className="text-sm text-muted-foreground">Waiting for evaluation to start...</p>

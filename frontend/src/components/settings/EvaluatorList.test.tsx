@@ -64,9 +64,7 @@ describe('EvaluatorList', () => {
   });
 
   it('shows mode badges', async () => {
-    mockListEvaluators.mockResolvedValue([
-      makeEvaluator({ modes: ['qa', 'rag', 'agent'] }),
-    ]);
+    mockListEvaluators.mockResolvedValue([makeEvaluator({ modes: ['qa', 'rag', 'agent'] })]);
 
     render(<EvaluatorList />);
 
@@ -78,9 +76,7 @@ describe('EvaluatorList', () => {
   });
 
   it('shows available status with green indicator', async () => {
-    mockListEvaluators.mockResolvedValue([
-      makeEvaluator({ available: true }),
-    ]);
+    mockListEvaluators.mockResolvedValue([makeEvaluator({ available: true })]);
 
     render(<EvaluatorList />);
 
@@ -90,9 +86,7 @@ describe('EvaluatorList', () => {
   });
 
   it('shows unavailable status with red indicator', async () => {
-    mockListEvaluators.mockResolvedValue([
-      makeEvaluator({ available: false }),
-    ]);
+    mockListEvaluators.mockResolvedValue([makeEvaluator({ available: false })]);
 
     render(<EvaluatorList />);
 
@@ -102,9 +96,7 @@ describe('EvaluatorList', () => {
   });
 
   it('shows built-in badge for builtin evaluators', async () => {
-    mockListEvaluators.mockResolvedValue([
-      makeEvaluator({ builtin: true }),
-    ]);
+    mockListEvaluators.mockResolvedValue([makeEvaluator({ builtin: true })]);
 
     render(<EvaluatorList />);
 
@@ -129,9 +121,7 @@ describe('EvaluatorList', () => {
 
   it('opens detail panel when Configure is clicked', async () => {
     const user = userEvent.setup();
-    mockListEvaluators.mockResolvedValue([
-      makeEvaluator({ id: 'e-1', name: 'QA Evaluator' }),
-    ]);
+    mockListEvaluators.mockResolvedValue([makeEvaluator({ id: 'e-1', name: 'QA Evaluator' })]);
     mockListConfigFiles.mockResolvedValue([]);
 
     render(<EvaluatorList />);

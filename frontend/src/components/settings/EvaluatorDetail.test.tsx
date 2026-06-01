@@ -48,26 +48,14 @@ describe('EvaluatorDetail', () => {
   });
 
   it('renders evaluator name and description', () => {
-    render(
-      <EvaluatorDetail
-        open={true}
-        onOpenChange={vi.fn()}
-        evaluator={makeEvaluator()}
-      />
-    );
+    render(<EvaluatorDetail open={true} onOpenChange={vi.fn()} evaluator={makeEvaluator()} />);
 
     expect(screen.getByText('LLM-as-Judge')).toBeInTheDocument();
     expect(screen.getByText('Direct LLM-as-judge scoring via LiteLLM.')).toBeInTheDocument();
   });
 
   it('renders mode badges', () => {
-    render(
-      <EvaluatorDetail
-        open={true}
-        onOpenChange={vi.fn()}
-        evaluator={makeEvaluator()}
-      />
-    );
+    render(<EvaluatorDetail open={true} onOpenChange={vi.fn()} evaluator={makeEvaluator()} />);
 
     expect(screen.getByText('qa')).toBeInTheDocument();
     expect(screen.getByText('rag')).toBeInTheDocument();
@@ -80,20 +68,14 @@ describe('EvaluatorDetail', () => {
         open={true}
         onOpenChange={vi.fn()}
         evaluator={makeEvaluator({ builtin: true })}
-      />
+      />,
     );
 
     expect(screen.getByText('Built-in')).toBeInTheDocument();
   });
 
   it('renders default configuration key-value pairs', () => {
-    render(
-      <EvaluatorDetail
-        open={true}
-        onOpenChange={vi.fn()}
-        evaluator={makeEvaluator()}
-      />
-    );
+    render(<EvaluatorDetail open={true} onOpenChange={vi.fn()} evaluator={makeEvaluator()} />);
 
     expect(screen.getByText('pass_threshold')).toBeInTheDocument();
     expect(screen.getByText('0.7')).toBeInTheDocument();
@@ -108,20 +90,14 @@ describe('EvaluatorDetail', () => {
         open={true}
         onOpenChange={vi.fn()}
         evaluator={makeEvaluator({ defaults: {} })}
-      />
+      />,
     );
 
     expect(screen.getByText('No default configuration')).toBeInTheDocument();
   });
 
   it('renders config schema properties', () => {
-    render(
-      <EvaluatorDetail
-        open={true}
-        onOpenChange={vi.fn()}
-        evaluator={makeEvaluator()}
-      />
-    );
+    render(<EvaluatorDetail open={true} onOpenChange={vi.fn()} evaluator={makeEvaluator()} />);
 
     expect(screen.getByText('model')).toBeInTheDocument();
     expect(screen.getByText('string')).toBeInTheDocument();
@@ -134,20 +110,14 @@ describe('EvaluatorDetail', () => {
         open={true}
         onOpenChange={vi.fn()}
         evaluator={makeEvaluator({ config_schema: {} })}
-      />
+      />,
     );
 
     expect(screen.getByText('No configurable options')).toBeInTheDocument();
   });
 
   it('fetches config files on mount', () => {
-    render(
-      <EvaluatorDetail
-        open={true}
-        onOpenChange={vi.fn()}
-        evaluator={makeEvaluator()}
-      />
-    );
+    render(<EvaluatorDetail open={true} onOpenChange={vi.fn()} evaluator={makeEvaluator()} />);
 
     expect(mockListConfigFiles).toHaveBeenCalledWith('litellm-judge');
   });
@@ -158,13 +128,7 @@ describe('EvaluatorDetail', () => {
       { filename: 'prompt.txt', size: 64, modified_at: '2026-01-02T00:00:00Z' },
     ]);
 
-    render(
-      <EvaluatorDetail
-        open={true}
-        onOpenChange={vi.fn()}
-        evaluator={makeEvaluator()}
-      />
-    );
+    render(<EvaluatorDetail open={true} onOpenChange={vi.fn()} evaluator={makeEvaluator()} />);
 
     await waitFor(() => {
       expect(screen.getByText('rubric.yaml')).toBeInTheDocument();
@@ -175,13 +139,7 @@ describe('EvaluatorDetail', () => {
   it('shows empty state when no config files', async () => {
     mockListConfigFiles.mockResolvedValue([]);
 
-    render(
-      <EvaluatorDetail
-        open={true}
-        onOpenChange={vi.fn()}
-        evaluator={makeEvaluator()}
-      />
-    );
+    render(<EvaluatorDetail open={true} onOpenChange={vi.fn()} evaluator={makeEvaluator()} />);
 
     await waitFor(() => {
       expect(screen.getByText('No config files uploaded')).toBeInTheDocument();
@@ -191,17 +149,13 @@ describe('EvaluatorDetail', () => {
   it('can upload a config file', async () => {
     const user = userEvent.setup();
     mockUploadConfigFile.mockResolvedValue({ filename: 'test.yaml', size: 10 });
-    mockListConfigFiles.mockResolvedValueOnce([]).mockResolvedValueOnce([
-      { filename: 'test.yaml', size: 10, modified_at: '2026-01-01T00:00:00Z' },
-    ]);
+    mockListConfigFiles
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { filename: 'test.yaml', size: 10, modified_at: '2026-01-01T00:00:00Z' },
+      ]);
 
-    render(
-      <EvaluatorDetail
-        open={true}
-        onOpenChange={vi.fn()}
-        evaluator={makeEvaluator()}
-      />
-    );
+    render(<EvaluatorDetail open={true} onOpenChange={vi.fn()} evaluator={makeEvaluator()} />);
 
     const fileInput = screen.getByTestId('config-file-input');
     const file = new File(['content'], 'test.yaml', { type: 'text/yaml' });
@@ -222,13 +176,7 @@ describe('EvaluatorDetail', () => {
     ]);
     mockDeleteConfigFile.mockResolvedValue(undefined);
 
-    render(
-      <EvaluatorDetail
-        open={true}
-        onOpenChange={vi.fn()}
-        evaluator={makeEvaluator()}
-      />
-    );
+    render(<EvaluatorDetail open={true} onOpenChange={vi.fn()} evaluator={makeEvaluator()} />);
 
     await waitFor(() => {
       expect(screen.getByText('to-delete.yaml')).toBeInTheDocument();

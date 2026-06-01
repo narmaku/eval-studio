@@ -44,7 +44,10 @@ export function RubricRefineDialog({
 
   useEffect(() => {
     if (open) {
-      api.listProviders().then(setProviders).catch(() => {});
+      api
+        .listProviders()
+        .then(setProviders)
+        .catch(() => {});
     }
   }, [open]);
 

@@ -83,7 +83,7 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
       name: d.name,
       weight: String(d.weight),
       description: d.description,
-    })) ?? []
+    })) ?? [],
   );
   const [passThreshold, setPassThreshold] = useState(String(rubric?.pass_threshold ?? 0.7));
   const [aggregation, setAggregation] = useState(rubric?.aggregation ?? 'weighted_average');
@@ -209,11 +209,7 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
         )}
 
         {dimensions.map((dim, index) => (
-          <div
-            key={index}
-            data-testid="dimension-row"
-            className="space-y-2 rounded-md border p-3"
-          >
+          <div key={index} data-testid="dimension-row" className="space-y-2 rounded-md border p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
                 Dimension {index + 1}

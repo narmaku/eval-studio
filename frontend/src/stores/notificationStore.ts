@@ -20,9 +20,7 @@ interface NotificationStore {
   unreadCount: number;
   isOpen: boolean;
 
-  addNotification: (
-    notification: Omit<Notification, 'id' | 'timestamp' | 'read'>,
-  ) => void;
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   removeNotification: (id: string) => void;
@@ -48,19 +46,14 @@ export const useNotificationStore = create<NotificationStore>((set) => ({
       read: false,
     };
     set((state) => {
-      const updated = [notification, ...state.notifications].slice(
-        0,
-        MAX_NOTIFICATIONS,
-      );
+      const updated = [notification, ...state.notifications].slice(0, MAX_NOTIFICATIONS);
       return { notifications: updated, unreadCount: computeUnreadCount(updated) };
     });
   },
 
   markAsRead: (id) =>
     set((state) => {
-      const updated = state.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n,
-      );
+      const updated = state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n));
       return { notifications: updated, unreadCount: computeUnreadCount(updated) };
     }),
 

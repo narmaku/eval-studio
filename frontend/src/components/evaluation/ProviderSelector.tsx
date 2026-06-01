@@ -63,7 +63,9 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
         // Only show the dropdown if we got multiple models or models from a real endpoint
         // (not just the single configured fallback)
         const firstModel = models[0];
-        const hasRealModels = models.length > 1 || (models.length === 1 && firstModel !== undefined && firstModel.owned_by !== 'configured');
+        const hasRealModels =
+          models.length > 1 ||
+          (models.length === 1 && firstModel !== undefined && firstModel.owned_by !== 'configured');
         if (hasRealModels) {
           setAvailableModels(models);
         } else {
@@ -157,14 +159,19 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
                   <SelectItem key={provider.id} value={provider.id}>
                     <span className="flex items-center gap-2">
                       <span className="font-medium">{provider.name}</span>
-                      <span className="text-muted-foreground text-xs">{provider.litellm_model}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {provider.litellm_model}
+                      </span>
                       {provider.tags.map((tag) => (
                         <Badge key={tag} variant="secondary" className="text-[10px] px-1 py-0">
                           {tag}
                         </Badge>
                       ))}
                       {!provider.has_api_key && (
-                        <Badge variant="outline" className="text-[10px] px-1 py-0 text-yellow-600 border-yellow-400">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1 py-0 text-yellow-600 border-yellow-400"
+                        >
                           (no key)
                         </Badge>
                       )}
