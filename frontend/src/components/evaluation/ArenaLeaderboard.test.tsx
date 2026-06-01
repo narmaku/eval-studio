@@ -139,4 +139,179 @@ describe('ArenaLeaderboard', () => {
     const scoreCell = screen.getByText('30%');
     expect(scoreCell.className).toContain('red');
   });
+
+  it('renders a single contestant correctly', () => {
+    const singleContestant: ArenaLeaderboardResponse = {
+      evaluation_id: 'eval-1',
+      evaluation_name: 'Single Arena',
+      contestants: [
+        {
+          contestant_model: 'openai/gpt-4o',
+          total_items: 5,
+          passed_count: 4,
+          failed_count: 1,
+          errored_count: 0,
+          average_score: 0.82,
+          min_score: 0.5,
+          max_score: 1.0,
+        },
+      ],
+    };
+    render(<ArenaLeaderboard leaderboard={singleContestant} />);
+
+    expect(screen.getByText('openai/gpt-4o')).toBeInTheDocument();
+    expect(screen.getByText('82%')).toBeInTheDocument();
+    // Only header + 1 data row
+    const rows = screen.getAllByRole('row');
+    expect(rows).toHaveLength(2);
+  });
+
+  it('handles tie scores by listing in given order', () => {
+    const tieLeaderboard: ArenaLeaderboardResponse = {
+      evaluation_id: 'eval-1',
+      evaluation_name: 'Tie Arena',
+      contestants: [
+        {
+          contestant_model: 'model-a',
+          total_items: 10,
+          passed_count: 7,
+          failed_count: 3,
+          errored_count: 0,
+          average_score: 0.7,
+          min_score: 0.3,
+          max_score: 1.0,
+        },
+        {
+          contestant_model: 'model-b',
+          total_items: 10,
+          passed_count: 7,
+          failed_count: 3,
+          errored_count: 0,
+          average_score: 0.7,
+          min_score: 0.3,
+          max_score: 1.0,
+        },
+      ],
+    };
+    render(<ArenaLeaderboard leaderboard={tieLeaderboard} />);
+
+    expect(screen.getByText('model-a')).toBeInTheDocument();
+    expect(screen.getByText('model-b')).toBeInTheDocument();
+    // Both should show 70%
+    const scores = screen.getAllByText('70%');
+    expect(scores).toHaveLength(2);
+  });
+
+  it('highlights first row with special background class', () => {
+    render(<ArenaLeaderboard leaderboard={mockLeaderboard} />);
+
+    const rows = screen.getAllByRole('row');
+    // First data row (index 1, since index 0 is header)
+    expect(rows[1]!.className).toContain('bg-yellow');
+    // Second data row should NOT have the highlight
+    expect(rows[2]!.className).not.toContain('bg-yellow');
+  });
+
+  it('renders all contestants as errored when all have 100% errors', () => {
+    const allErrored: ArenaLeaderboardResponse = {
+      evaluation_id: 'eval-1',
+      evaluation_name: 'All Errored',
+      contestants: [
+        {
+          contestant_model: 'broken-1',
+          total_items: 5,
+          passed_count: 0,
+          failed_count: 0,
+          errored_count: 5,
+          average_score: 0,
+          min_score: null,
+          max_score: null,
+        },
+        {
+          contestant_model: 'broken-2',
+          total_items: 5,
+          passed_count: 0,
+          failed_count: 0,
+          errored_count: 5,
+          average_score: 0,
+          min_score: null,
+          max_score: null,
+        },
+      ],
+    };
+    render(<ArenaLeaderboard leaderboard={allErrored} />);
+
+    const errorBadges = screen.getAllByText('Error');
+    expect(errorBadges).toHaveLength(2);
+  });
+
+  it('applies yellow for a score at exactly 0.4 boundary', () => {
+    const boundaryLeaderboard: ArenaLeaderboardResponse = {
+      evaluation_id: 'eval-1',
+      evaluation_name: 'Boundary',
+      contestants: [
+        {
+          contestant_model: 'boundary-model',
+          total_items: 10,
+          passed_count: 4,
+          failed_count: 6,
+          errored_count: 0,
+          average_score: 0.4,
+          min_score: 0.1,
+          max_score: 0.8,
+        },
+      ],
+    };
+    render(<ArenaLeaderboard leaderboard={boundaryLeaderboard} />);
+
+    const scoreCell = screen.getByText('40%');
+    expect(scoreCell.className).toContain('yellow');
+  });
+
+  it('applies green for a score at exactly 0.7 boundary', () => {
+    const boundaryLeaderboard: ArenaLeaderboardResponse = {
+      evaluation_id: 'eval-1',
+      evaluation_name: 'Boundary',
+      contestants: [
+        {
+          contestant_model: 'boundary-model',
+          total_items: 10,
+          passed_count: 7,
+          failed_count: 3,
+          errored_count: 0,
+          average_score: 0.7,
+          min_score: 0.2,
+          max_score: 1.0,
+        },
+      ],
+    };
+    render(<ArenaLeaderboard leaderboard={boundaryLeaderboard} />);
+
+    const scoreCell = screen.getByText('70%');
+    expect(scoreCell.className).toContain('green');
+  });
+
+  it('does not show Error badge for partially errored contestant', () => {
+    const partialError: ArenaLeaderboardResponse = {
+      evaluation_id: 'eval-1',
+      evaluation_name: 'Partial Error',
+      contestants: [
+        {
+          contestant_model: 'partial-model',
+          total_items: 10,
+          passed_count: 3,
+          failed_count: 2,
+          errored_count: 5,
+          average_score: 0.35,
+          min_score: 0.0,
+          max_score: 0.8,
+        },
+      ],
+    };
+    render(<ArenaLeaderboard leaderboard={partialError} />);
+
+    // Should show a score percentage, not "Error"
+    expect(screen.queryByText('Error')).not.toBeInTheDocument();
+    expect(screen.getByText('35%')).toBeInTheDocument();
+  });
 });

@@ -182,4 +182,81 @@ describe('ContestantSelector', () => {
       expect(button).toBeDisabled();
     });
   });
+
+  it('does not call onChange when removing an empty slot beyond value length', async () => {
+    const user = userEvent.setup();
+    const contestants: ModelEndpoint[] = [
+      { name: 'Model A', litellm_model: 'openai/a' },
+      { name: 'Model B', litellm_model: 'openai/b' },
+    ];
+    const onChange = vi.fn();
+    render(
+      <ContestantSelector value={contestants} onChange={onChange} />,
+    );
+
+    // Add a third slot (empty)
+    await user.click(screen.getByRole('button', { name: /add contestant/i }));
+    expect(screen.getByText('#3')).toBeInTheDocument();
+
+    // Remove the third slot (index 2, which is beyond value.length of 2)
+    const removeButtons = screen.getAllByRole('button', { name: /remove contestant/i });
+    await user.click(removeButtons[2]!);
+
+    // onChange should NOT be called because the slot was empty
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('does not add past MAX_CONTESTANTS (8) via repeated clicks', async () => {
+    const user = userEvent.setup();
+    const contestants: ModelEndpoint[] = Array.from({ length: 7 }, (_, i) => ({
+      name: `Model ${i + 1}`,
+      litellm_model: `openai/model-${i + 1}`,
+    }));
+    const onChange = vi.fn();
+    render(<ContestantSelector value={contestants} onChange={onChange} />);
+
+    const addButton = screen.getByRole('button', { name: /add contestant/i });
+    // Should be able to add one more (7 -> 8)
+    expect(addButton).not.toBeDisabled();
+    await user.click(addButton);
+    expect(screen.getByText('#8')).toBeInTheDocument();
+
+    // Now should be disabled at max
+    expect(addButton).toBeDisabled();
+  });
+
+  it('does not remove below MIN_CONTESTANTS (2) when only 2 remain', async () => {
+    const user = userEvent.setup();
+    const contestants: ModelEndpoint[] = [
+      { name: 'Model A', litellm_model: 'openai/a' },
+      { name: 'Model B', litellm_model: 'openai/b' },
+    ];
+    const onChange = vi.fn();
+    render(<ContestantSelector value={contestants} onChange={onChange} />);
+
+    const removeButtons = screen.getAllByRole('button', { name: /remove contestant/i });
+    // Both remove buttons should be disabled
+    expect(removeButtons).toHaveLength(2);
+    removeButtons.forEach((button) => {
+      expect(button).toBeDisabled();
+    });
+
+    // Clicking a disabled button should not trigger onChange
+    await user.click(removeButtons[0]!);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('has correct aria-labels on remove buttons', () => {
+    const contestants: ModelEndpoint[] = [
+      { name: 'Model A', litellm_model: 'openai/a' },
+      { name: 'Model B', litellm_model: 'openai/b' },
+      { name: 'Model C', litellm_model: 'openai/c' },
+    ];
+    const onChange = vi.fn();
+    render(<ContestantSelector value={contestants} onChange={onChange} />);
+
+    expect(screen.getByLabelText('Remove contestant 1')).toBeInTheDocument();
+    expect(screen.getByLabelText('Remove contestant 2')).toBeInTheDocument();
+    expect(screen.getByLabelText('Remove contestant 3')).toBeInTheDocument();
+  });
 });

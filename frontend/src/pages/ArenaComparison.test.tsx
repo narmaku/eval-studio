@@ -275,4 +275,216 @@ describe('ArenaComparison page', () => {
       expect(screen.getByRole('button', { name: /new arena/i })).toBeInTheDocument();
     });
   });
+
+  it('shows error toast when createAndRunEvaluation fails', async () => {
+    const user = userEvent.setup();
+    mockCreateAndRunEvaluation.mockRejectedValue(new Error('Server error'));
+
+    const { useEvaluationStore } = await import('@/stores/evaluationStore');
+    (useEvaluationStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      currentEvaluation: null,
+      createAndRunEvaluation: mockCreateAndRunEvaluation,
+      setCurrentEvaluation: mockSetCurrentEvaluation,
+      isLoading: false,
+    });
+
+    await renderPage();
+
+    // Setup valid config
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-select-dataset'));
+    await user.click(screen.getByTestId('mock-select-judge'));
+    await user.click(screen.getByRole('button', { name: /start arena/i }));
+
+    // Should stay on configure phase (not transition to running)
+    await waitFor(() => {
+      expect(screen.getByTestId('contestant-selector')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('evaluation-progress')).not.toBeInTheDocument();
+  });
+
+  it('shows Cancel button during running phase', async () => {
+    const user = userEvent.setup();
+    mockCreateAndRunEvaluation.mockResolvedValue({ id: 'eval-123', status: 'running' });
+
+    const { useEvaluationStore } = await import('@/stores/evaluationStore');
+    (useEvaluationStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      currentEvaluation: { id: 'eval-123', status: 'running' },
+      createAndRunEvaluation: mockCreateAndRunEvaluation,
+      setCurrentEvaluation: mockSetCurrentEvaluation,
+      isLoading: false,
+    });
+
+    await renderPage();
+
+    // Setup config and start
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-select-dataset'));
+    await user.click(screen.getByTestId('mock-select-judge'));
+    await user.click(screen.getByRole('button', { name: /start arena/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    });
+  });
+
+  it('returns to configure phase when Cancel is clicked', async () => {
+    const user = userEvent.setup();
+    mockCreateAndRunEvaluation.mockResolvedValue({ id: 'eval-123', status: 'running' });
+
+    const { useEvaluationStore } = await import('@/stores/evaluationStore');
+    (useEvaluationStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      currentEvaluation: { id: 'eval-123', status: 'running' },
+      createAndRunEvaluation: mockCreateAndRunEvaluation,
+      setCurrentEvaluation: mockSetCurrentEvaluation,
+      isLoading: false,
+    });
+
+    await renderPage();
+
+    // Setup config and start
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-select-dataset'));
+    await user.click(screen.getByTestId('mock-select-judge'));
+    await user.click(screen.getByRole('button', { name: /start arena/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    // Should call setCurrentEvaluation(null) and return to configure
+    expect(mockSetCurrentEvaluation).toHaveBeenCalledWith(null);
+  });
+
+  it('returns to configure phase when evaluation fails', async () => {
+    const user = userEvent.setup();
+    mockCreateAndRunEvaluation.mockResolvedValue({ id: 'eval-123', status: 'running' });
+
+    const { useEvaluationStore } = await import('@/stores/evaluationStore');
+    // Override getState to return failed status
+    Object.assign(useEvaluationStore, {
+      getState: () => ({
+        currentEvaluation: { id: 'eval-123', status: 'failed', name: 'Arena Test' },
+      }),
+    });
+    (useEvaluationStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      currentEvaluation: { id: 'eval-123', status: 'running' },
+      createAndRunEvaluation: mockCreateAndRunEvaluation,
+      setCurrentEvaluation: mockSetCurrentEvaluation,
+      isLoading: false,
+    });
+
+    await renderPage();
+
+    // Setup config and start
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-select-dataset'));
+    await user.click(screen.getByTestId('mock-select-judge'));
+    await user.click(screen.getByRole('button', { name: /start arena/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('evaluation-progress')).toBeInTheDocument();
+    });
+
+    // Trigger the onComplete callback (which reads getState internally)
+    await user.click(screen.getByTestId('mock-complete'));
+
+    // Should go back to configure phase (failed evaluations don't show results)
+    await waitFor(() => {
+      expect(screen.getByTestId('contestant-selector')).toBeInTheDocument();
+    });
+  });
+
+  it('returns to configure phase when evaluation is cancelled', async () => {
+    const user = userEvent.setup();
+    mockCreateAndRunEvaluation.mockResolvedValue({ id: 'eval-123', status: 'running' });
+
+    const { useEvaluationStore } = await import('@/stores/evaluationStore');
+    // Override getState to return cancelled status
+    Object.assign(useEvaluationStore, {
+      getState: () => ({
+        currentEvaluation: { id: 'eval-123', status: 'cancelled', name: 'Arena Test' },
+      }),
+    });
+    (useEvaluationStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      currentEvaluation: { id: 'eval-123', status: 'running' },
+      createAndRunEvaluation: mockCreateAndRunEvaluation,
+      setCurrentEvaluation: mockSetCurrentEvaluation,
+      isLoading: false,
+    });
+
+    await renderPage();
+
+    // Setup config and start
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-select-dataset'));
+    await user.click(screen.getByTestId('mock-select-judge'));
+    await user.click(screen.getByRole('button', { name: /start arena/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('evaluation-progress')).toBeInTheDocument();
+    });
+
+    // Trigger the onComplete callback
+    await user.click(screen.getByTestId('mock-complete'));
+
+    // Should go back to configure phase
+    await waitFor(() => {
+      expect(screen.getByTestId('contestant-selector')).toBeInTheDocument();
+    });
+  });
+
+  it('calls createAndRunEvaluation with arena mode and contestants', async () => {
+    const user = userEvent.setup();
+    mockCreateAndRunEvaluation.mockResolvedValue({ id: 'eval-123', status: 'running' });
+
+    await renderPage();
+
+    // Setup valid config
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-add-contestant'));
+    await user.click(screen.getByTestId('mock-select-dataset'));
+    await user.click(screen.getByTestId('mock-select-judge'));
+    await user.click(screen.getByRole('button', { name: /start arena/i }));
+
+    await waitFor(() => {
+      expect(mockCreateAndRunEvaluation).toHaveBeenCalledTimes(1);
+    });
+
+    const request = mockCreateAndRunEvaluation.mock.calls[0][0];
+    expect(request.mode).toBe('arena');
+    expect(request.dataset_id).toBe('ds-1');
+    expect(request.config.contestants).toHaveLength(2);
+    expect(request.config.judge_config).toEqual({ provider_id: 'judge-1' });
+  });
+
+  it('shows "Starting..." text when isLoading is true', async () => {
+    const { useEvaluationStore } = await import('@/stores/evaluationStore');
+    (useEvaluationStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      currentEvaluation: null,
+      createAndRunEvaluation: mockCreateAndRunEvaluation,
+      setCurrentEvaluation: mockSetCurrentEvaluation,
+      isLoading: true,
+    });
+
+    await renderPage();
+
+    expect(screen.getByRole('button', { name: /starting/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /starting/i })).toBeDisabled();
+  });
+
+  it('displays page description text', async () => {
+    await renderPage();
+
+    expect(
+      screen.getByText(/compare multiple models by running the same evaluation/i),
+    ).toBeInTheDocument();
+  });
 });
