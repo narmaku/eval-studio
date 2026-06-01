@@ -1,5 +1,7 @@
 """API endpoints for smart dataset import: analyze, import, and session cleanup."""
 
+import os
+
 import structlog
 from fastapi import APIRouter, Depends, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,11 +48,20 @@ async def analyze_files(files: list[UploadFile]) -> AnalyzeResponse:
         raise AppException(400, "Bad Request", f"Too many files. Maximum is {settings.max_import_files}")
 
     analyzed_files: list[AnalyzedFile] = []
+    total_bytes_read = 0
 
     for upload in files:
-        filename = upload.filename or "unknown"
+        # Sanitize filename: strip directory components to prevent path traversal
+        raw_name = upload.filename or "unknown"
+        filename = os.path.basename(raw_name)
+        if not filename:
+            filename = "unknown"
+
         try:
-            content = await upload.read()
+            # Read at most max_import_file_size + 1 to detect oversized files
+            # without loading unbounded data into memory
+            max_read = settings.max_import_file_size + 1
+            content = await upload.read(max_read)
 
             if len(content) == 0:
                 analyzed_files.append(
@@ -68,6 +79,18 @@ async def analyze_files(files: list[UploadFile]) -> AnalyzeResponse:
                     )
                 )
                 continue
+
+            total_bytes_read += len(content)
+            if total_bytes_read > settings.max_import_total_size:
+                max_total_mb = settings.max_import_total_size // (1024 * 1024)
+                analyzed_files.append(
+                    AnalyzedFile(
+                        filename=filename,
+                        format=DetectedFormat.unknown,
+                        error=f"Total upload size exceeded. Maximum aggregate size is {max_total_mb} MB",
+                    )
+                )
+                break
 
             fmt = detect_format(filename, content)
             if fmt == DetectedFormat.unknown:
@@ -87,27 +110,24 @@ async def analyze_files(files: list[UploadFile]) -> AnalyzeResponse:
             )
 
         except Exception as exc:
-            logger.warning("import.analyze_error", filename=filename, error=str(exc))
+            logger.warning("import.analyze_error", filename=filename, error=str(exc), exc_info=True)
             analyzed_files.append(
                 AnalyzedFile(
                     filename=filename,
                     format=DetectedFormat.unknown,
-                    error=f"Error processing file: {exc}",
+                    error="Error processing file. Check server logs for details.",
                 )
             )
 
     # Build response
     all_fields: set[str] = set()
     total_items = 0
-    # Collect all rows across files for session storage
-    all_rows: list[dict] = []
     file_results: list[FileAnalysisResult] = []
 
     for af in analyzed_files:
         if af.schema:
             all_fields.update(af.schema.fields)
             total_items += af.schema.total_rows
-            all_rows.extend(af.rows)
 
         file_results.append(
             FileAnalysisResult(
@@ -125,8 +145,7 @@ async def analyze_files(files: list[UploadFile]) -> AnalyzeResponse:
     merged_fields = sorted(all_fields)
     mapping_suggestion = suggest_mapping(merged_fields)
 
-    # Store full rows in the session (re-parse files to get all rows)
-    # For now, we store the analyzed files with their full row data
+    # Store analyzed files with sample row data in session for the import step
     session = create_session(analyzed_files)
 
     suggested = SuggestedMappingResponse(

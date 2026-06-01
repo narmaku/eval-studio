@@ -189,13 +189,30 @@ def detect_format(filename: str, content: bytes) -> DetectedFormat:
     return DetectedFormat.unknown
 
 
-def _flatten_dict(d: dict[str, Any], parent_key: str = "", sep: str = ".") -> dict[str, Any]:
-    """Flatten a nested dictionary into dot-notation keys."""
+_MAX_FLATTEN_DEPTH = 20
+
+
+def _flatten_dict(d: dict[str, Any], parent_key: str = "", sep: str = ".", _depth: int = 0) -> dict[str, Any]:
+    """Flatten a nested dictionary into dot-notation keys.
+
+    Args:
+        d: Dictionary to flatten.
+        parent_key: Prefix for keys (used in recursion).
+        sep: Separator between nested key segments.
+        _depth: Current recursion depth (internal).
+
+    Returns:
+        Flattened dictionary with dot-notation keys.
+    """
+    if _depth >= _MAX_FLATTEN_DEPTH:
+        # Stop recursion at max depth to prevent stack overflow on malicious input
+        return {parent_key: d} if parent_key else {"_truncated": d}
+
     items: list[tuple[str, Any]] = []
     for k, v in d.items():
         new_key = f"{parent_key}{sep}{k}" if parent_key else k
         if isinstance(v, dict):
-            items.extend(_flatten_dict(v, new_key, sep).items())
+            items.extend(_flatten_dict(v, new_key, sep, _depth + 1).items())
         elif isinstance(v, list) and v and isinstance(v[0], str):
             # For lists like answers.text, create a path like "answers.text[0]"
             items.append((f"{new_key}[0]", v[0]))
@@ -476,7 +493,11 @@ def apply_mapping(
 
         # Build metadata from unmapped fields
         if metadata_fields is not None:
-            metadata = {f: _resolve_nested(row, f) for f in metadata_fields if _resolve_nested(row, f) is not None}
+            metadata = {}
+            for f in metadata_fields:
+                val = _resolve_nested(row, f)
+                if val is not None:
+                    metadata[f] = val
         else:
             metadata = {k: v for k, v in row.items() if k not in mapped_fields}
 
