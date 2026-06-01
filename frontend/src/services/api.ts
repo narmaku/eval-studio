@@ -6,6 +6,8 @@ import type {
   Dataset,
   DatasetDetail,
   CreateDatasetRequest,
+  AnalyzeResponse,
+  ImportRequest,
   Result,
   ResultComparison,
   ArenaLeaderboardResponse,
@@ -145,6 +147,27 @@ export const api = {
   updateDataset: (id: string, data: Partial<CreateDatasetRequest>) =>
     request<Dataset>(`/api/v1/datasets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteDataset: (id: string) => request<void>(`/api/v1/datasets/${id}`, { method: 'DELETE' }),
+
+  // --- Smart Import ---
+  analyzeDatasetFiles: async (files: File[]): Promise<AnalyzeResponse> => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    const url = `${BASE_URL}/api/v1/datasets/analyze`;
+    const response = await fetch(url, { method: 'POST', body: formData });
+    if (!response.ok) {
+      const errorBody = (await response.json().catch(() => ({
+        type: 'about:blank',
+        title: 'Analysis failed',
+        status: response.status,
+        detail: response.statusText,
+        instance: url,
+      }))) as ApiError;
+      throw new ApiClientError(response.status, errorBody);
+    }
+    return response.json() as Promise<AnalyzeResponse>;
+  },
+  importDataset: (data: ImportRequest) =>
+    request<Dataset>('/api/v1/datasets/import', { method: 'POST', body: JSON.stringify(data) }),
 
   // --- Environments ---
   listEnvironments: () => request<Environment[]>('/api/v1/environments'),
