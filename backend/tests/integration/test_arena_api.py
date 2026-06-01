@@ -222,6 +222,113 @@ async def test_arena_leaderboard_with_errored_results(client, db_session):
     assert contestant["passed_count"] == 1
 
 
+@pytest.mark.asyncio
+async def test_create_arena_evaluation_empty_contestants_list(client):
+    """POST /evaluations with arena mode and empty contestants list returns 422."""
+    payload = {
+        "name": "Empty List Arena",
+        "mode": "arena",
+        "config": {"contestants": []},
+    }
+    response = await client.post("/api/v1/evaluations", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_arena_evaluation_exactly_2_contestants(client):
+    """POST /evaluations with arena mode and exactly 2 contestants succeeds (minimum valid)."""
+    response = await _create_arena_evaluation(
+        client,
+        contestants=[
+            {"litellm_model": "model-1"},
+            {"litellm_model": "model-2"},
+        ],
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert len(data["config"]["contestants"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_arena_leaderboard_empty_results(client, db_session):
+    """GET /results/arena/{id} returns empty contestants when no results exist."""
+    evaluation = Evaluation(name="Empty Arena", mode="arena", status="completed", config={})
+    db_session.add(evaluation)
+    await db_session.commit()
+
+    response = await client.get(f"/api/v1/results/arena/{evaluation.id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["evaluation_id"] == evaluation.id
+    assert data["contestants"] == []
+
+
+@pytest.mark.asyncio
+async def test_arena_leaderboard_all_errored(client, db_session):
+    """Leaderboard with all errored results shows average_score=0 and null min/max."""
+    evaluation = Evaluation(name="All Errors Arena", mode="arena", status="completed", config={})
+    db_session.add(evaluation)
+    await db_session.flush()
+
+    # All results for model-a are errors (score=None)
+    for _ in range(3):
+        db_session.add(
+            Result(
+                evaluation_id=evaluation.id,
+                contestant_model="model-a",
+                score=None,
+                passed=False,
+                actual_answer=None,
+                judge_reasoning="API error",
+            )
+        )
+    await db_session.commit()
+
+    response = await client.get(f"/api/v1/results/arena/{evaluation.id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["contestants"]) == 1
+    contestant = data["contestants"][0]
+    assert contestant["contestant_model"] == "model-a"
+    assert contestant["total_items"] == 3
+    assert contestant["errored_count"] == 3
+    assert contestant["passed_count"] == 0
+    assert contestant["failed_count"] == 0
+    assert contestant["average_score"] == 0.0
+    assert contestant["min_score"] is None
+    assert contestant["max_score"] is None
+
+
+@pytest.mark.asyncio
+async def test_arena_leaderboard_multiple_contestants_sorted(client, db_session):
+    """Leaderboard sorts contestants by average_score descending."""
+    evaluation = Evaluation(name="Sorted Arena", mode="arena", status="completed", config={})
+    db_session.add(evaluation)
+    await db_session.flush()
+
+    # model-c: avg 0.3, model-a: avg 0.9, model-b: avg 0.6
+    for model, score in [("model-c", 0.3), ("model-a", 0.9), ("model-b", 0.6)]:
+        db_session.add(
+            Result(
+                evaluation_id=evaluation.id,
+                contestant_model=model,
+                score=score,
+                passed=score >= 0.7,
+                actual_answer=f"answer-{model}",
+            )
+        )
+    await db_session.commit()
+
+    response = await client.get(f"/api/v1/results/arena/{evaluation.id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["contestants"]) == 3
+    # Verify sorted descending
+    assert data["contestants"][0]["contestant_model"] == "model-a"
+    assert data["contestants"][1]["contestant_model"] == "model-b"
+    assert data["contestants"][2]["contestant_model"] == "model-c"
+
+
 async def _seed_arena_results(db_session) -> str:
     """Seed arena evaluation with results for leaderboard testing."""
     evaluation = Evaluation(name="Leaderboard Test", mode="arena", status="completed", config={})
