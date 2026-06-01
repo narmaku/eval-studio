@@ -6,20 +6,21 @@ import type { Result } from '@/types';
 function makeResult(
   overrides: Partial<Result> & { dataset_item_id: string; contestant_model: string },
 ): Result {
+  const { dataset_item_id, contestant_model, ...rest } = overrides;
   return {
-    id: `result-${overrides.dataset_item_id}-${overrides.contestant_model}`,
+    id: `result-${dataset_item_id}-${contestant_model}`,
     evaluation_id: 'eval-1',
-    dataset_item_id: overrides.dataset_item_id,
+    dataset_item_id,
     session_id: null,
-    contestant_model: overrides.contestant_model,
-    score: overrides.score ?? 0.8,
-    passed: overrides.passed ?? true,
-    actual_answer: overrides.actual_answer ?? 'Some answer',
-    judge_reasoning: overrides.judge_reasoning ?? null,
+    contestant_model,
+    score: 0.8,
+    passed: true,
+    actual_answer: 'Some answer',
+    judge_reasoning: null,
     scores_breakdown: null,
     retrieved_chunks: null,
     created_at: '2026-01-01T00:00:00Z',
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -154,5 +155,144 @@ describe('ArenaResultsGrid', () => {
     // Should show truncated text
     const truncated = screen.getByText(/A{1,}\.\.\.$/);
     expect(truncated).toBeInTheDocument();
+  });
+
+  it('shows "--" for null actual_answer', () => {
+    const results: Result[] = [
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'openai/gpt-4o',
+        actual_answer: null,
+      }),
+    ];
+
+    render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);
+
+    // The truncate function returns '--' for null
+    const dashes = screen.getAllByText('--');
+    expect(dashes.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders 0% for null score', () => {
+    const results: Result[] = [
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'openai/gpt-4o',
+        score: null,
+        passed: null,
+      }),
+    ];
+
+    render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);
+
+    expect(screen.getByText('0%')).toBeInTheDocument();
+  });
+
+  it('renders Pass badge for passing results', () => {
+    const results: Result[] = [
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'openai/gpt-4o',
+        score: 0.9,
+        passed: true,
+      }),
+    ];
+
+    render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);
+
+    expect(screen.getByText('Pass')).toBeInTheDocument();
+  });
+
+  it('renders Fail badge for failing results', () => {
+    const results: Result[] = [
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'openai/gpt-4o',
+        score: 0.2,
+        passed: false,
+      }),
+    ];
+
+    render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);
+
+    expect(screen.getByText('Fail')).toBeInTheDocument();
+  });
+
+  it('does not render Pass or Fail badge when passed is null', () => {
+    const results: Result[] = [
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'openai/gpt-4o',
+        score: 0.5,
+        passed: null,
+      }),
+    ];
+
+    render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);
+
+    expect(screen.queryByText('Pass')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fail')).not.toBeInTheDocument();
+  });
+
+  it('truncates long dataset_item_id', () => {
+    const longId = 'Q'.repeat(50);
+    const results: Result[] = [
+      makeResult({
+        dataset_item_id: longId,
+        contestant_model: 'openai/gpt-4o',
+      }),
+    ];
+
+    render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);
+
+    // truncate(text, 40) should add '...'
+    const truncated = screen.getByText(/Q{1,}\.\.\./);
+    expect(truncated).toBeInTheDocument();
+  });
+
+  it('renders Question column header', () => {
+    render(<ArenaResultsGrid results={twoContestantResults} contestants={twoContestants} />);
+
+    expect(screen.getByText('Question')).toBeInTheDocument();
+  });
+
+  it('applies score color classes correctly', () => {
+    const results: Result[] = [
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'openai/gpt-4o',
+        score: 0.85,
+      }),
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'anthropic/claude-3',
+        score: 0.5,
+      }),
+    ];
+
+    render(<ArenaResultsGrid results={results} contestants={twoContestants} />);
+
+    const highScore = screen.getByText('85%');
+    expect(highScore.className).toContain('green');
+
+    const midScore = screen.getByText('50%');
+    expect(midScore.className).toContain('yellow');
+  });
+
+  it('shows "--" placeholder for all missing contestants in a row', () => {
+    // Results exist for one question but no contestants match the column list
+    const results: Result[] = [
+      makeResult({
+        dataset_item_id: 'q1',
+        contestant_model: 'unknown-model',
+        actual_answer: 'some answer',
+      }),
+    ];
+
+    render(<ArenaResultsGrid results={results} contestants={twoContestants} />);
+
+    // Both columns should show '--' since unknown-model is not in contestants list
+    const dashes = screen.getAllByText('--');
+    expect(dashes).toHaveLength(2);
   });
 });
