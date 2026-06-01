@@ -10,10 +10,16 @@ const defaultStoreState = {
   currentDataset: null,
   isLoading: false,
   error: null,
+  analysisResult: null,
+  isAnalyzing: false,
+  isImporting: false,
   fetchDatasets: mockFetchDatasets,
   fetchDataset: vi.fn(),
   uploadDataset: vi.fn(),
   removeDataset: mockRemoveDataset,
+  analyzeFiles: vi.fn(),
+  smartImport: vi.fn(),
+  clearAnalysis: vi.fn(),
   setDatasets: vi.fn(),
   setCurrentDataset: vi.fn(),
   setLoading: vi.fn(),
@@ -33,8 +39,8 @@ vi.mock('@/stores/datasetStore', () => ({
 }));
 
 // Stub child components to avoid testing them here
-vi.mock('@/components/datasets/DatasetUploadDialog', () => ({
-  DatasetUploadDialog: () => <div data-testid="upload-dialog" />,
+vi.mock('@/components/datasets/SmartImportDialog', () => ({
+  SmartImportDialog: () => <div data-testid="upload-dialog" />,
 }));
 
 vi.mock('@/components/datasets/DatasetDetailView', () => ({
@@ -103,9 +109,9 @@ describe('Datasets page', () => {
     expect(screen.getByText('Dataset Two')).toBeInTheDocument();
   });
 
-  it('renders Upload Dataset button', async () => {
+  it('renders Import Dataset button', async () => {
     await renderPage();
-    const buttons = screen.getAllByRole('button', { name: /upload dataset/i });
+    const buttons = screen.getAllByRole('button', { name: /import dataset/i });
     expect(buttons.length).toBeGreaterThanOrEqual(1);
   });
 });

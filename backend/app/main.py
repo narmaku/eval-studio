@@ -87,6 +87,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 # Import and include routers
+from app.api.v1.dataset_import import router as dataset_import_router  # noqa: E402
 from app.api.v1.datasets import router as datasets_router  # noqa: E402
 from app.api.v1.environments import router as environments_router  # noqa: E402
 from app.api.v1.evaluations import router as evaluations_router  # noqa: E402
@@ -101,6 +102,7 @@ from app.websocket.chat import router as ws_chat_router  # noqa: E402
 from app.websocket.progress import router as ws_progress_router  # noqa: E402
 
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(dataset_import_router, prefix="/api/v1")
 app.include_router(datasets_router, prefix="/api/v1")
 app.include_router(evaluations_router, prefix="/api/v1")
 app.include_router(evaluators_router, prefix="/api/v1")

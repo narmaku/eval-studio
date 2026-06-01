@@ -20,6 +20,12 @@ class Settings(BaseSettings):
 
     evaluator_config_dir: str = "config/evaluators"
 
+    # Dataset import settings
+    max_import_file_size: int = 10_485_760  # 10 MB
+    max_import_total_size: int = 104_857_600  # 100 MB aggregate across all files
+    max_import_files: int = 50
+    import_sample_rows: int = 20
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

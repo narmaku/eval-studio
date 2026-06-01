@@ -41,3 +41,46 @@ export interface CreateDatasetRequest {
   tags?: string[];
   items?: DatasetItemCreate[];
 }
+
+// --- Smart Import types (aligned with backend AnalyzeResponse / ImportRequest) ---
+
+export interface FileAnalysisResult {
+  filename: string;
+  format: string;
+  field_count: number;
+  row_count: number;
+  fields: string[];
+  sample_rows: Record<string, unknown>[];
+  errors: string[];
+}
+
+export interface SuggestedMapping {
+  question_field: string | null;
+  answer_field: string | null;
+  metadata_fields: string[];
+  confidence: number;
+}
+
+export interface AnalyzeResponse {
+  analysis_id: string;
+  files: FileAnalysisResult[];
+  merged_fields: string[];
+  suggested_mapping: SuggestedMapping;
+  total_rows: number;
+}
+
+export interface FieldMapping {
+  question_field: string;
+  answer_field: string;
+}
+
+export type MergeMode = 'single' | 'separate';
+
+export interface ImportRequest {
+  analysis_id: string;
+  name: string;
+  description?: string;
+  tags?: string[];
+  mapping: FieldMapping;
+  merge_mode: MergeMode;
+}
