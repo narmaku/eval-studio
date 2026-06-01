@@ -31,18 +31,21 @@ async def broadcast_progress(
     completed: int,
     total: int,
     current_item: str,
+    contestant_model: str | None = None,
 ) -> None:
     """Send progress update to all WebSocket clients watching this evaluation."""
     async with _lock:
         websockets = _connections.get(evaluation_id, set()).copy()
 
-    message = {
+    message: dict = {
         "type": "progress",
         "evaluation_id": evaluation_id,
         "completed": completed,
         "total": total,
         "current_item": current_item,
     }
+    if contestant_model is not None:
+        message["contestant_model"] = contestant_model
 
     dead_connections: list[WebSocket] = []
     for ws in websockets:
