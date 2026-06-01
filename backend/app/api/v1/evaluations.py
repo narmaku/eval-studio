@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory, get_db
-from app.core.exceptions import ConflictException, NotFoundException, NotImplementedException
+from app.core.exceptions import ConflictException, NotFoundException, NotImplementedException, ValidationException
 from app.models.dataset import Dataset
 from app.models.evaluation import Evaluation
 from app.models.result import Result
@@ -18,6 +18,7 @@ from app.schemas.evaluation import (
     EvaluationResponse,
     EvaluationStatus,
 )
+from app.services.arena_evaluation_service import run_arena_evaluation
 from app.services.evaluation_service import run_qa_evaluation
 from app.services.rag_evaluation_service import run_rag_evaluation
 
@@ -38,6 +39,14 @@ async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depend
         result = await db.execute(select(Dataset).where(Dataset.id == payload.dataset_id))
         if not result.scalar_one_or_none():
             raise NotFoundException("Dataset", payload.dataset_id)
+
+    # Arena-specific validation: must have at least 2 contestants
+    if payload.mode == EvaluationMode.ARENA:
+        contestants = payload.config.get("contestants", [])
+        if not contestants or len(contestants) < 2:
+            raise ValidationException(
+                "Arena evaluations require at least 2 contestants in config.contestants."
+            )
 
     evaluation = Evaluation(
         name=payload.name,
@@ -141,7 +150,7 @@ async def run_evaluation(
             "Only 'pending' or 'failed' evaluations can be run."
         )
 
-    if evaluation.mode not in ("qa", "rag"):
+    if evaluation.mode not in ("qa", "rag", "arena"):
         raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
 
     # Reset status to pending before launching background task
@@ -152,7 +161,9 @@ async def run_evaluation(
     # Launch background task with its own database session
     async def _run_in_background() -> None:
         async with async_session_factory() as bg_session:
-            if evaluation.mode == "rag":
+            if evaluation.mode == "arena":
+                await run_arena_evaluation(evaluation_id, bg_session)
+            elif evaluation.mode == "rag":
                 await run_rag_evaluation(evaluation_id, bg_session)
             else:
                 await run_qa_evaluation(evaluation_id, bg_session)
@@ -179,7 +190,7 @@ async def rerun_evaluation(
     if evaluation.status == "running":
         raise ConflictException("Evaluation is currently running.")
 
-    if evaluation.mode not in ("qa", "rag"):
+    if evaluation.mode not in ("qa", "rag", "arena"):
         raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
 
     # Delete existing results for this evaluation
@@ -195,7 +206,9 @@ async def rerun_evaluation(
     # Launch background task
     async def _run_in_background() -> None:
         async with async_session_factory() as bg_session:
-            if evaluation.mode == "rag":
+            if evaluation.mode == "arena":
+                await run_arena_evaluation(evaluation_id, bg_session)
+            elif evaluation.mode == "rag":
                 await run_rag_evaluation(evaluation_id, bg_session)
             else:
                 await run_qa_evaluation(evaluation_id, bg_session)

@@ -10,7 +10,13 @@ from app.core.exceptions import NotFoundException
 from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.schemas.common import PaginatedResponse
-from app.schemas.result import ComparisonResponse, EvaluationComparisonItem, ResultResponse
+from app.schemas.result import (
+    ArenaContestantSummary,
+    ArenaLeaderboardResponse,
+    ComparisonResponse,
+    EvaluationComparisonItem,
+    ResultResponse,
+)
 
 logger = structlog.get_logger()
 
@@ -86,6 +92,58 @@ async def compare_results(
 
     logger.info("results.compared", evaluation_ids=evaluation_ids)
     return ComparisonResponse(evaluations=comparisons)
+
+
+@router.get("/arena/{evaluation_id}", response_model=ArenaLeaderboardResponse)
+async def get_arena_leaderboard(
+    evaluation_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ArenaLeaderboardResponse:
+    """Get arena leaderboard with ranked contestants for an evaluation."""
+    eval_result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
+    evaluation = eval_result.scalar_one_or_none()
+    if not evaluation:
+        raise NotFoundException("Evaluation", evaluation_id)
+
+    results_result = await db.execute(select(Result).where(Result.evaluation_id == evaluation_id))
+    results = results_result.scalars().all()
+
+    # Group results by contestant_model
+    contestant_results: dict[str, list[Result]] = {}
+    for r in results:
+        model_name = r.contestant_model or "__unknown__"
+        contestant_results.setdefault(model_name, []).append(r)
+
+    # Build per-contestant summaries
+    summaries: list[ArenaContestantSummary] = []
+    for model_name, model_results in contestant_results.items():
+        scores = [r.score for r in model_results if r.score is not None]
+        passed_count = sum(1 for r in model_results if r.passed is True and r.score is not None)
+        errored_count = sum(1 for r in model_results if r.score is None)
+        failed_count = sum(1 for r in model_results if r.passed is False and r.score is not None)
+
+        summaries.append(
+            ArenaContestantSummary(
+                contestant_model=model_name,
+                total_items=len(model_results),
+                passed_count=passed_count,
+                failed_count=failed_count,
+                errored_count=errored_count,
+                average_score=sum(scores) / len(scores) if scores else 0.0,
+                min_score=min(scores) if scores else None,
+                max_score=max(scores) if scores else None,
+            )
+        )
+
+    # Sort by average_score descending (leaderboard ranking)
+    summaries.sort(key=lambda s: s.average_score, reverse=True)
+
+    logger.info("results.arena_leaderboard", evaluation_id=evaluation_id, contestants=len(summaries))
+    return ArenaLeaderboardResponse(
+        evaluation_id=evaluation_id,
+        evaluation_name=evaluation.name,
+        contestants=summaries,
+    )
 
 
 @router.get("/{result_id}", response_model=ResultResponse)
