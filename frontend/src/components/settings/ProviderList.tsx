@@ -98,11 +98,6 @@ export function ProviderList() {
               <div className="flex items-center gap-2">
                 <h3 className="font-medium">{provider.name}</h3>
                 <Badge variant="secondary">{provider.purpose}</Badge>
-                {provider.source === 'yaml' && (
-                  <Badge variant="outline" className="text-xs">
-                    YAML
-                  </Badge>
-                )}
               </div>
               <p className="text-xs text-muted-foreground font-mono">{provider.litellm_model}</p>
               {provider.api_base && (
@@ -124,26 +119,22 @@ export function ProviderList() {
                   API Key Set
                 </Badge>
               )}
-              {provider.source === 'user' && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(provider)}
-                    aria-label="Edit"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDeleteTarget(provider)}
-                    aria-label="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEdit(provider)}
+                aria-label="Edit"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDeleteTarget(provider)}
+                aria-label="Delete"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           </CardContent>
         </Card>

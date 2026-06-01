@@ -1,7 +1,5 @@
 """Pydantic schemas for inference provider profiles."""
 
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -40,10 +38,6 @@ class ProviderResponse(BaseModel):
     proxy: str | None = None
     tags: list[str] = []
     purpose: str = "test"
-    source: str = "yaml"
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-
     model_config = ConfigDict(from_attributes=True)
 
 

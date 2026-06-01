@@ -78,9 +78,6 @@ class TestProviderResponse:
 
     def test_defaults(self):
         resp = ProviderResponse(id="p-1", name="Test", litellm_model="m")
-        assert resp.source == "yaml"
         assert resp.has_api_key is False
-        assert resp.created_at is None
-        assert resp.updated_at is None
         assert resp.tags == []
         assert resp.purpose == "test"

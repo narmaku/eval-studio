@@ -14,9 +14,6 @@ const mockProviders: Provider[] = [
     proxy: null,
     tags: ['fast'],
     purpose: 'test',
-    source: 'yaml',
-    created_at: null,
-    updated_at: null,
   },
   {
     id: 'provider-2',
@@ -27,9 +24,6 @@ const mockProviders: Provider[] = [
     proxy: null,
     tags: [],
     purpose: 'test',
-    source: 'yaml',
-    created_at: null,
-    updated_at: null,
   },
 ];
 

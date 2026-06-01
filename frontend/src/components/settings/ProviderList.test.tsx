@@ -15,9 +15,6 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   proxy: null,
   tags: ['general'],
   purpose: 'test',
-  source: 'user',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
   ...overrides,
 });
 
@@ -119,29 +116,10 @@ describe('ProviderList', () => {
     expect(screen.getByText('judge')).toBeInTheDocument();
   });
 
-  it('shows YAML badge for YAML providers', () => {
+  it('shows edit/delete buttons for all providers', () => {
     storeState = {
       ...defaultStore,
-      providers: [makeProvider({ id: 'p-1', source: 'yaml' })],
-    };
-    render(<ProviderList />);
-    expect(screen.getByText('YAML')).toBeInTheDocument();
-  });
-
-  it('does not show edit/delete buttons for YAML providers', () => {
-    storeState = {
-      ...defaultStore,
-      providers: [makeProvider({ id: 'p-1', source: 'yaml' })],
-    };
-    render(<ProviderList />);
-    expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
-  });
-
-  it('shows edit/delete buttons for user providers', () => {
-    storeState = {
-      ...defaultStore,
-      providers: [makeProvider({ id: 'p-1', source: 'user' })],
+      providers: [makeProvider({ id: 'p-1', name: 'My Provider' })],
     };
     render(<ProviderList />);
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
@@ -185,7 +163,7 @@ describe('ProviderList', () => {
     const user = userEvent.setup();
     storeState = {
       ...defaultStore,
-      providers: [makeProvider({ id: 'p-1', name: 'My Provider', source: 'user' })],
+      providers: [makeProvider({ id: 'p-1', name: 'My Provider' })],
     };
     render(<ProviderList />);
 

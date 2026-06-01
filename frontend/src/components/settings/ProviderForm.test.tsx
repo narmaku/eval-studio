@@ -30,9 +30,6 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   proxy: null,
   tags: ['fast'],
   purpose: 'test',
-  source: 'user',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
   ...overrides,
 });
 

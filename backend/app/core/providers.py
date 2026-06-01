@@ -64,6 +64,50 @@ class ProviderRegistry:
         """Return a single provider by ID, or None if not found."""
         return self._providers.get(provider_id)
 
+    def add_provider(self, profile: ProviderProfile) -> None:
+        """Add a new provider and persist to YAML."""
+        self._providers[profile.id] = profile
+        self._persist_yaml()
+
+    def update_provider(self, provider_id: str, updates: dict) -> ProviderProfile | None:
+        """Update an existing provider and persist to YAML."""
+        profile = self._providers.get(provider_id)
+        if not profile:
+            return None
+        for key, value in updates.items():
+            if hasattr(profile, key):
+                setattr(profile, key, value)
+        self._persist_yaml()
+        return profile
+
+    def delete_provider(self, provider_id: str) -> bool:
+        """Delete a provider and persist to YAML."""
+        if provider_id not in self._providers:
+            return False
+        del self._providers[provider_id]
+        self._persist_yaml()
+        return True
+
+    def _persist_yaml(self) -> None:
+        """Write current providers back to the YAML config file."""
+        data = {
+            "providers": [
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "litellm_model": p.litellm_model,
+                    **({"api_base": p.api_base} if p.api_base else {}),
+                    **({"api_key_env": p.api_key_env} if p.api_key_env else {}),
+                    **({"proxy": p.proxy} if p.proxy else {}),
+                    **({"tags": p.tags} if p.tags else {}),
+                    **({"purpose": p.purpose} if p.purpose != "test" else {}),
+                }
+                for p in self._providers.values()
+            ]
+        }
+        with open(_config_path, "w") as f:
+            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
 
 def _resolve_config_path() -> Path:
     """Resolve the providers.yaml config path.
