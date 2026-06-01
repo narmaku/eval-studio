@@ -46,7 +46,7 @@ export default function ArenaComparison() {
 
     // Use the first contestant as the primary model_endpoint (required by API)
     // and pass all contestants in the config
-    const primaryEndpoint = validContestants[0];
+    const primaryEndpoint = validContestants[0]!;
 
     const request: CreateEvaluationRequest = {
       name: `Arena - ${validContestants.map((c) => c.name).join(' vs ')}`,

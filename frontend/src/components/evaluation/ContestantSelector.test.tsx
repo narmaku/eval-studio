@@ -130,7 +130,7 @@ describe('ContestantSelector', () => {
 
     const removeButtons = screen.getAllByRole('button', { name: /remove/i });
     // Remove the second contestant
-    await user.click(removeButtons[1]);
+    await user.click(removeButtons[1]!);
 
     expect(onChange).toHaveBeenCalledWith([
       { name: 'Model A', litellm_model: 'openai/a' },

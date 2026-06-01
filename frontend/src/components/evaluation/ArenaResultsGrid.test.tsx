@@ -6,20 +6,21 @@ import type { Result } from '@/types';
 function makeResult(
   overrides: Partial<Result> & { dataset_item_id: string; contestant_model: string },
 ): Result {
+  const { dataset_item_id, contestant_model, ...rest } = overrides;
   return {
-    id: `result-${overrides.dataset_item_id}-${overrides.contestant_model}`,
+    id: `result-${dataset_item_id}-${contestant_model}`,
     evaluation_id: 'eval-1',
-    dataset_item_id: overrides.dataset_item_id,
+    dataset_item_id,
     session_id: null,
-    contestant_model: overrides.contestant_model,
-    score: overrides.score ?? 0.8,
-    passed: overrides.passed ?? true,
-    actual_answer: overrides.actual_answer ?? 'Some answer',
-    judge_reasoning: overrides.judge_reasoning ?? null,
+    contestant_model,
+    score: 0.8,
+    passed: true,
+    actual_answer: 'Some answer',
+    judge_reasoning: null,
     scores_breakdown: null,
     retrieved_chunks: null,
     created_at: '2026-01-01T00:00:00Z',
-    ...overrides,
+    ...rest,
   };
 }
 
