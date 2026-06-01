@@ -173,6 +173,17 @@ async def test_arena_leaderboard_not_found(client):
 
 
 @pytest.mark.asyncio
+async def test_arena_leaderboard_rejects_non_arena_evaluation(client, db_session):
+    """GET /results/arena/{id} returns 422 for non-arena evaluations."""
+    evaluation = Evaluation(name="QA Eval", mode="qa", status="completed", config={})
+    db_session.add(evaluation)
+    await db_session.commit()
+
+    response = await client.get(f"/api/v1/results/arena/{evaluation.id}")
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_arena_leaderboard_with_errored_results(client, db_session):
     """Leaderboard counts errored results (score=None) correctly."""
     evaluation = Evaluation(name="Error Arena", mode="arena", status="completed", config={})

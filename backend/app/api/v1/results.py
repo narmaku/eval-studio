@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import NotFoundException, ValidationException
 from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.schemas.common import PaginatedResponse
@@ -104,6 +104,9 @@ async def get_arena_leaderboard(
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
         raise NotFoundException("Evaluation", evaluation_id)
+
+    if evaluation.mode != "arena":
+        raise ValidationException(f"Evaluation '{evaluation_id}' is mode '{evaluation.mode}', not 'arena'.")
 
     results_result = await db.execute(select(Result).where(Result.evaluation_id == evaluation_id))
     results = results_result.scalars().all()

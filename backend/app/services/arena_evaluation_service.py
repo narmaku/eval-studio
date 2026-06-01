@@ -12,7 +12,7 @@ from app.adapters.factory import create_evaluation_adapter
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
-from app.services.provider_utils import proxy_env, resolve_judge_config, resolve_model_config
+from app.services.provider_utils import ResolvedModel, proxy_env, resolve_judge_config, resolve_model_config
 from app.websocket.progress import broadcast_progress
 
 logger = structlog.get_logger()
@@ -119,7 +119,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         )
 
         # 7. Resolve contestant model configs
-        resolved_contestants = []
+        resolved_contestants: list[tuple[str, ResolvedModel]] = []
         for contestant in contestants:
             try:
                 resolved = resolve_model_config(contestant)
@@ -153,7 +153,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         async def process_contestant_item(
             contestant_name: str,
-            resolved_model,
+            resolved_model: ResolvedModel,
             item: DatasetItem,
         ) -> Result:
             nonlocal completed_counter
@@ -207,7 +207,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         async def bounded_process(
             contestant_name: str,
-            resolved_model,
+            resolved_model: ResolvedModel,
             item: DatasetItem,
         ) -> Result | Exception:
             async with semaphore:
