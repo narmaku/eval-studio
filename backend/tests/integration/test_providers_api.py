@@ -1,15 +1,24 @@
 """Integration tests for the providers API endpoints (YAML-backed CRUD)."""
 
+from pathlib import Path
+
 import pytest
 
 from app.core.providers import ProviderProfile, provider_registry
 
 
 @pytest.fixture(autouse=True)
-def _seed_test_providers():
-    """Seed the global registry with test providers for each test, then restore."""
-    original_providers = provider_registry._providers.copy()
+def _seed_test_providers(tmp_path):
+    """Seed the global registry with test providers for each test, then restore.
 
+    Redirects _config_path to a temp file so _persist_yaml() doesn't
+    clobber the real config/providers.yaml during CRUD tests.
+    """
+    original_providers = provider_registry._providers.copy()
+    original_config_path = provider_registry._config_path
+    original_mtime = provider_registry._last_mtime
+
+    provider_registry._config_path = tmp_path / "providers.yaml"
     provider_registry._providers.clear()
     provider_registry._providers["test-model"] = ProviderProfile(
         id="test-model",
@@ -37,11 +46,14 @@ def _seed_test_providers():
         tags=["local"],
         purpose="test",
     )
+    provider_registry._persist_yaml()
 
     yield
 
     provider_registry._providers.clear()
     provider_registry._providers.update(original_providers)
+    provider_registry._config_path = original_config_path
+    provider_registry._last_mtime = original_mtime
 
 
 # ── List / Get ──
