@@ -1,10 +1,13 @@
 """Inference provider profiles loaded from YAML configuration."""
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,10 +36,15 @@ class ProviderRegistry:
 
     def __init__(self) -> None:
         self._providers: dict[str, ProviderProfile] = {}
+        self._config_path: Path | None = None
+        self._last_mtime: float = 0.0
 
     def load_from_yaml(self, path: Path) -> None:
         """Load provider profiles from a YAML file."""
+        self._config_path = path
+        self._providers = {}
         if not path.exists():
+            self._last_mtime = 0.0
             return
         with open(path) as f:
             data = yaml.safe_load(f) or {}
@@ -52,9 +60,26 @@ class ProviderRegistry:
                 purpose=item.get("purpose", "test"),
             )
             self._providers[profile.id] = profile
+        self._last_mtime = os.path.getmtime(path)
+
+    def _check_reload(self) -> None:
+        """Reload YAML config if the file's mtime has changed."""
+        if self._config_path is None:
+            return
+        if not self._config_path.exists():
+            if self._providers:
+                logger.info("Config file %s deleted, clearing providers", self._config_path)
+                self._providers = {}
+                self._last_mtime = 0.0
+            return
+        current_mtime = os.path.getmtime(self._config_path)
+        if current_mtime != self._last_mtime:
+            logger.info("Config file %s changed, reloading providers", self._config_path)
+            self.load_from_yaml(self._config_path)
 
     def list_providers(self, purpose: str | None = None) -> list[ProviderProfile]:
         """Return all providers, optionally filtered by purpose."""
+        self._check_reload()
         providers = list(self._providers.values())
         if purpose:
             providers = [p for p in providers if p.purpose == purpose]
@@ -62,6 +87,7 @@ class ProviderRegistry:
 
     def get_provider(self, provider_id: str) -> ProviderProfile | None:
         """Return a single provider by ID, or None if not found."""
+        self._check_reload()
         return self._providers.get(provider_id)
 
     def add_provider(self, profile: ProviderProfile) -> None:
@@ -90,6 +116,8 @@ class ProviderRegistry:
 
     def _persist_yaml(self) -> None:
         """Write current providers back to the YAML config file."""
+        if self._config_path is None:
+            return
         data = {
             "providers": [
                 {
@@ -105,8 +133,9 @@ class ProviderRegistry:
                 for p in self._providers.values()
             ]
         }
-        with open(_config_path, "w") as f:
+        with open(self._config_path, "w") as f:
             yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+        self._last_mtime = os.path.getmtime(self._config_path)
 
 
 def _resolve_config_path() -> Path:
