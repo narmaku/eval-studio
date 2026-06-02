@@ -1,6 +1,5 @@
 """API endpoints for inference provider profiles (YAML-backed CRUD)."""
 
-import os
 import uuid
 
 import httpx
