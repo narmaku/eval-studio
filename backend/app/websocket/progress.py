@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -51,6 +53,41 @@ async def broadcast_progress(
     for ws in websockets:
         try:
             await ws.send_json(message)
+        except Exception:
+            dead_connections.append(ws)
+
+    # Clean up dead connections
+    if dead_connections:
+        async with _lock:
+            conns = _connections.get(evaluation_id, set())
+            for ws in dead_connections:
+                conns.discard(ws)
+
+
+async def broadcast_log(
+    evaluation_id: str,
+    level: str,
+    message: str,
+    details: dict[str, Any] | None = None,
+) -> None:
+    """Send a log entry to all WebSocket clients watching this evaluation."""
+    async with _lock:
+        websockets = _connections.get(evaluation_id, set()).copy()
+
+    log_message: dict[str, Any] = {
+        "type": "log",
+        "evaluation_id": evaluation_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "level": level,
+        "message": message,
+    }
+    if details is not None:
+        log_message["details"] = details
+
+    dead_connections: list[WebSocket] = []
+    for ws in websockets:
+        try:
+            await ws.send_json(log_message)
         except Exception:
             dead_connections.append(ws)
 
