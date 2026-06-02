@@ -5,7 +5,6 @@ import type {
   LogEntry,
   RunningEvaluation,
   WebSocketMessage,
-  EvaluationMode,
 } from '@/types';
 import { api } from '@/services/api';
 

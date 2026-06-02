@@ -1,53 +1,15 @@
-# Inference provider profiles for eval-studio
-# Each provider is a named endpoint that can be selected in the UI.
-
 providers:
-  - id: llama-cpp-151
-    name: "Llama.cpp (.151)"
-    litellm_model: "openai/gemma-4-31B-it-Q6_K.gguf"
-    api_base: "http://192.168.0.151:3080/v1"
-    tags: ["local", "llama.cpp"]
-    purpose: "test"
-  - id: rls-staging
-    name: "RLS Staging (Granite)"
-    litellm_model: "openai/granite-3.3-8b-instruct"
-    api_base: "https://lightspeed-stack.staging.example.com/v1"
-    api_key_env: "RLS_API_KEY"
-    proxy: "http://squid.corp.redhat.com:3128"
-    tags: ["staging", "granite", "rhel-lightspeed"]
-    purpose: "test"
-
-  - id: openai-gpt4
-    name: "OpenAI GPT-4.1"
-    litellm_model: "gpt-4.1"
-    api_key_env: "OPENAI_API_KEY"
-    tags: ["production", "openai"]
-    purpose: "test"
-
-  - id: openai-gpt4o-mini
-    name: "OpenAI GPT-4o-mini"
-    litellm_model: "gpt-4o-mini"
-    api_key_env: "OPENAI_API_KEY"
-    tags: ["dev", "cheap", "openai"]
-    purpose: "test"
-
-  - id: ollama-local
-    name: "Local Ollama"
-    litellm_model: "ollama/llama3.2:3b"
-    api_base: "http://localhost:11434"
-    tags: ["local", "dev", "free"]
-    purpose: "test"
-
-  - id: judge-gpt4
-    name: "Judge - GPT-4.1"
-    litellm_model: "gpt-4.1"
-    api_key_env: "OPENAI_API_KEY"
-    tags: ["judge"]
-    purpose: "judge"
-
-  - id: judge-gemini-flash
-    name: "Judge - Gemini 2.5 Flash"
-    litellm_model: "gemini/gemini-2.5-flash"
-    api_key_env: "GEMINI_API_KEY"
-    tags: ["judge", "gemini", "cheap"]
-    purpose: "judge"
+- id: test-judge
+  name: Test Judge
+  litellm_model: gpt-4.1
+  api_key_env: TEST_JUDGE_KEY_FOR_PROVIDERS
+  proxy: http://proxy:3128
+  tags:
+  - judge
+  purpose: judge
+- id: no-key-provider
+  name: No Key Provider
+  litellm_model: ollama/llama3
+  api_base: http://localhost:11434
+  tags:
+  - local

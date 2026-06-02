@@ -23,16 +23,32 @@ import type {
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
+function getInitialPhase(): PagePhase {
+  try {
+    const stored = sessionStorage.getItem('runningEvaluation');
+    if (stored) {
+      const running = JSON.parse(stored) as { mode: string };
+      if (running.mode === 'arena') return 'running';
+    }
+  } catch {
+    // ignore
+  }
+  return 'configure';
+}
+
 export default function ArenaComparison() {
-  const [phase, setPhase] = useState<PagePhase>('configure');
+  const [phase, setPhase] = useState<PagePhase>(getInitialPhase);
 
   // Auto-resume running evaluation from sessionStorage
   const { getRunningEvaluation, setCurrentEvaluation: setCurrentEval } = useEvaluationStore();
   useEffect(() => {
     const running = getRunningEvaluation();
     if (running && running.mode === 'arena') {
-      setCurrentEval({ id: running.id, name: running.name, mode: running.mode } as Parameters<typeof setCurrentEval>[0]);
-      setPhase('running');
+      setCurrentEval({
+        id: running.id,
+        name: running.name,
+        mode: running.mode,
+      } as Parameters<typeof setCurrentEval>[0]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

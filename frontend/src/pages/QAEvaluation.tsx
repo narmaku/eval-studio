@@ -17,16 +17,32 @@ import type { ModelEndpoint, JudgeReference, Result, CreateEvaluationRequest } f
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
+function getInitialPhase(): PagePhase {
+  try {
+    const stored = sessionStorage.getItem('runningEvaluation');
+    if (stored) {
+      const running = JSON.parse(stored) as { mode: string };
+      if (running.mode === 'qa') return 'running';
+    }
+  } catch {
+    // ignore
+  }
+  return 'configure';
+}
+
 export default function QAEvaluation() {
-  const [phase, setPhase] = useState<PagePhase>('configure');
+  const [phase, setPhase] = useState<PagePhase>(getInitialPhase);
 
   // Auto-resume running evaluation from sessionStorage
   const { getRunningEvaluation, setCurrentEvaluation: setCurrentEval } = useEvaluationStore();
   useEffect(() => {
     const running = getRunningEvaluation();
     if (running && running.mode === 'qa') {
-      setCurrentEval({ id: running.id, name: running.name, mode: running.mode } as Parameters<typeof setCurrentEval>[0]);
-      setPhase('running');
+      setCurrentEval({
+        id: running.id,
+        name: running.name,
+        mode: running.mode,
+      } as Parameters<typeof setCurrentEval>[0]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

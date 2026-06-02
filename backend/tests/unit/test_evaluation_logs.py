@@ -1,9 +1,8 @@
 """Unit tests for broadcast_log injection in evaluation services."""
 
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import Score
@@ -11,6 +10,11 @@ from app.core.providers import ProviderProfile, provider_registry
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation
 from app.services.evaluation_service import run_qa_evaluation
+
+
+def _extract_log_messages(mock_broadcast_log: AsyncMock) -> list[str]:
+    """Extract message strings from broadcast_log call args."""
+    return [c.kwargs.get("message", c.args[1] if len(c.args) > 1 else "") for c in mock_broadcast_log.call_args_list]
 
 
 @pytest.fixture(autouse=True)
@@ -91,7 +95,7 @@ async def test_qa_evaluation_emits_start_log(db_session: AsyncSession, evaluatio
         await run_qa_evaluation(evaluation.id, db_session)
 
     # Check that at least one log was called with "Starting evaluation"
-    log_messages = [c.kwargs.get("message", c.args[1] if len(c.args) > 1 else "") for c in mock_broadcast_log.call_args_list]
+    log_messages = _extract_log_messages(mock_broadcast_log)
     start_logs = [m for m in log_messages if "Starting evaluation" in m]
     assert len(start_logs) == 1, f"Expected 'Starting evaluation' log, got: {log_messages}"
 
@@ -113,7 +117,7 @@ async def test_qa_evaluation_emits_model_resolved_log(db_session: AsyncSession, 
     ):
         await run_qa_evaluation(evaluation.id, db_session)
 
-    log_messages = [c.kwargs.get("message", c.args[1] if len(c.args) > 1 else "") for c in mock_broadcast_log.call_args_list]
+    log_messages = _extract_log_messages(mock_broadcast_log)
     model_logs = [m for m in log_messages if "Model resolved" in m]
     assert len(model_logs) == 1, f"Expected 'Model resolved' log, got: {log_messages}"
 
@@ -135,7 +139,7 @@ async def test_qa_evaluation_emits_judge_resolved_log(db_session: AsyncSession, 
     ):
         await run_qa_evaluation(evaluation.id, db_session)
 
-    log_messages = [c.kwargs.get("message", c.args[1] if len(c.args) > 1 else "") for c in mock_broadcast_log.call_args_list]
+    log_messages = _extract_log_messages(mock_broadcast_log)
     judge_logs = [m for m in log_messages if "Judge model" in m]
     assert len(judge_logs) == 1, f"Expected 'Judge model' log, got: {log_messages}"
 
@@ -157,7 +161,7 @@ async def test_qa_evaluation_emits_per_item_logs(db_session: AsyncSession, evalu
     ):
         await run_qa_evaluation(evaluation.id, db_session)
 
-    log_messages = [c.kwargs.get("message", c.args[1] if len(c.args) > 1 else "") for c in mock_broadcast_log.call_args_list]
+    log_messages = _extract_log_messages(mock_broadcast_log)
 
     # Should have "Processing item" logs for each item (2 items)
     processing_logs = [m for m in log_messages if "Processing item" in m]
@@ -189,7 +193,7 @@ async def test_qa_evaluation_emits_completion_log(db_session: AsyncSession, eval
     ):
         await run_qa_evaluation(evaluation.id, db_session)
 
-    log_messages = [c.kwargs.get("message", c.args[1] if len(c.args) > 1 else "") for c in mock_broadcast_log.call_args_list]
+    log_messages = _extract_log_messages(mock_broadcast_log)
     completion_logs = [m for m in log_messages if "Evaluation complete" in m]
     assert len(completion_logs) == 1, f"Expected 'Evaluation complete' log, got: {log_messages}"
 
@@ -221,7 +225,8 @@ async def test_qa_evaluation_emits_error_log_on_item_failure(db_session: AsyncSe
 
     # Find error-level logs
     error_calls = [
-        c for c in mock_broadcast_log.call_args_list
+        c
+        for c in mock_broadcast_log.call_args_list
         if c.kwargs.get("level") == "error" or (len(c.args) > 1 and "error" in str(c.args))
     ]
     assert len(error_calls) >= 1, "Expected at least one error-level log call"
