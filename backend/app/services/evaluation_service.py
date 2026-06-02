@@ -102,6 +102,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         model_api_base = resolved.api_base
         model_api_key = resolved.api_key
         model_proxy = resolved.proxy
+        model_ssl_cert = resolved.ssl_cert_path
 
         logger.info(
             "evaluation.model_resolved",
@@ -176,7 +177,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 litellm_kwargs["api_key"] = model_api_key
             if model_api_base:
                 litellm_kwargs["api_base"] = model_api_base
-            with proxy_env(model_proxy):
+            with proxy_env(model_proxy, model_ssl_cert):
                 response = await litellm.acompletion(**litellm_kwargs)
             actual_answer = response.choices[0].message.content or ""
 

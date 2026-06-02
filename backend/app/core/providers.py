@@ -20,6 +20,7 @@ class ProviderProfile:
     api_base: str | None = None
     api_key_env: str | None = None
     proxy: str | None = None
+    ssl_cert_path: str | None = None
     tags: list[str] = field(default_factory=list)
     purpose: str = "test"  # "test" (model under test) or "judge"
 
@@ -56,6 +57,7 @@ class ProviderRegistry:
                 api_base=item.get("api_base"),
                 api_key_env=item.get("api_key_env"),
                 proxy=item.get("proxy"),
+                ssl_cert_path=item.get("ssl_cert_path"),
                 tags=item.get("tags", []),
                 purpose=item.get("purpose", "test"),
             )
@@ -127,6 +129,7 @@ class ProviderRegistry:
                     **({"api_base": p.api_base} if p.api_base else {}),
                     **({"api_key_env": p.api_key_env} if p.api_key_env else {}),
                     **({"proxy": p.proxy} if p.proxy else {}),
+                    **({"ssl_cert_path": p.ssl_cert_path} if p.ssl_cert_path else {}),
                     **({"tags": p.tags} if p.tags else {}),
                     **({"purpose": p.purpose} if p.purpose != "test" else {}),
                 }

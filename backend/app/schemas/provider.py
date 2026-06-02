@@ -11,6 +11,7 @@ class ProviderCreate(BaseModel):
     api_base: str | None = None
     api_key_env: str | None = None
     proxy: str | None = None
+    ssl_cert_path: str | None = None
     tags: list[str] = Field(default_factory=list)
     purpose: str = "test"
 
@@ -23,6 +24,7 @@ class ProviderUpdate(BaseModel):
     api_base: str | None = None
     api_key_env: str | None = None
     proxy: str | None = None
+    ssl_cert_path: str | None = None
     tags: list[str] | None = None
     purpose: str | None = None
 
@@ -34,8 +36,9 @@ class ProviderResponse(BaseModel):
     name: str
     litellm_model: str
     api_base: str | None = None
-    has_api_key: bool = False  # True if api_key_env is set AND the env var exists
+    has_api_key: bool = False
     proxy: str | None = None
+    ssl_cert_path: str | None = None
     tags: list[str] = []
     purpose: str = "test"
     model_config = ConfigDict(from_attributes=True)

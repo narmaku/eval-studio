@@ -64,6 +64,7 @@ export interface Provider {
   api_base: string | null;
   has_api_key: boolean;
   proxy: string | null;
+  ssl_cert_path: string | null;
   tags: string[];
   purpose: string;
 }

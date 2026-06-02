@@ -24,6 +24,7 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
         api_base=p.api_base,
         has_api_key=p.api_key is not None,
         proxy=p.proxy,
+        ssl_cert_path=p.ssl_cert_path,
         tags=p.tags,
         purpose=p.purpose,
     )
@@ -57,6 +58,7 @@ async def create_provider(payload: ProviderCreate) -> ProviderResponse:
         api_base=payload.api_base,
         api_key_env=payload.api_key_env,
         proxy=payload.proxy,
+        ssl_cert_path=payload.ssl_cert_path,
         tags=payload.tags,
         purpose=payload.purpose,
     )

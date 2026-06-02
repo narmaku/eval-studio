@@ -71,6 +71,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
   const [apiBase, setApiBase] = useState(provider?.api_base ?? '');
   const [apiKeyEnv, setApiKeyEnv] = useState('');
   const [proxy, setProxy] = useState(provider?.proxy ?? '');
+  const [sslCertPath, setSslCertPath] = useState(provider?.ssl_cert_path ?? '');
   const [purpose, setPurpose] = useState(provider?.purpose ?? 'test');
   const [tagsInput, setTagsInput] = useState(provider?.tags?.join(', ') ?? '');
   const [errors, setErrors] = useState<string[]>([]);
@@ -104,6 +105,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         api_base: apiBase.trim() || null,
         api_key_env: apiKeyEnv.trim() || null,
         proxy: proxy.trim() || null,
+        ssl_cert_path: sslCertPath.trim() || null,
         tags,
         purpose,
       };
@@ -184,6 +186,19 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
           onChange={(e) => setProxy(e.target.value)}
           placeholder="e.g., http://proxy:3128"
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="provider-ssl-cert">SSL Certificate Bundle (optional)</Label>
+        <Input
+          id="provider-ssl-cert"
+          value={sslCertPath}
+          onChange={(e) => setSslCertPath(e.target.value)}
+          placeholder="e.g., /etc/pki/tls/certs/ca-bundle.crt"
+        />
+        <p className="text-xs text-muted-foreground">
+          Path to a custom CA certificate bundle for proxy/TLS verification.
+        </p>
       </div>
 
       <div className="space-y-2">

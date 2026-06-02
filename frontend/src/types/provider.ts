@@ -4,6 +4,7 @@ export interface CreateProviderRequest {
   api_base?: string | null;
   api_key_env?: string | null;
   proxy?: string | null;
+  ssl_cert_path?: string | null;
   tags?: string[];
   purpose?: string;
 }

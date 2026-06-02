@@ -25,6 +25,7 @@ class ResolvedModel:
     api_key: str | None = None
     api_base: str | None = None
     proxy: str | None = None
+    ssl_cert_path: str | None = None
 
 
 def resolve_model_config(
@@ -61,11 +62,14 @@ def resolve_model_config(
     provider_id = config.get("provider_id")
     provider = registry.get_provider(provider_id) if provider_id else None
 
+    ssl_cert_path: str | None = None
+
     if provider:
         model = provider.litellm_model
         api_base = provider.api_base
         api_key = provider.api_key
         proxy = provider.proxy
+        ssl_cert_path = provider.ssl_cert_path
     else:
         # 2. Direct config fields
         model = config.get("litellm_model") or config.get("model")
@@ -86,7 +90,10 @@ def resolve_model_config(
     if not api_key and api_base:
         api_key = "no-key-needed"
 
-    return ResolvedModel(model=model, api_key=api_key, api_base=api_base, proxy=proxy)
+    if not ssl_cert_path:
+        ssl_cert_path = settings.ssl_cert_file
+
+    return ResolvedModel(model=model, api_key=api_key, api_base=api_base, proxy=proxy, ssl_cert_path=ssl_cert_path)
 
 
 def resolve_judge_config(
@@ -129,31 +136,43 @@ def resolve_judge_config(
 
 
 @contextmanager
-def proxy_env(proxy: str | None):
-    """Temporarily set HTTP_PROXY/HTTPS_PROXY for LiteLLM calls.
+def proxy_env(proxy: str | None, ssl_cert_path: str | None = None):
+    """Temporarily set HTTP_PROXY/HTTPS_PROXY and SSL cert env vars for LiteLLM calls.
+
+    Sets SSL_CERT_FILE, REQUESTS_CA_BUNDLE, and CURL_CA_BUNDLE when a custom
+    CA certificate bundle is needed (common in enterprise environments with
+    MITM proxies).
 
     Note: env vars are process-global. For concurrent evaluations with different
     proxies, this could race. Acceptable for MVP -- a proper fix would use
     httpx transport-level proxy config.
     """
-    if not proxy:
+    if not proxy and not ssl_cert_path:
         yield
         return
-    old_http = os.environ.get("HTTP_PROXY")
-    old_https = os.environ.get("HTTPS_PROXY")
-    os.environ["HTTP_PROXY"] = proxy
-    os.environ["HTTPS_PROXY"] = proxy
+
+    saved: dict[str, str | None] = {}
+    cert_vars = ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
+    proxy_vars = ("HTTP_PROXY", "HTTPS_PROXY")
+
     try:
+        if proxy:
+            for var in proxy_vars:
+                saved[var] = os.environ.get(var)
+                os.environ[var] = proxy
+
+        if ssl_cert_path:
+            for var in cert_vars:
+                saved[var] = os.environ.get(var)
+                os.environ[var] = ssl_cert_path
+
         yield
     finally:
-        if old_http is None:
-            os.environ.pop("HTTP_PROXY", None)
-        else:
-            os.environ["HTTP_PROXY"] = old_http
-        if old_https is None:
-            os.environ.pop("HTTPS_PROXY", None)
-        else:
-            os.environ["HTTPS_PROXY"] = old_https
+        for var, old_val in saved.items():
+            if old_val is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = old_val
 
 
 async def resolve_provider(
