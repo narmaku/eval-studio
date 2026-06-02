@@ -1,7 +1,7 @@
 [project]
 name = "eval-studio-backend"
 version = "0.1.0"
-description = "FastAPI backend for eval-studio AI evaluation platform"
+description = "FastAPI backend for eval-studio — the workspace for building, running, and improving AI evaluations"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115,<0.116",

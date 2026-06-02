@@ -2,12 +2,19 @@
 
 ## Project Overview
 
-eval-studio is an interactive web application for evaluating AI systems against
-real-world sysadmin scenarios. It supports four evaluation modes: Q&A benchmarks,
-RAG evaluation, interactive agent sessions, and side-by-side model comparison.
-The core value proposition is bridging the gap between static benchmarks and
-production-ready AI assessment by providing pluggable evaluation adapters,
-real Linux environment provisioning, and LLM-as-judge scoring.
+eval-studio is a workspace for building, running, and improving AI evaluations.
+It goes beyond evaluation execution — it covers everything needed to be successful
+in building AI evaluations of any kind and iterating on changes in internal AI
+tooling and AI products.
+
+It is a workspace for engineers (and non-technical subject-matter experts) to build
+datasets, scoring metrics/rubrics, and telemetry integrations, then use them
+seamlessly with any evaluation system onboarded into the platform. The first
+integration target is lightspeed-evaluation.
+
+Evaluation modes: Q&A benchmarks, RAG evaluation, interactive agent sessions, and
+side-by-side model arena. The pluggable adapter architecture supports onboarding
+external evaluation frameworks as scoring backends.
 
 ## Architecture Summary
 
