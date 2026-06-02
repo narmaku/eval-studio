@@ -9,6 +9,7 @@ import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
 import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
+import { ToolSidePanel } from '@/components/chat/ToolSidePanel';
 import { ToolInspector } from '@/components/chat/ToolInspector';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { useEvaluationStore } from '@/stores/evaluationStore';
@@ -18,7 +19,7 @@ import { useNotificationStore } from '@/stores/notificationStore';
 import { Play, Square, RefreshCw, Wifi, WifiOff, Clock, ExternalLink } from 'lucide-react';
 import type { ModelEndpoint, JudgeReference } from '@/types';
 
-type PagePhase = 'configure' | 'active' | 'ended';
+type PagePhase = 'configure' | 'active' | 'review';
 
 export default function AgentEvaluation() {
   const [phase, setPhase] = useState<PagePhase>('configure');
@@ -74,7 +75,7 @@ export default function AgentEvaluation() {
       if (status === prevStatus) return;
 
       if (status === 'completed' || status === 'failed') {
-        setPhase('ended');
+        setPhase('review');
         if (status === 'completed') {
           toast.success('Session completed');
           useNotificationStore.getState().addNotification({
@@ -142,7 +143,7 @@ export default function AgentEvaluation() {
   const handleEndSession = useCallback(async () => {
     try {
       await endSession();
-      setPhase('ended');
+      setPhase('review');
       toast.success('Session ended');
     } catch {
       toast.error('Failed to end session');
@@ -246,32 +247,37 @@ export default function AgentEvaluation() {
             </div>
           )}
 
-          {/* Three-panel layout */}
-          <div className="grid flex-1 gap-4 md:grid-cols-3" style={{ minHeight: '500px' }}>
-            <ConversationPanel
-              messages={messages}
-              isProcessing={isProcessing}
-              onSend={sendMessage}
-              disabled={!isConnected}
-            />
-            <ToolInspector toolCalls={toolCalls} />
-            <ScoringPanel scores={scores} isSessionEnded={false} />
+          {/* Chat-primary layout with collapsible tool panel */}
+          <div className="flex flex-1 gap-4" style={{ minHeight: '500px' }}>
+            <div className="flex-1 min-w-0">
+              <ConversationPanel
+                messages={messages}
+                isProcessing={isProcessing}
+                onSend={sendMessage}
+                disabled={!isConnected}
+              />
+            </div>
+            <ToolSidePanel toolCalls={toolCalls} />
           </div>
         </>
       )}
 
-      {/* Ended Phase */}
-      {phase === 'ended' && (
+      {/* Review Phase */}
+      {phase === 'review' && (
         <>
-          <div className="grid gap-4 md:grid-cols-3" style={{ minHeight: '400px' }}>
-            <ConversationPanel
-              messages={messages}
-              isProcessing={false}
-              onSend={() => {}}
-              disabled={true}
-            />
-            <ToolInspector toolCalls={toolCalls} />
-            <ScoringPanel scores={scores} isSessionEnded={true} />
+          <div className="flex flex-1 gap-4" style={{ minHeight: '400px' }}>
+            <div className="flex-1 min-w-0">
+              <ConversationPanel
+                messages={messages}
+                isProcessing={false}
+                onSend={() => {}}
+                disabled={true}
+              />
+            </div>
+            <div className="w-[400px] shrink-0 flex flex-col gap-4">
+              <ToolInspector toolCalls={toolCalls} />
+              <ScoringPanel scores={scores} isSessionEnded={true} />
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
