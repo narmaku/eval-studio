@@ -11,7 +11,7 @@ from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.services.provider_utils import proxy_env, resolve_judge_config, resolve_model_config
-from app.websocket.progress import broadcast_progress
+from app.websocket.progress import broadcast_log, broadcast_progress
 
 logger = structlog.get_logger()
 
@@ -110,6 +110,12 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             has_key=bool(model_api_key),
             provider=model_endpoint.get("provider_id") or "none",
         )
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=f"Model resolved: {model_under_test}",
+            details={"model": model_under_test, "api_base": model_api_base},
+        )
 
         # 6. Resolve judge: provider profile > DB judge config > LITELLM_MODEL env
         try:
@@ -126,6 +132,12 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             api_base=judge_resolved.api_base,
             has_key=bool(judge_resolved.api_key),
         )
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=f"Judge model: {judge_resolved.model}",
+            details={"model": judge_resolved.model, "api_base": judge_resolved.api_base},
+        )
 
         adapter = create_evaluation_adapter(
             model=judge_resolved.model,
@@ -140,8 +152,20 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         completed_counter = 0
         counter_lock = asyncio.Lock()
 
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=f"Starting evaluation: {evaluation.name} (qa), {total} items, model: {model_under_test}",
+        )
+
         async def process_item(idx: int, item: DatasetItem) -> Result:
             nonlocal completed_counter
+
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Processing item {idx + 1}/{total}: {item.question[:80]}",
+            )
 
             # Step A: Call the model under test (with proxy support)
             litellm_kwargs: dict = {
@@ -156,12 +180,27 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 response = await litellm.acompletion(**litellm_kwargs)
             actual_answer = response.choices[0].message.content or ""
 
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Model response received ({len(actual_answer)} chars)",
+                details={"model": model_under_test},
+            )
+
             # Step B: Score the response using the judge
             score: Score = await adapter.evaluate_qa(
                 question=item.question,
                 expected_answer=item.expected_answer or "",
                 actual_answer=actual_answer,
                 judge_config=judge_params,
+            )
+
+            passed_label = "PASS" if score.passed else "FAIL"
+            reasoning_preview = (score.reasoning or "")[:100]
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Score: {score.value:.2f} ({passed_label}) — {reasoning_preview}",
             )
 
             # Step C: Build Result record (do NOT add to session here;
@@ -204,10 +243,18 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         # 8. Collect results into the session sequentially (session is not
         # safe for concurrent mutations from multiple coroutines).
         error_count = 0
+        passed_count = 0
+        total_score = 0.0
+        scored_count = 0
         for i, r in enumerate(results):
             if isinstance(r, Exception):
                 error_count += 1
                 logger.error("evaluation.item_error", item_index=i, evaluation_id=evaluation_id, error=str(r))
+                await broadcast_log(
+                    evaluation_id=evaluation_id,
+                    level="error",
+                    message=f"Error on item {i + 1}: {r}",
+                )
                 error_result = Result(
                     evaluation_id=evaluation_id,
                     dataset_item_id=items[i].id if i < len(items) else None,
@@ -219,6 +266,11 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 db.add(error_result)
             else:
                 db.add(r)
+                if r.passed:
+                    passed_count += 1
+                if r.score is not None:
+                    total_score += r.score
+                    scored_count += 1
 
         # 9. Update evaluation status
         if error_count == total:
@@ -226,6 +278,13 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         else:
             evaluation.status = "completed"
         await db.commit()
+
+        avg_score = total_score / scored_count if scored_count > 0 else 0.0
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=f"Evaluation completed: {passed_count}/{total} passed, avg score: {avg_score:.2f}",
+        )
 
     except Exception:
         logger.exception("evaluation.unhandled_error", evaluation_id=evaluation_id)

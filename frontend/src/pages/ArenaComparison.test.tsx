@@ -102,6 +102,9 @@ vi.mock('@/stores/evaluationStore', () => ({
       createAndRunEvaluation: mockCreateAndRunEvaluation,
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: false,
+      getRunningEvaluation: () => null,
+      clearRunningEvaluation: vi.fn(),
+      clearLogs: vi.fn(),
     })),
     {
       getState: () => ({
@@ -220,6 +223,9 @@ describe('ArenaComparison page', () => {
       createAndRunEvaluation: mockCreateAndRunEvaluation,
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: false,
+      getRunningEvaluation: () => null,
+      clearRunningEvaluation: vi.fn(),
+      clearLogs: vi.fn(),
     });
 
     await renderPage();
@@ -244,6 +250,9 @@ describe('ArenaComparison page', () => {
       createAndRunEvaluation: mockCreateAndRunEvaluation,
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: false,
+      getRunningEvaluation: () => null,
+      clearRunningEvaluation: vi.fn(),
+      clearLogs: vi.fn(),
     });
 
     mockGetArenaLeaderboard.mockResolvedValue({
@@ -286,6 +295,9 @@ describe('ArenaComparison page', () => {
       createAndRunEvaluation: mockCreateAndRunEvaluation,
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: false,
+      getRunningEvaluation: () => null,
+      clearRunningEvaluation: vi.fn(),
+      clearLogs: vi.fn(),
     });
 
     await renderPage();
@@ -314,6 +326,9 @@ describe('ArenaComparison page', () => {
       createAndRunEvaluation: mockCreateAndRunEvaluation,
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: false,
+      getRunningEvaluation: () => null,
+      clearRunningEvaluation: vi.fn(),
+      clearLogs: vi.fn(),
     });
 
     await renderPage();
@@ -340,6 +355,9 @@ describe('ArenaComparison page', () => {
       createAndRunEvaluation: mockCreateAndRunEvaluation,
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: false,
+      getRunningEvaluation: () => null,
+      clearRunningEvaluation: vi.fn(),
+      clearLogs: vi.fn(),
     });
 
     await renderPage();
@@ -377,6 +395,9 @@ describe('ArenaComparison page', () => {
       createAndRunEvaluation: mockCreateAndRunEvaluation,
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: false,
+      getRunningEvaluation: () => null,
+      clearRunningEvaluation: vi.fn(),
+      clearLogs: vi.fn(),
     });
 
     await renderPage();
@@ -417,6 +438,9 @@ describe('ArenaComparison page', () => {
       createAndRunEvaluation: mockCreateAndRunEvaluation,
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: false,
+      getRunningEvaluation: () => null,
+      clearRunningEvaluation: vi.fn(),
+      clearLogs: vi.fn(),
     });
 
     await renderPage();
@@ -472,6 +496,9 @@ describe('ArenaComparison page', () => {
       createAndRunEvaluation: mockCreateAndRunEvaluation,
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: true,
+      getRunningEvaluation: () => null,
+      clearRunningEvaluation: vi.fn(),
+      clearLogs: vi.fn(),
     });
 
     await renderPage();

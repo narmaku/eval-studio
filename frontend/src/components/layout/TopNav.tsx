@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useEvaluationStore } from '@/stores/evaluationStore';
 
 const navItems = [
   { to: '/', label: 'Dashboard' },
@@ -14,6 +15,12 @@ const navItems = [
 
 export function TopNav() {
   const { unreadCount, toggleOpen } = useNotificationStore();
+  const getRunningEvaluation = useEvaluationStore((state) => state.getRunningEvaluation);
+  // Subscribe to currentEvaluation to trigger re-renders when running state changes
+  const _currentEvaluation = useEvaluationStore((state) => state.currentEvaluation);
+
+  // Read from sessionStorage
+  const runningEvaluation = getRunningEvaluation();
 
   return (
     <header className="border-b bg-background">
@@ -31,7 +38,18 @@ export function TopNav() {
                 }`
               }
             >
-              {item.label}
+              <span className="flex items-center gap-1.5">
+                {item.label}
+                {item.to === '/evaluate' && runningEvaluation && (
+                  <span
+                    className="relative flex h-2 w-2"
+                    title={`Running: ${runningEvaluation.name}`}
+                  >
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                  </span>
+                )}
+              </span>
             </NavLink>
           ))}
         </nav>

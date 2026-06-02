@@ -13,7 +13,7 @@ from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.services.provider_utils import ResolvedModel, proxy_env, resolve_judge_config, resolve_model_config
-from app.websocket.progress import broadcast_progress
+from app.websocket.progress import broadcast_log, broadcast_progress
 
 logger = structlog.get_logger()
 
@@ -110,6 +110,12 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             api_base=judge_resolved.api_base,
             has_key=bool(judge_resolved.api_key),
         )
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=f"Judge model: {judge_resolved.model}",
+            details={"model": judge_resolved.model, "api_base": judge_resolved.api_base},
+        )
 
         adapter = create_evaluation_adapter(
             model=judge_resolved.model,
@@ -151,12 +157,37 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         max_concurrency = config.get("max_concurrency", 10)
         semaphore = asyncio.Semaphore(max_concurrency)
 
+        contestant_names = [name for name, _ in resolved_contestants]
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=(
+                f"Starting evaluation: {evaluation.name} (arena), "
+                f"{len(items)} items x {len(resolved_contestants)} contestants, "
+                f"models: {', '.join(contestant_names)}"
+            ),
+        )
+        for contestant_name, resolved_model in resolved_contestants:
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Model resolved: {contestant_name}",
+                details={"model": resolved_model.model, "api_base": resolved_model.api_base},
+            )
+
         async def process_contestant_item(
             contestant_name: str,
             resolved_model: ResolvedModel,
             item: DatasetItem,
         ) -> Result:
             nonlocal completed_counter
+
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Processing: {item.question[:80]}",
+                details={"contestant_model": contestant_name},
+            )
 
             # Call the contestant model
             litellm_kwargs: dict = {
@@ -172,12 +203,28 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 response = await litellm.acompletion(**litellm_kwargs)
             actual_answer = response.choices[0].message.content or ""
 
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Model response received ({len(actual_answer)} chars)",
+                details={"contestant_model": contestant_name},
+            )
+
             # Score via judge adapter
             score: Score = await adapter.evaluate_qa(
                 question=item.question,
                 expected_answer=item.expected_answer or "",
                 actual_answer=actual_answer,
                 judge_config=judge_params,
+            )
+
+            passed_label = "PASS" if score.passed else "FAIL"
+            reasoning_preview = (score.reasoning or "")[:100]
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Score: {score.value:.2f} ({passed_label}) — {reasoning_preview}",
+                details={"contestant_model": contestant_name},
             )
 
             result = Result(
@@ -238,6 +285,12 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                     evaluation_id=evaluation_id,
                     error=str(r),
                 )
+                await broadcast_log(
+                    evaluation_id=evaluation_id,
+                    level="error",
+                    message=f"Error on item {item_idx + 1}: {r}",
+                    details={"contestant_model": contestant_name},
+                )
                 error_result = Result(
                     evaluation_id=evaluation_id,
                     dataset_item_id=items[item_idx].id if item_idx < len(items) else None,
@@ -266,6 +319,14 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             status=evaluation.status,
             successful_contestants=list(contestants_with_success),
             failed_contestants=list(contestants_with_errors - contestants_with_success),
+        )
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=(
+                f"Evaluation completed: {len(contestants_with_success)} contestants succeeded, "
+                f"{len(contestants_with_errors - contestants_with_success)} failed"
+            ),
         )
 
     except Exception:

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -23,14 +23,41 @@ import type {
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
+function getInitialPhase(): PagePhase {
+  try {
+    const stored = sessionStorage.getItem('runningEvaluation');
+    if (stored) {
+      const running = JSON.parse(stored) as { mode: string };
+      if (running.mode === 'arena') return 'running';
+    }
+  } catch {
+    // ignore
+  }
+  return 'configure';
+}
+
 export default function ArenaComparison() {
-  const [phase, setPhase] = useState<PagePhase>('configure');
+  const [phase, setPhase] = useState<PagePhase>(getInitialPhase);
+
+  // Auto-resume running evaluation from sessionStorage
+  const { getRunningEvaluation, setCurrentEvaluation: setCurrentEval } = useEvaluationStore();
+  useEffect(() => {
+    const running = getRunningEvaluation();
+    if (running && running.mode === 'arena') {
+      setCurrentEval({
+        id: running.id,
+        name: running.name,
+        mode: running.mode,
+      } as Parameters<typeof setCurrentEval>[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [contestants, setContestants] = useState<ModelEndpoint[]>([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>();
   const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
   const [leaderboard, setLeaderboard] = useState<ArenaLeaderboardResponse | null>(null);
 
-  const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading } =
+  const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
     useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults } = useResultStore();
@@ -173,6 +200,8 @@ export default function ArenaComparison() {
             variant="outline"
             onClick={() => {
               setCurrentEvaluation(null);
+              clearRunningEvaluation();
+              clearLogs();
               setPhase('configure');
               toast('Arena cancelled');
             }}

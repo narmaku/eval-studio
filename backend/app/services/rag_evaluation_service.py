@@ -19,7 +19,7 @@ from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.rag_backends.factory import create_rag_adapter
 from app.services.provider_utils import resolve_judge_config
-from app.websocket.progress import broadcast_progress
+from app.websocket.progress import broadcast_log, broadcast_progress
 
 logger = structlog.get_logger()
 
@@ -149,6 +149,12 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             api_base=judge_resolved.api_base,
             has_key=bool(judge_resolved.api_key),
         )
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=f"Judge model: {judge_resolved.model}",
+            details={"model": judge_resolved.model, "api_base": judge_resolved.api_base},
+        )
 
         adapter = create_evaluation_adapter(
             model=judge_resolved.model,
@@ -163,8 +169,20 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         completed_counter = 0
         counter_lock = asyncio.Lock()
 
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=f"Starting evaluation: {evaluation.name} (rag), {total} items",
+        )
+
         async def process_item(idx: int, item: DatasetItem) -> Result:
             nonlocal completed_counter
+
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Processing item {idx + 1}/{total}: {item.question[:80]}",
+            )
 
             # Step A: Call the RAG backend via adapter
             rag_response = await rag_adapter.retrieve_and_generate(item.question)
@@ -173,6 +191,13 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             actual_answer = rag_response.answer
             chunks = rag_response.chunks
             chunk_contents = [c.get("content", "") for c in chunks]
+
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Model response received ({len(actual_answer)} chars)",
+                details={"chunks_retrieved": len(chunks)},
+            )
 
             # Step C: Score with adapter (catch NotImplementedError gracefully)
             score_value: float | None = None
@@ -202,6 +227,15 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                     evaluation_id=evaluation_id,
                 )
                 # Leave score/breakdown as None -- we still store the answer + chunks
+
+            if score_value is not None:
+                passed_label = "PASS" if passed else "FAIL"
+                reasoning_preview = (reasoning or "")[:100]
+                await broadcast_log(
+                    evaluation_id=evaluation_id,
+                    level="info",
+                    message=f"Score: {score_value:.2f} ({passed_label}) — {reasoning_preview}",
+                )
 
             # Step D: Build Result record
             result = Result(
@@ -242,10 +276,18 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         # 8. Collect results into the session sequentially
         error_count = 0
+        passed_count = 0
+        total_score = 0.0
+        scored_count = 0
         for i, r in enumerate(results):
             if isinstance(r, Exception):
                 error_count += 1
                 logger.error("rag_evaluation.item_error", item_index=i, evaluation_id=evaluation_id, error=str(r))
+                await broadcast_log(
+                    evaluation_id=evaluation_id,
+                    level="error",
+                    message=f"Error on item {i + 1}: {r}",
+                )
                 error_result = Result(
                     evaluation_id=evaluation_id,
                     dataset_item_id=items[i].id if i < len(items) else None,
@@ -257,6 +299,11 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 db.add(error_result)
             else:
                 db.add(r)
+                if r.passed:
+                    passed_count += 1
+                if r.score is not None:
+                    total_score += r.score
+                    scored_count += 1
 
         # 9. Update evaluation status
         if error_count == total:
@@ -264,6 +311,13 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         else:
             evaluation.status = "completed"
         await db.commit()
+
+        avg_score = total_score / scored_count if scored_count > 0 else 0.0
+        await broadcast_log(
+            evaluation_id=evaluation_id,
+            level="info",
+            message=f"Evaluation completed: {passed_count}/{total} passed, avg score: {avg_score:.2f}",
+        )
 
     except Exception:
         logger.exception("rag_evaluation.unhandled_error", evaluation_id=evaluation_id)

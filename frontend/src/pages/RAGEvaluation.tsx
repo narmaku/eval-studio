@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,35 @@ import type { JudgeReference, Result, CreateEvaluationRequest } from '@/types';
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
+function getInitialPhase(): PagePhase {
+  try {
+    const stored = sessionStorage.getItem('runningEvaluation');
+    if (stored) {
+      const running = JSON.parse(stored) as { mode: string };
+      if (running.mode === 'rag') return 'running';
+    }
+  } catch {
+    // ignore
+  }
+  return 'configure';
+}
+
 export default function RAGEvaluation() {
-  const [phase, setPhase] = useState<PagePhase>('configure');
+  const [phase, setPhase] = useState<PagePhase>(getInitialPhase);
+
+  // Auto-resume running evaluation from sessionStorage
+  const { getRunningEvaluation, setCurrentEvaluation: setCurrentEval } = useEvaluationStore();
+  useEffect(() => {
+    const running = getRunningEvaluation();
+    if (running && running.mode === 'rag') {
+      setCurrentEval({
+        id: running.id,
+        name: running.name,
+        mode: running.mode,
+      } as Parameters<typeof setCurrentEval>[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>();
   const [ragEndpoint, setRagEndpoint] = useState<RAGEndpointSettings>();
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(ALL_RAG_METRICS);
@@ -28,7 +55,7 @@ export default function RAGEvaluation() {
   const [selectedResult, setSelectedResult] = useState<Result | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading } =
+  const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
     useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults } = useResultStore();
@@ -189,6 +216,8 @@ export default function RAGEvaluation() {
             variant="outline"
             onClick={() => {
               setCurrentEvaluation(null);
+              clearRunningEvaluation();
+              clearLogs();
               setPhase('configure');
               toast('Evaluation cancelled');
             }}
