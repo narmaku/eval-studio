@@ -86,3 +86,31 @@ export interface CreateEvaluationRequest {
   judge_config_id?: string;
   config: EvaluationConfig;
 }
+
+export type LogLevel = 'info' | 'warning' | 'error';
+
+export interface LogEntry {
+  type: 'log';
+  evaluation_id: string;
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ProgressMessage {
+  type: 'progress';
+  evaluation_id: string;
+  completed: number;
+  total: number;
+  current_item: string;
+  contestant_model?: string;
+}
+
+export interface RunningEvaluation {
+  id: string;
+  name: string;
+  mode: EvaluationMode;
+}
+
+export type WebSocketMessage = LogEntry | ProgressMessage;
