@@ -47,11 +47,12 @@ export interface CreateDatasetRequest {
 export interface FileAnalysisResult {
   filename: string;
   format: string;
-  field_count: number;
-  row_count: number;
   fields: string[];
   sample_rows: Record<string, unknown>[];
-  errors: string[];
+  total_rows: number;
+  has_header: boolean;
+  nested_paths: string[];
+  error: string | null;
 }
 
 export interface SuggestedMapping {

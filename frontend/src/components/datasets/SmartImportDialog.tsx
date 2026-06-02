@@ -422,11 +422,11 @@ export function SmartImportDialog({ open, onOpenChange }: SmartImportDialogProps
                 >
                   <span className="truncate font-medium">{fileResult.filename}</span>
                   <Badge variant="secondary">{fileResult.format}</Badge>
-                  <span className="text-muted-foreground">{fileResult.row_count} rows</span>
-                  {fileResult.errors.length > 0 && (
+                  <span className="text-muted-foreground">{fileResult.total_rows} rows</span>
+                  {fileResult.error && (
                     <span className="flex items-center gap-1 text-destructive text-xs">
                       <AlertCircle className="h-3 w-3" />
-                      {fileResult.errors[0]}
+                      {fileResult.error}
                     </span>
                   )}
                 </div>

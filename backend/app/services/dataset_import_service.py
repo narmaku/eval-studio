@@ -87,6 +87,7 @@ _QUESTION_PATTERNS: list[re.Pattern[str]] = [
 
 _ANSWER_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^(expected_?)?answer$", re.IGNORECASE),
+    re.compile(r"^(expected_?)?response$", re.IGNORECASE),
     re.compile(r"^output$", re.IGNORECASE),
     re.compile(r"^response$", re.IGNORECASE),
     re.compile(r"^target$", re.IGNORECASE),
@@ -213,9 +214,13 @@ def _flatten_dict(d: dict[str, Any], parent_key: str = "", sep: str = ".", _dept
         new_key = f"{parent_key}{sep}{k}" if parent_key else k
         if isinstance(v, dict):
             items.extend(_flatten_dict(v, new_key, sep, _depth + 1).items())
-        elif isinstance(v, list) and v and isinstance(v[0], str):
-            # For lists like answers.text, create a path like "answers.text[0]"
-            items.append((f"{new_key}[0]", v[0]))
+        elif isinstance(v, list) and v:
+            if isinstance(v[0], dict):
+                items.extend(_flatten_dict(v[0], f"{new_key}[0]", sep, _depth + 1).items())
+            elif isinstance(v[0], str):
+                items.append((f"{new_key}[0]", v[0]))
+            else:
+                items.append((new_key, v))
         else:
             items.append((new_key, v))
     return dict(items)
@@ -372,6 +377,16 @@ def _extract_csv_schema(text: str, sample_size: int, delimiter: str = ",") -> Fi
     )
 
 
+def _leaf_name(field_path: str) -> str:
+    """Extract the leaf field name from a nested path like 'turns[0].query' → 'query'."""
+    parts = re.split(r"\.|\[", field_path)
+    for part in reversed(parts):
+        cleaned = part.rstrip("]")
+        if cleaned and not cleaned.isdigit():
+            return cleaned
+    return field_path
+
+
 def suggest_mapping(fields: list[str]) -> SuggestedMapping:
     """Suggest field mappings based on pattern matching.
 
@@ -387,17 +402,22 @@ def suggest_mapping(fields: list[str]) -> SuggestedMapping:
     answer_confidence = 0.0
 
     for f in fields:
+        leaf = _leaf_name(f)
         for i, pattern in enumerate(_QUESTION_PATTERNS):
-            if pattern.match(f):
+            if pattern.match(f) or pattern.match(leaf):
                 score = 1.0 - (i * 0.1)
+                if f != leaf:
+                    score *= 0.95
                 if score > question_confidence:
                     question_field = f
                     question_confidence = score
                 break
 
         for i, pattern in enumerate(_ANSWER_PATTERNS):
-            if pattern.match(f):
+            if pattern.match(f) or pattern.match(leaf):
                 score = 1.0 - (i * 0.1)
+                if f != leaf:
+                    score *= 0.95
                 if score > answer_confidence:
                     answer_field = f
                     answer_confidence = score
