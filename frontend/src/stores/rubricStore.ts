@@ -35,8 +35,8 @@ export const useRubricStore = create<RubricStore>((set) => ({
       if (nameFilter) {
         params.name = nameFilter;
       }
-      const rubrics = await api.listRubrics(params);
-      set({ rubrics, isLoading: false });
+      const response = await api.listRubrics(params);
+      set({ rubrics: response.items, isLoading: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch rubrics';
       set({ error: message, isLoading: false });

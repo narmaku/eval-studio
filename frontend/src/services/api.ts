@@ -231,7 +231,7 @@ export const api = {
     if (params?.offset !== undefined) query.set('offset', String(params.offset));
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     const qs = query.toString();
-    return request<Rubric[]>(`/api/v1/rubrics${qs ? `?${qs}` : ''}`);
+    return request<PaginatedResponse<Rubric>>(`/api/v1/rubrics${qs ? `?${qs}` : ''}`);
   },
   getRubric: (id: string) => request<Rubric>(`/api/v1/rubrics/${id}`),
   createRubric: (data: CreateRubricRequest) =>
