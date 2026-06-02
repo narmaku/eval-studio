@@ -68,7 +68,7 @@ export function ConversationPanel({
           <div ref={bottomRef} />
         </div>
       </CardContent>
-      <ChatInput onSend={onSend} disabled={disabled || isProcessing} />
+      {!disabled && <ChatInput onSend={onSend} disabled={isProcessing} />}
     </Card>
   );
 }
