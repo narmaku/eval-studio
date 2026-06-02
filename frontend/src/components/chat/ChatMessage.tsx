@@ -64,7 +64,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   });
 
   return (
-    <div className={cn('flex flex-col gap-1', config.align)}>
+    <div className={cn('flex flex-col gap-1', config.align)} data-message-id={message.id}>
       <div className="flex items-center gap-1.5">
         <Icon className={cn('h-3 w-3', config.accent)} />
         <span className={cn('text-xs font-medium', config.accent)}>{config.label}</span>
