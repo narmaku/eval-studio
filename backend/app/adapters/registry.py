@@ -42,6 +42,8 @@ class EvaluatorRegistry:
 
     def __init__(self) -> None:
         self._evaluators: dict[str, EvaluatorInfo] = {}
+        self._config_path: Path | None = None
+        self._last_mtime: float = 0.0
 
     def load_from_yaml(self, path: Path) -> None:
         """Load evaluator definitions from a YAML file.
@@ -49,7 +51,10 @@ class EvaluatorRegistry:
         Malformed entries are skipped with a warning. Entries whose
         adapter_class cannot be resolved are marked as unavailable.
         """
+        self._config_path = path
+        self._evaluators = {}
         if not path.exists():
+            self._last_mtime = 0.0
             return
         with open(path) as f:
             data = yaml.safe_load(f) or {}
@@ -84,6 +89,7 @@ class EvaluatorRegistry:
                 available=available,
             )
             self._evaluators[info.id] = info
+        self._last_mtime = os.path.getmtime(path)
 
     @staticmethod
     def _validate_adapter_namespace(adapter_class: str) -> bool:
@@ -111,8 +117,24 @@ class EvaluatorRegistry:
             logger.warning("Adapter class %s is not importable: %s", adapter_class, exc)
             return False
 
+    def _check_reload(self) -> None:
+        """Reload YAML config if the file's mtime has changed."""
+        if self._config_path is None:
+            return
+        if not self._config_path.exists():
+            if self._evaluators:
+                logger.info("Config file %s deleted, clearing evaluators", self._config_path)
+                self._evaluators = {}
+                self._last_mtime = 0.0
+            return
+        current_mtime = os.path.getmtime(self._config_path)
+        if current_mtime != self._last_mtime:
+            logger.info("Config file %s changed, reloading evaluators", self._config_path)
+            self.load_from_yaml(self._config_path)
+
     def list_evaluators(self, mode: str | None = None) -> list[EvaluatorInfo]:
         """Return all evaluators, optionally filtered by supported mode."""
+        self._check_reload()
         evaluators = list(self._evaluators.values())
         if mode:
             evaluators = [e for e in evaluators if mode in e.modes]
@@ -120,6 +142,7 @@ class EvaluatorRegistry:
 
     def get_evaluator(self, evaluator_id: str) -> EvaluatorInfo | None:
         """Return a single evaluator by ID, or None if not found."""
+        self._check_reload()
         return self._evaluators.get(evaluator_id)
 
     def create_adapter(self, evaluator_id: str, **config: Any) -> EvaluationAdapter:
