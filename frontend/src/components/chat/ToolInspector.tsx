@@ -30,7 +30,7 @@ export function ToolInspector({ toolCalls }: ToolInspectorProps) {
         ) : (
           <div className="space-y-2">
             {toolCalls.map((tc) => (
-              <ToolCallCard key={tc.id} toolCall={tc} />
+              <ToolCallCard key={tc.id} toolCall={tc} messageId={tc.message_id} />
             ))}
           </div>
         )}
