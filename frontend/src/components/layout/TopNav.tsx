@@ -1,7 +1,9 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useEvaluationStore } from '@/stores/evaluationStore';
+import type { EvaluationMode } from '@/types';
 
 const navItems = [
   { to: '/', label: 'Dashboard' },
@@ -12,8 +14,27 @@ const navItems = [
   { to: '/environments', label: 'Environments' },
 ];
 
+const modeRoutes: Record<EvaluationMode, string> = {
+  qa: '/evaluate/qa',
+  rag: '/evaluate/rag',
+  arena: '/evaluate/arena',
+  agent: '/evaluate/agent',
+};
+
 export function TopNav() {
   const { unreadCount, toggleOpen } = useNotificationStore();
+  const getRunningEvaluation = useEvaluationStore((state) => state.getRunningEvaluation);
+  const currentEvaluation = useEvaluationStore((state) => state.currentEvaluation);
+  const navigate = useNavigate();
+
+  // Read from sessionStorage (re-evaluated when currentEvaluation changes, which tracks running state)
+  const runningEvaluation = getRunningEvaluation();
+
+  const handleRunningClick = () => {
+    if (runningEvaluation) {
+      navigate(modeRoutes[runningEvaluation.mode]);
+    }
+  };
 
   return (
     <header className="border-b bg-background">
@@ -31,7 +52,18 @@ export function TopNav() {
                 }`
               }
             >
-              {item.label}
+              <span className="flex items-center gap-1.5">
+                {item.label}
+                {item.to === '/evaluate' && runningEvaluation && (
+                  <span
+                    className="relative flex h-2 w-2"
+                    title={`Running: ${runningEvaluation.name}`}
+                  >
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                  </span>
+                )}
+              </span>
             </NavLink>
           ))}
         </nav>
