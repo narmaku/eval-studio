@@ -62,7 +62,7 @@ export function EvaluationLogPanel() {
   if (logs.length === 0) {
     return (
       <div className="rounded-md border bg-muted/30 p-4">
-        <p className="text-sm text-zinc-400 font-mono">Waiting for logs...</p>
+        <p className="text-sm text-muted-foreground font-mono">Waiting for logs...</p>
       </div>
     );
   }
