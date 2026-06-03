@@ -47,6 +47,24 @@ services:
     profiles:
       - litellm
 
+  rag-demo:
+    build:
+      context: ./environments/rag-demo
+    ports:
+      - "8100:8100"
+    env_file:
+      - .env
+    environment:
+      - LITELLM_MODEL=${LITELLM_MODEL:-}
+    profiles:
+      - rag
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   eval-studio-data:
   frontend-node-modules:
