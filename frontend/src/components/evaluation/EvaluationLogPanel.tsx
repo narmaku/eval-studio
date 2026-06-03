@@ -5,7 +5,7 @@ import type { LogEntry, LogLevel } from '@/types';
 const MAX_DISPLAYED_LOGS = 500;
 
 const levelStyles: Record<LogLevel, string> = {
-  info: 'text-muted-foreground',
+  info: 'text-zinc-400',
   warning: 'text-yellow-500',
   error: 'text-red-500',
 };
@@ -28,11 +28,11 @@ function formatTimestamp(iso: string): string {
 function LogEntryRow({ entry }: { entry: LogEntry }) {
   return (
     <div className="flex gap-2 py-0.5 leading-tight">
-      <span className="text-muted-foreground/60 shrink-0">[{formatTimestamp(entry.timestamp)}]</span>
+      <span className="text-zinc-500 shrink-0">[{formatTimestamp(entry.timestamp)}]</span>
       <span className={`shrink-0 font-semibold ${levelStyles[entry.level]}`}>
         {levelLabels[entry.level]}
       </span>
-      <span className="text-foreground/90 break-all">{entry.message}</span>
+      <span className="text-zinc-200 break-all">{entry.message}</span>
     </div>
   );
 }
