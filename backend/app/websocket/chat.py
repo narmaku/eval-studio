@@ -22,6 +22,7 @@ from sqlalchemy import select
 
 from app.core.database import async_session_factory
 from app.mcp.manager import cleanup_manager
+from app.models.evaluation import Evaluation
 from app.models.session import Session
 from app.services.agent_chat_service import end_and_score_session, process_user_message
 
@@ -138,6 +139,12 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
                 if session and session.status == "active":
                     session.status = "ended"
                     session.ended_at = datetime.now(UTC)
+                    # Also update linked evaluation status
+                    if session.evaluation_id:
+                        eval_result = await db.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
+                        evaluation = eval_result.scalar_one_or_none()
+                        if evaluation and evaluation.status == "running":
+                            evaluation.status = "completed"
                     await db.commit()
                     logger.info("ws.session_auto_ended", session_id=session_id)
         except Exception:
