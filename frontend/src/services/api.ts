@@ -30,6 +30,9 @@ import type {
   GenerateRubricRequest,
   RefineRubricRequest,
   EvaluatorInfo,
+  ToolServer,
+  CreateToolServerRequest,
+  UpdateToolServerRequest,
 } from '@/types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
@@ -299,6 +302,33 @@ export const api = {
     }
     return response.text();
   },
+
+  // Tool Servers
+  listToolServers: (params?: { type?: string; enabled?: boolean }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.type) searchParams.set('type', params.type);
+    if (params?.enabled !== undefined) searchParams.set('enabled', String(params.enabled));
+    const query = searchParams.toString();
+    return request<ToolServer[]>(`/api/v1/tool-servers${query ? `?${query}` : ''}`);
+  },
+  createToolServer: (data: CreateToolServerRequest) =>
+    request<ToolServer>('/api/v1/tool-servers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  updateToolServer: (id: string, data: UpdateToolServerRequest) =>
+    request<ToolServer>(`/api/v1/tool-servers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  deleteToolServer: (id: string) =>
+    request<void>(`/api/v1/tool-servers/${id}`, { method: 'DELETE' }),
+  validateToolServer: (id: string) =>
+    request<{ available: boolean; path: string | null }>(`/api/v1/tool-servers/${id}/validate`, {
+      method: 'POST',
+    }),
 };
 
 export { ApiClientError };

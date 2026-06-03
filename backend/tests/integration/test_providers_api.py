@@ -1,7 +1,5 @@
 """Integration tests for the providers API endpoints (YAML-backed CRUD)."""
 
-from pathlib import Path
-
 import pytest
 
 from app.core.providers import ProviderProfile, provider_registry

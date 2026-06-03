@@ -1,0 +1,14 @@
+tool_servers:
+- id: example-filesystem
+  name: Filesystem MCP Server (Example)
+  type: mcp_stdio
+  command: npx
+  args:
+  - '-y'
+  - '@modelcontextprotocol/server-filesystem'
+  - /tmp/sandbox
+  description: Read-only filesystem access for the agent (disabled by default)
+  tags:
+  - filesystem
+  - example
+  enabled: false
