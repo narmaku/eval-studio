@@ -166,6 +166,18 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
           set((state) => ({
             logs: [...state.logs, data],
           }));
+        } else if (data.type === 'status') {
+          const currentEval = get().currentEvaluation;
+          if (currentEval) {
+            set({ currentEvaluation: { ...currentEval, status: data.status } });
+          }
+          if (
+            data.status === 'completed' ||
+            data.status === 'failed' ||
+            data.status === 'cancelled'
+          ) {
+            get().clearRunningEvaluation();
+          }
         }
       } catch {
         // Ignore malformed messages

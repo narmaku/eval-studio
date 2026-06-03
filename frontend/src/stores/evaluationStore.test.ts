@@ -220,6 +220,78 @@ describe('evaluationStore', () => {
       expect(state.logs[0]!.level).toBe('info');
     });
 
+    it('updates currentEvaluation status on status message', () => {
+      useEvaluationStore.setState({
+        currentEvaluation: {
+          id: 'eval-123',
+          name: 'Test Eval',
+          mode: 'qa',
+          status: 'running',
+          dataset_id: 'd1',
+          environment_id: null,
+          judge_config_id: null,
+          config: {
+            model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+            judge_config: { preset: 'default' },
+          },
+          result_count: null,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T01:00:00Z',
+        },
+      });
+
+      useEvaluationStore.getState().connectToEvaluation('eval-123');
+      const ws = MockWebSocket.instances[0]!;
+
+      ws.simulateMessage({
+        type: 'status',
+        evaluation_id: 'eval-123',
+        status: 'completed',
+      });
+
+      const state = useEvaluationStore.getState();
+      expect(state.currentEvaluation?.status).toBe('completed');
+    });
+
+    it('clears running evaluation on terminal status message', () => {
+      useEvaluationStore.setState({
+        currentEvaluation: {
+          id: 'eval-123',
+          name: 'Test Eval',
+          mode: 'qa',
+          status: 'running',
+          dataset_id: 'd1',
+          environment_id: null,
+          judge_config_id: null,
+          config: {
+            model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+            judge_config: { preset: 'default' },
+          },
+          result_count: null,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T01:00:00Z',
+        },
+      });
+
+      // Persist a running evaluation first
+      useEvaluationStore.getState().persistRunningEvaluation({
+        id: 'eval-123',
+        name: 'Test Eval',
+        mode: 'qa',
+      });
+
+      useEvaluationStore.getState().connectToEvaluation('eval-123');
+      const ws = MockWebSocket.instances[0]!;
+
+      ws.simulateMessage({
+        type: 'status',
+        evaluation_id: 'eval-123',
+        status: 'failed',
+      });
+
+      expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('runningEvaluation');
+    });
+
     it('updates progress with contestant_model for arena', () => {
       useEvaluationStore.getState().connectToEvaluation('eval-arena');
       const ws = MockWebSocket.instances[0]!;
