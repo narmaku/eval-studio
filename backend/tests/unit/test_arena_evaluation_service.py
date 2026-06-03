@@ -98,6 +98,7 @@ async def test_arena_result_has_contestant_model(db_session: AsyncSession, arena
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "completed"
+    assert eval_obj.error is None
 
     # Verify results: 2 contestants x 2 items = 4 results
     results_result = await db_session.execute(select(Result).where(Result.evaluation_id == evaluation.id))
@@ -165,7 +166,7 @@ async def test_arena_error_isolation(db_session: AsyncSession, arena_evaluation_
 
 @pytest.mark.asyncio
 async def test_arena_all_contestants_fail(db_session: AsyncSession, arena_evaluation_with_dataset):
-    """All contestants fail -- evaluation status should be 'failed'."""
+    """All contestants fail -- evaluation status should be 'failed' with error."""
     from app.services.arena_evaluation_service import run_arena_evaluation
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
@@ -182,11 +183,13 @@ async def test_arena_all_contestants_fail(db_session: AsyncSession, arena_evalua
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "failed"
+    assert eval_obj.error is not None
+    assert "All contestants failed" in eval_obj.error
 
 
 @pytest.mark.asyncio
 async def test_arena_validation_fewer_than_2_contestants(db_session: AsyncSession):
-    """Arena with fewer than 2 contestants should fail validation."""
+    """Arena with fewer than 2 contestants should fail validation with error."""
     from app.services.arena_evaluation_service import run_arena_evaluation
 
     dataset = Dataset(name="arena-val-test", item_count=1)
@@ -219,6 +222,7 @@ async def test_arena_validation_fewer_than_2_contestants(db_session: AsyncSessio
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "failed"
+    assert eval_obj.error == "At least 2 contestants required, got 1"
 
 
 @pytest.mark.asyncio

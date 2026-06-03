@@ -302,6 +302,26 @@ async def test_broadcast_status_failed():
     msg = ws.send_json.call_args[0][0]
     assert msg["status"] == "failed"
     assert msg["type"] == "status"
+    assert "error" not in msg
+
+
+@pytest.mark.asyncio
+async def test_broadcast_status_failed_with_error():
+    """broadcast_status includes error field when provided."""
+    ws = AsyncMock()
+    async with _lock:
+        _connections["eval-status-err"] = {ws}
+
+    await broadcast_status(
+        evaluation_id="eval-status-err",
+        status="failed",
+        error="Dataset not configured",
+    )
+
+    msg = ws.send_json.call_args[0][0]
+    assert msg["status"] == "failed"
+    assert msg["type"] == "status"
+    assert msg["error"] == "Dataset not configured"
 
 
 @pytest.mark.asyncio
