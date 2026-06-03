@@ -92,6 +92,7 @@ from app.api.v1.datasets import router as datasets_router  # noqa: E402
 from app.api.v1.environments import router as environments_router  # noqa: E402
 from app.api.v1.evaluations import router as evaluations_router  # noqa: E402
 from app.api.v1.evaluators import router as evaluators_router  # noqa: E402
+from app.api.v1.harnesses import router as harnesses_router  # noqa: E402
 from app.api.v1.health import router as health_router  # noqa: E402
 from app.api.v1.judges import router as judges_router  # noqa: E402
 from app.api.v1.providers import router as providers_router  # noqa: E402
@@ -114,5 +115,6 @@ app.include_router(providers_router, prefix="/api/v1")
 app.include_router(rubrics_router, prefix="/api/v1")
 app.include_router(results_router, prefix="/api/v1")
 app.include_router(tool_servers_router, prefix="/api/v1")
+app.include_router(harnesses_router, prefix="/api/v1")
 app.include_router(ws_chat_router)
 app.include_router(ws_progress_router)

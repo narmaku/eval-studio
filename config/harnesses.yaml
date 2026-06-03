@@ -1,0 +1,21 @@
+harnesses:
+  - id: builtin-litellm
+    name: "Built-in Agent (LiteLLM)"
+    type: builtin
+    description: "LiteLLM-based agent with MCP tool execution"
+    default: true
+    enabled: true
+    supported_features:
+      - streaming
+      - tool_calls
+      - mcp
+
+  - id: goose-cli
+    name: "Goose CLI Agent"
+    type: subprocess
+    binary_path: "goose"
+    description: "Block Goose AI coding agent"
+    output_format: "goose"
+    enabled: false
+    supported_features:
+      - tool_calls
