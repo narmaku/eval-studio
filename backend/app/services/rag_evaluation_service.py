@@ -48,6 +48,7 @@ def _build_rag_adapter_config(rag_endpoint: dict[str, Any]) -> dict[str, Any]:
     # Pass through all keys from rag_endpoint to the adapter config
     for key in (
         "url",
+        "endpoint_url",
         "auth_header",
         "query_field",
         "answer_field",
@@ -63,6 +64,10 @@ def _build_rag_adapter_config(rag_endpoint: dict[str, Any]) -> dict[str, Any]:
     ):
         if key in rag_endpoint:
             adapter_config[key] = rag_endpoint[key]
+
+    # Normalize: if frontend sent endpoint_url but not url, map it for the adapter
+    if "url" not in adapter_config and "endpoint_url" in adapter_config:
+        adapter_config["url"] = adapter_config.pop("endpoint_url")
 
     return adapter_config
 
@@ -122,7 +127,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         # 5. Validate RAG endpoint config and create adapter
         config = evaluation.config or {}
         rag_endpoint = config.get("rag_endpoint", {})
-        rag_url = rag_endpoint.get("url")
+        rag_url = rag_endpoint.get("url") or rag_endpoint.get("endpoint_url")
 
         # For HTTP backend (default), URL is required
         backend_type = rag_endpoint.get("backend_type", "http")
