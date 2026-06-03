@@ -21,6 +21,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
 from app.core.database import async_session_factory
+from app.mcp.manager import cleanup_manager
 from app.models.session import Session
 from app.services.agent_chat_service import end_and_score_session, process_user_message
 
@@ -122,6 +123,12 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
         # 4. Cleanup on disconnect
         _active_connections.pop(session_id, None)
         _processing.discard(session_id)
+
+        # Clean up MCP server managers
+        try:
+            await cleanup_manager(session_id)
+        except Exception:
+            logger.exception("ws.mcp_cleanup_error", session_id=session_id)
 
         # Mark session as ended if still active
         try:

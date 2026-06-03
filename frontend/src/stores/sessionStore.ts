@@ -9,6 +9,8 @@ import type {
   WsMessageChunk,
   WsMessageComplete,
   WsToolCallMessage,
+  WsToolExecutingMessage,
+  WsToolResultMessage,
   WsScoreMessage,
   WsStatusMessage,
   WsErrorMessage,
@@ -227,15 +229,22 @@ function handleWsMessage(
           messages.push(finalMessage);
         }
 
-        // Add any tool calls from the completed message, tagging each with message_id
+        // Add any tool calls from the completed message, tagging each with message_id.
+        // Skip tool calls that were already added via individual tool_call envelopes
+        // during the agentic loop (matched by id).
         let toolCalls = state.toolCalls;
         if (complete.data.tool_calls && complete.data.tool_calls.length > 0) {
-          const taggedToolCalls = complete.data.tool_calls.map((tc) => ({
-            ...tc,
-            message_id: complete.data.message_id,
-            status: tc.status ?? ('completed' as const),
-          }));
-          toolCalls = [...toolCalls, ...taggedToolCalls];
+          const existingIds = new Set(toolCalls.map((tc) => tc.id));
+          const newToolCalls = complete.data.tool_calls
+            .filter((tc) => !existingIds.has(tc.id))
+            .map((tc) => ({
+              ...tc,
+              message_id: complete.data.message_id,
+              status: tc.status ?? ('completed' as const),
+            }));
+          if (newToolCalls.length > 0) {
+            toolCalls = [...toolCalls, ...newToolCalls];
+          }
         }
 
         return { messages, toolCalls, isProcessing: false };
@@ -246,7 +255,34 @@ function handleWsMessage(
     case 'tool_call': {
       const toolMsg = envelope as unknown as WsToolCallMessage;
       set((state) => ({
-        toolCalls: [...state.toolCalls, toolMsg.data],
+        toolCalls: [...state.toolCalls, { ...toolMsg.data, status: toolMsg.data.status ?? 'pending' }],
+      }));
+      break;
+    }
+
+    case 'tool_executing': {
+      const execMsg = envelope as unknown as WsToolExecutingMessage;
+      set((state) => ({
+        toolCalls: state.toolCalls.map((tc) =>
+          tc.id === execMsg.data.tool_call_id ? { ...tc, status: 'executing' as const } : tc,
+        ),
+      }));
+      break;
+    }
+
+    case 'tool_result': {
+      const resultMsg = envelope as unknown as WsToolResultMessage;
+      set((state) => ({
+        toolCalls: state.toolCalls.map((tc) =>
+          tc.id === resultMsg.data.tool_call_id
+            ? {
+                ...tc,
+                status: resultMsg.data.is_error ? ('error' as const) : ('completed' as const),
+                result: resultMsg.data.result,
+                duration_ms: resultMsg.data.duration_ms,
+              }
+            : tc,
+        ),
       }));
       break;
     }

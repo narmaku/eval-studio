@@ -5,6 +5,7 @@ interface via the AgentBackendAdapter ABC.
 """
 
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import litellm
 import structlog
@@ -34,12 +35,14 @@ class LiteLLMAgentAdapter(AgentBackendAdapter):
         self,
         messages: list[dict[str, str]],
         system_prompt: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[AgentStreamChunk, None]:
         """Send messages to LiteLLM and stream response chunks.
 
         Args:
             messages: Conversation history as a list of role/content dicts.
             system_prompt: Optional system prompt to prepend.
+            tools: Optional list of tool definitions in OpenAI function-calling format.
 
         Yields:
             AgentStreamChunk for each piece of the response.
@@ -60,6 +63,8 @@ class LiteLLMAgentAdapter(AgentBackendAdapter):
             litellm_kwargs["api_key"] = self.api_key
         if self.api_base:
             litellm_kwargs["api_base"] = self.api_base
+        if tools:
+            litellm_kwargs["tools"] = tools
 
         logger.debug(
             "litellm_agent.send_message",
