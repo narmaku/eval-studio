@@ -410,7 +410,8 @@ def _generate_answer(query: str, context_docs: list[SourceDocument]) -> str:
         ]
 
         response = litellm.completion(model=model, messages=messages, max_tokens=512)
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else ""
 
     except Exception as exc:
         logger.warning("LLM generation failed: %s", exc)

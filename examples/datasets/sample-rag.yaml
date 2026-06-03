@@ -1,5 +1,6 @@
 name: RHEL Sysadmin RAG Evaluation
 description: Questions about RHEL system administration for testing RAG evaluation
+version: "1.0"
 items:
   - question: "How do I check the status of a systemd service?"
     expected_answer: "Use 'systemctl status <service-name>' to check a systemd service. This shows active state, PID, memory usage, and recent logs."
