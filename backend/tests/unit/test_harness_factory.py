@@ -12,24 +12,16 @@ from app.harnesses.subprocess_harness import SubprocessHarness
 
 @pytest.fixture(autouse=True)
 def _setup_test_harnesses(tmp_path):
-    original_harnesses = harness_registry._harnesses.copy()
-    original_config_path = harness_registry._config_path
-    original_mtime = harness_registry._last_mtime
+    """Seed the registry with test harnesses.
 
+    The root conftest isolates all registries to temp paths automatically.
+    """
     harness_registry._config_path = tmp_path / "harnesses.yaml"
-    harness_registry._harnesses.clear()
     harness_registry._harnesses["test-builtin"] = HarnessProfile(id="test-builtin", name="Test Builtin", type="builtin")
     harness_registry._harnesses["test-subprocess"] = HarnessProfile(
         id="test-subprocess", name="Test Subprocess", type="subprocess", binary_path="echo"
     )
     harness_registry._persist_yaml()
-
-    yield
-
-    harness_registry._harnesses.clear()
-    harness_registry._harnesses.update(original_harnesses)
-    harness_registry._config_path = original_config_path
-    harness_registry._last_mtime = original_mtime
 
 
 def test_create_builtin_harness():

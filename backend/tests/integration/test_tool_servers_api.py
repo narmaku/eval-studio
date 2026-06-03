@@ -7,12 +7,11 @@ from app.core.tool_servers import StandaloneToolDef, ToolServerProfile, tool_ser
 
 @pytest.fixture(autouse=True)
 def _seed_test_tool_servers(tmp_path):
-    original_servers = tool_server_registry._servers.copy()
-    original_config_path = tool_server_registry._config_path
-    original_mtime = tool_server_registry._last_mtime
+    """Seed the registry with test tool servers.
 
+    The root conftest isolates all registries to temp paths automatically.
+    """
     tool_server_registry._config_path = tmp_path / "tool_servers.yaml"
-    tool_server_registry._servers.clear()
     tool_server_registry._servers["test-mcp"] = ToolServerProfile(
         id="test-mcp",
         name="Test MCP Server",
@@ -33,13 +32,6 @@ def _seed_test_tool_servers(tmp_path):
         enabled=True,
     )
     tool_server_registry._persist_yaml()
-
-    yield
-
-    tool_server_registry._servers.clear()
-    tool_server_registry._servers.update(original_servers)
-    tool_server_registry._config_path = original_config_path
-    tool_server_registry._last_mtime = original_mtime
 
 
 @pytest.mark.asyncio
