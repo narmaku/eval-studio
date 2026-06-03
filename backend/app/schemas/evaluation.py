@@ -38,6 +38,7 @@ class EvaluationResponse(BaseModel):
     name: str
     mode: EvaluationMode
     status: EvaluationStatus
+    error: str | None = None
     dataset_id: str | None
     environment_id: str | None
     judge_config_id: str | None
