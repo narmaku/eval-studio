@@ -7,12 +7,11 @@ from app.harnesses.registry import HarnessProfile, harness_registry
 
 @pytest.fixture(autouse=True)
 def _seed_test_harnesses(tmp_path):
-    original_harnesses = harness_registry._harnesses.copy()
-    original_config_path = harness_registry._config_path
-    original_mtime = harness_registry._last_mtime
+    """Seed the registry with test harnesses.
 
+    The root conftest isolates all registries to temp paths automatically.
+    """
     harness_registry._config_path = tmp_path / "harnesses.yaml"
-    harness_registry._harnesses.clear()
     harness_registry._harnesses["test-builtin"] = HarnessProfile(
         id="test-builtin",
         name="Test Builtin",
@@ -33,13 +32,6 @@ def _seed_test_harnesses(tmp_path):
         supported_features=["tool_calls"],
     )
     harness_registry._persist_yaml()
-
-    yield
-
-    harness_registry._harnesses.clear()
-    harness_registry._harnesses.update(original_harnesses)
-    harness_registry._config_path = original_config_path
-    harness_registry._last_mtime = original_mtime
 
 
 @pytest.mark.asyncio

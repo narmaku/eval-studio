@@ -7,15 +7,11 @@ from app.core.providers import ProviderProfile, provider_registry
 
 @pytest.fixture(autouse=True)
 def _seed_test_providers(tmp_path):
-    """Seed the global registry with test providers for each test, then restore.
+    """Seed the registry with test providers.
 
-    Redirects _config_path to a temp file so _persist_yaml() doesn't
-    clobber the real config/providers.yaml during CRUD tests.
+    The root conftest isolates all registries to temp paths automatically.
+    This fixture only needs to seed test data.
     """
-    original_providers = provider_registry._providers.copy()
-    original_config_path = provider_registry._config_path
-    original_mtime = provider_registry._last_mtime
-
     provider_registry._config_path = tmp_path / "providers.yaml"
     provider_registry._providers.clear()
     provider_registry._providers["test-model"] = ProviderProfile(
@@ -45,13 +41,6 @@ def _seed_test_providers(tmp_path):
         purpose="test",
     )
     provider_registry._persist_yaml()
-
-    yield
-
-    provider_registry._providers.clear()
-    provider_registry._providers.update(original_providers)
-    provider_registry._config_path = original_config_path
-    provider_registry._last_mtime = original_mtime
 
 
 # ── List / Get ──

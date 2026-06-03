@@ -1,3 +1,7 @@
+# Agent harness definitions for eval-studio
+# Each entry defines an agent runtime (builtin LLM or external CLI).
+# Copy this file to harnesses.yaml and customize for your environment.
+
 harnesses:
   - id: builtin-litellm
     name: "Built-in Agent (LiteLLM)"

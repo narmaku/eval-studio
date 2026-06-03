@@ -34,6 +34,12 @@ backend/dist/
 .env.local
 .env.*.local
 
+# User config (may contain internal URLs, env var names, local infra)
+# Use config/*.yaml.example as templates
+config/providers.yaml
+config/tool_servers.yaml
+config/harnesses.yaml
+
 # Database
 *.db
 *.db-shm
