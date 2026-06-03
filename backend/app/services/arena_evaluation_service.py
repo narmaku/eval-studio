@@ -13,7 +13,7 @@ from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.services.provider_utils import ResolvedModel, proxy_env, resolve_judge_config, resolve_model_config
-from app.websocket.progress import broadcast_log, broadcast_progress
+from app.websocket.progress import broadcast_log, broadcast_progress, broadcast_status
 
 logger = structlog.get_logger()
 
@@ -54,6 +54,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("arena.no_dataset", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         dataset_result = await db.execute(select(Dataset).where(Dataset.id == evaluation.dataset_id))
@@ -62,6 +63,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("arena.dataset_not_found", dataset_id=evaluation.dataset_id, evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         # 4. Validate contestants
@@ -76,6 +78,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             )
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         # 5. Load judge config
@@ -91,6 +94,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 )
                 evaluation.status = "failed"
                 await db.commit()
+                await broadcast_status(evaluation_id, "failed")
                 return
 
         judge_params = _to_judge_params(judge_config)
@@ -102,6 +106,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("arena.no_judge_model", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         logger.info(
@@ -147,6 +152,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             )
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         # 8. Process each contestant x each dataset item
@@ -312,6 +318,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         else:
             evaluation.status = "failed"
         await db.commit()
+        await broadcast_status(evaluation_id, evaluation.status)
 
         logger.info(
             "arena.completed",
@@ -337,5 +344,6 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             if evaluation:
                 evaluation.status = "failed"
                 await db.commit()
+                await broadcast_status(evaluation_id, "failed")
         except Exception:
             logger.exception("arena.status_update_failed", evaluation_id=evaluation_id)

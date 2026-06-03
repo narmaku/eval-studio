@@ -11,7 +11,7 @@ from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.services.provider_utils import proxy_env, resolve_judge_config, resolve_model_config
-from app.websocket.progress import broadcast_log, broadcast_progress
+from app.websocket.progress import broadcast_log, broadcast_progress, broadcast_status
 
 logger = structlog.get_logger()
 
@@ -52,6 +52,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("evaluation.no_dataset", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         dataset_result = await db.execute(select(Dataset).where(Dataset.id == evaluation.dataset_id))
@@ -60,6 +61,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("dataset.not_found", dataset_id=evaluation.dataset_id, evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         # 4. Load judge config
@@ -75,6 +77,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 )
                 evaluation.status = "failed"
                 await db.commit()
+                await broadcast_status(evaluation_id, "failed")
                 return
 
         judge_params = _to_judge_params(judge_config)
@@ -96,6 +99,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("evaluation.no_model", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         model_under_test = resolved.model
@@ -125,6 +129,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("evaluation.no_judge_model", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         logger.info(
@@ -279,6 +284,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         else:
             evaluation.status = "completed"
         await db.commit()
+        await broadcast_status(evaluation_id, evaluation.status)
 
         avg_score = total_score / scored_count if scored_count > 0 else 0.0
         await broadcast_log(
@@ -295,5 +301,6 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             if evaluation:
                 evaluation.status = "failed"
                 await db.commit()
+                await broadcast_status(evaluation_id, "failed")
         except Exception:
             logger.exception("evaluation.status_update_failed", evaluation_id=evaluation_id)

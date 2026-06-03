@@ -108,10 +108,16 @@ export interface ProgressMessage {
   contestant_model?: string;
 }
 
+export interface StatusMessage {
+  type: 'status';
+  evaluation_id: string;
+  status: EvaluationStatus;
+}
+
 export interface RunningEvaluation {
   id: string;
   name: string;
   mode: EvaluationMode;
 }
 
-export type WebSocketMessage = LogEntry | ProgressMessage;
+export type WebSocketMessage = LogEntry | ProgressMessage | StatusMessage;
