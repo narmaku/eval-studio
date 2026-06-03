@@ -522,6 +522,14 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
     if not session:
         raise ValueError(f"Session '{session_id}' not found")
 
+    # Idempotency guard: if the session is already ended, return current state
+    if session.status != "active":
+        return {
+            "status": session.status,
+            "scores": session.scores,
+            "ended_at": session.ended_at.isoformat() if session.ended_at else None,
+        }
+
     session.status = "ended"
     session.ended_at = datetime.now(UTC)
 

@@ -95,7 +95,7 @@ async def create_session(payload: SessionCreate, db: AsyncSession = Depends(get_
     await db.commit()
     await db.refresh(session)
 
-    logger.info("session.created", session_id=session.id, evaluation_id=payload.evaluation_id, mode=payload.mode)
+    logger.info("session.created", session_id=session.id, evaluation_id=evaluation_id, mode=payload.mode)
     return SessionResponse.model_validate(session)
 
 

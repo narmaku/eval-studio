@@ -218,3 +218,21 @@ async def test_end_session_without_evaluation_no_result(db_session: AsyncSession
     result_query = await db_session.execute(select(Result))
     results = result_query.scalars().all()
     assert len(results) == 0
+
+
+@pytest.mark.asyncio
+async def test_end_and_score_idempotent_no_duplicate_result(db_session: AsyncSession, session_with_auto_eval):
+    """Calling end_and_score_session twice should not create a duplicate Result."""
+    session = session_with_auto_eval
+
+    # First call: creates Result and updates evaluation
+    await end_and_score_session(session.id, db_session)
+
+    # Second call: should be a no-op (idempotent)
+    result2 = await end_and_score_session(session.id, db_session)
+    assert result2["status"] == "ended"
+
+    # Verify only one Result exists
+    result_query = await db_session.execute(select(Result).where(Result.evaluation_id == session.evaluation_id))
+    results = result_query.scalars().all()
+    assert len(results) == 1
