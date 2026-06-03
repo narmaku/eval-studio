@@ -9,7 +9,7 @@ from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.rag_backends.base import RAGResponse
-from app.services.rag_evaluation_service import run_rag_evaluation
+from app.services.rag_evaluation_service import _build_rag_adapter_config, run_rag_evaluation
 
 
 @pytest.fixture
@@ -309,3 +309,108 @@ async def test_rag_no_rag_endpoint_config(db_session: AsyncSession):
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "failed"
+
+
+class TestBuildRagAdapterConfig:
+    """Unit tests for _build_rag_adapter_config key mapping."""
+
+    def test_endpoint_url_mapped_to_url(self):
+        """Frontend sends endpoint_url; adapter config should have url."""
+        rag_endpoint = {"endpoint_url": "http://localhost:8100/query"}
+        config = _build_rag_adapter_config(rag_endpoint)
+        assert config["url"] == "http://localhost:8100/query"
+        assert "endpoint_url" not in config
+
+    def test_url_key_still_works(self):
+        """Backward compat: url key should pass through unchanged."""
+        rag_endpoint = {"url": "http://localhost:8080/api/rag"}
+        config = _build_rag_adapter_config(rag_endpoint)
+        assert config["url"] == "http://localhost:8080/api/rag"
+
+    def test_url_takes_precedence_over_endpoint_url(self):
+        """If both url and endpoint_url are present, url wins."""
+        rag_endpoint = {
+            "url": "http://canonical-url/query",
+            "endpoint_url": "http://alternate-url/query",
+        }
+        config = _build_rag_adapter_config(rag_endpoint)
+        assert config["url"] == "http://canonical-url/query"
+
+    def test_default_backend_type(self):
+        """Default backend_type should be 'http' when not specified."""
+        config = _build_rag_adapter_config({})
+        assert config["backend_type"] == "http"
+
+    def test_all_passthrough_keys(self):
+        """All passthrough keys should be copied to adapter config."""
+        rag_endpoint = {
+            "endpoint_url": "http://localhost:8100/query",
+            "auth_header": "Bearer token",
+            "query_field": "q",
+            "answer_field": "a",
+            "chunks_field": "c",
+            "top_k": 5,
+        }
+        config = _build_rag_adapter_config(rag_endpoint)
+        assert config["url"] == "http://localhost:8100/query"
+        assert config["auth_header"] == "Bearer token"
+        assert config["query_field"] == "q"
+        assert config["answer_field"] == "a"
+        assert config["chunks_field"] == "c"
+        assert config["top_k"] == 5
+
+
+@pytest.mark.asyncio
+async def test_rag_evaluation_with_endpoint_url(db_session: AsyncSession):
+    """RAG evaluation should succeed when frontend sends endpoint_url instead of url."""
+    dataset = Dataset(name="endpoint-url-dataset", item_count=1)
+    db_session.add(dataset)
+    await db_session.flush()
+
+    item = DatasetItem(
+        dataset_id=dataset.id,
+        question="What is RHEL?",
+        expected_answer="Red Hat Enterprise Linux",
+        order_index=0,
+    )
+    db_session.add(item)
+
+    evaluation = Evaluation(
+        name="endpoint_url eval",
+        mode="rag",
+        status="pending",
+        dataset_id=dataset.id,
+        config={
+            "rag_endpoint": {
+                "endpoint_url": "http://localhost:8100/query",
+            },
+            "judge_config": {"provider_id": "__test__"},
+        },
+    )
+    db_session.add(evaluation)
+    await db_session.commit()
+
+    mock_adapter = _mock_rag_adapter()
+
+    mock_evaluate_rag = AsyncMock(
+        return_value={
+            "faithfulness": Score(value=0.9, passed=True, reasoning="Good"),
+        }
+    )
+
+    with (
+        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter) as mock_factory,
+        patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
+        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+    ):
+        await run_rag_evaluation(evaluation.id, db_session)
+
+    # Verify the factory received url (mapped from endpoint_url)
+    factory_call_config = mock_factory.call_args[0][0]
+    assert factory_call_config["url"] == "http://localhost:8100/query"
+    assert "endpoint_url" not in factory_call_config
+
+    # Verify evaluation completed successfully
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
+    eval_obj = result.scalar_one()
+    assert eval_obj.status == "completed"
