@@ -66,13 +66,25 @@ async def list_sessions(
 @router.post("", response_model=SessionResponse, status_code=201)
 async def create_session(payload: SessionCreate, db: AsyncSession = Depends(get_db)) -> SessionResponse:
     """Create a new interactive session, optionally linked to an evaluation."""
-    if payload.evaluation_id:
-        result = await db.execute(select(Evaluation).where(Evaluation.id == payload.evaluation_id))
+    evaluation_id = payload.evaluation_id
+    if evaluation_id:
+        result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
         if not result.scalar_one_or_none():
-            raise NotFoundException("Evaluation", payload.evaluation_id)
+            raise NotFoundException("Evaluation", evaluation_id)
+
+    # Auto-create an Evaluation for live sessions without one
+    if not evaluation_id and payload.mode == "live":
+        evaluation = Evaluation(
+            name=payload.name or "Agent Chat Session",
+            mode="agent",
+            status="running",
+        )
+        db.add(evaluation)
+        await db.flush()
+        evaluation_id = evaluation.id
 
     session = Session(
-        evaluation_id=payload.evaluation_id,
+        evaluation_id=evaluation_id,
         name=payload.name,
         mode=payload.mode,
         agent_config=payload.agent_config,
@@ -83,7 +95,7 @@ async def create_session(payload: SessionCreate, db: AsyncSession = Depends(get_
     await db.commit()
     await db.refresh(session)
 
-    logger.info("session.created", session_id=session.id, evaluation_id=payload.evaluation_id, mode=payload.mode)
+    logger.info("session.created", session_id=session.id, evaluation_id=evaluation_id, mode=payload.mode)
     return SessionResponse.model_validate(session)
 
 

@@ -20,6 +20,8 @@ from app.agent_backends.factory import create_agent_backend
 from app.harnesses.factory import create_harness
 from app.harnesses.registry import harness_registry
 from app.mcp.manager import cleanup_manager, get_or_create_manager
+from app.models.evaluation import Evaluation
+from app.models.result import Result
 from app.models.session import Session
 from app.services.provider_utils import resolve_model_config
 
@@ -520,6 +522,14 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
     if not session:
         raise ValueError(f"Session '{session_id}' not found")
 
+    # Idempotency guard: if the session is already ended, return current state
+    if session.status != "active":
+        return {
+            "status": session.status,
+            "scores": session.scores,
+            "ended_at": session.ended_at.isoformat() if session.ended_at else None,
+        }
+
     session.status = "ended"
     session.ended_at = datetime.now(UTC)
 
@@ -587,6 +597,24 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
         except Exception as exc:
             logger.exception("agent_chat.judge_error", session_id=session_id)
             session.error = f"Judge scoring failed: {exc}"
+
+    # Create Result and update Evaluation if session is linked to one
+    if session.evaluation_id:
+        result_record = Result(
+            evaluation_id=session.evaluation_id,
+            session_id=session.id,
+            score=session.scores.get("overall") if session.scores else None,
+            passed=session.scores.get("passed") if session.scores else None,
+            judge_reasoning=session.scores.get("reasoning") if session.scores else None,
+            scores_breakdown=session.scores.get("breakdown") if session.scores else None,
+            actual_answer=None,
+        )
+        db.add(result_record)
+
+        eval_result = await db.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
+        evaluation = eval_result.scalar_one_or_none()
+        if evaluation:
+            evaluation.status = "failed" if session.error else "completed"
 
     await db.commit()
 
