@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronDown, MessageSquare } from 'lucide-react';
+import { ChevronRight, ChevronDown, MessageSquare, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { ToolCall } from '@/types';
 
@@ -44,9 +44,32 @@ export function ToolCallCard({ toolCall, messageId }: ToolCallCardProps) {
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             )}
             <span className="font-mono font-medium truncate">{toolCall.tool_name}</span>
-            <Badge variant="secondary" className="ml-auto text-[10px] shrink-0">
-              {formatDuration(toolCall.duration_ms)}
-            </Badge>
+            <span className="ml-auto flex items-center gap-1.5 shrink-0">
+              {toolCall.status === 'executing' ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground">Executing...</span>
+                </>
+              ) : toolCall.status === 'error' ? (
+                <>
+                  <XCircle className="h-3.5 w-3.5 text-destructive" />
+                  <span className="text-[10px] text-destructive">Error</span>
+                </>
+              ) : toolCall.status === 'completed' ? (
+                <>
+                  <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                  {toolCall.duration_ms != null && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {formatDuration(toolCall.duration_ms)}
+                    </Badge>
+                  )}
+                </>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">
+                  {toolCall.duration_ms != null ? formatDuration(toolCall.duration_ms) : 'Pending'}
+                </Badge>
+              )}
+            </span>
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>

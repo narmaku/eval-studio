@@ -367,7 +367,7 @@ describe('sessionStore', () => {
       });
 
       expect(useSessionStore.getState().toolCalls).toHaveLength(1);
-      expect(useSessionStore.getState().toolCalls[0]).toEqual(toolCall);
+      expect(useSessionStore.getState().toolCalls[0]).toEqual({ ...toolCall, status: 'pending' });
     });
 
     it('handles score by appending to scores', () => {
@@ -452,6 +452,246 @@ describe('sessionStore', () => {
 
       useSessionStore.getState().disconnectWebSocket();
       expect(useSessionStore.getState().isConnected).toBe(false);
+    });
+
+    it('handles tool_executing by setting tool call status to executing', () => {
+      useSessionStore.getState().connectWebSocket('sess-1');
+      const ws = getWs();
+      ws.simulateOpen();
+
+      // First add a tool_call with pending status
+      ws.simulateMessage({
+        type: 'tool_call',
+        data: {
+          id: 'tc-exec-1',
+          tool_name: 'read_file',
+          arguments: { path: '/etc/hosts' },
+          result: null,
+          duration_ms: 0,
+          timestamp: '2026-01-01T00:00:01Z',
+          status: 'pending',
+        },
+        timestamp: '2026-01-01T00:00:01Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      expect(useSessionStore.getState().toolCalls).toHaveLength(1);
+      expect(useSessionStore.getState().toolCalls[0]!.status).toBe('pending');
+
+      // Now simulate tool_executing
+      ws.simulateMessage({
+        type: 'tool_executing',
+        data: { tool_call_id: 'tc-exec-1', tool_name: 'read_file' },
+        timestamp: '2026-01-01T00:00:02Z',
+        sender: 'system',
+        session_id: 'sess-1',
+      });
+
+      expect(useSessionStore.getState().toolCalls[0]!.status).toBe('executing');
+    });
+
+    it('handles tool_result by setting tool call status and result', () => {
+      useSessionStore.getState().connectWebSocket('sess-1');
+      const ws = getWs();
+      ws.simulateOpen();
+
+      // Add a pending tool_call
+      ws.simulateMessage({
+        type: 'tool_call',
+        data: {
+          id: 'tc-result-1',
+          tool_name: 'search',
+          arguments: { query: 'test' },
+          result: null,
+          duration_ms: 0,
+          timestamp: '2026-01-01T00:00:01Z',
+          status: 'pending',
+        },
+        timestamp: '2026-01-01T00:00:01Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      // Simulate tool_result
+      ws.simulateMessage({
+        type: 'tool_result',
+        data: {
+          tool_call_id: 'tc-result-1',
+          tool_name: 'search',
+          result: 'Found 3 results',
+          is_error: false,
+          duration_ms: 150,
+        },
+        timestamp: '2026-01-01T00:00:02Z',
+        sender: 'system',
+        session_id: 'sess-1',
+      });
+
+      const tc = useSessionStore.getState().toolCalls[0]!;
+      expect(tc.status).toBe('completed');
+      expect(tc.result).toBe('Found 3 results');
+      expect(tc.duration_ms).toBe(150);
+    });
+
+    it('handles tool_result with error by setting status to error', () => {
+      useSessionStore.getState().connectWebSocket('sess-1');
+      const ws = getWs();
+      ws.simulateOpen();
+
+      // Add a pending tool_call
+      ws.simulateMessage({
+        type: 'tool_call',
+        data: {
+          id: 'tc-err-1',
+          tool_name: 'bad_tool',
+          arguments: {},
+          result: null,
+          duration_ms: 0,
+          timestamp: '2026-01-01T00:00:01Z',
+          status: 'pending',
+        },
+        timestamp: '2026-01-01T00:00:01Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      // Simulate error tool_result
+      ws.simulateMessage({
+        type: 'tool_result',
+        data: {
+          tool_call_id: 'tc-err-1',
+          tool_name: 'bad_tool',
+          result: 'Tool crashed',
+          is_error: true,
+          duration_ms: 5,
+        },
+        timestamp: '2026-01-01T00:00:02Z',
+        sender: 'system',
+        session_id: 'sess-1',
+      });
+
+      const tc = useSessionStore.getState().toolCalls[0]!;
+      expect(tc.status).toBe('error');
+      expect(tc.result).toBe('Tool crashed');
+    });
+
+    it('keeps isProcessing true during tool execution, sets false on message_complete', () => {
+      useSessionStore.setState({ isProcessing: true });
+      useSessionStore.getState().connectWebSocket('sess-1');
+      const ws = getWs();
+      ws.simulateOpen();
+
+      // Add a tool_call
+      ws.simulateMessage({
+        type: 'tool_call',
+        data: {
+          id: 'tc-proc-1',
+          tool_name: 'search',
+          arguments: {},
+          result: null,
+          duration_ms: 0,
+          timestamp: '2026-01-01T00:00:01Z',
+          status: 'pending',
+        },
+        timestamp: '2026-01-01T00:00:01Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      // isProcessing should remain true
+      expect(useSessionStore.getState().isProcessing).toBe(true);
+
+      // tool_executing
+      ws.simulateMessage({
+        type: 'tool_executing',
+        data: { tool_call_id: 'tc-proc-1', tool_name: 'search' },
+        timestamp: '2026-01-01T00:00:02Z',
+        sender: 'system',
+        session_id: 'sess-1',
+      });
+
+      expect(useSessionStore.getState().isProcessing).toBe(true);
+
+      // tool_result
+      ws.simulateMessage({
+        type: 'tool_result',
+        data: {
+          tool_call_id: 'tc-proc-1',
+          tool_name: 'search',
+          result: 'done',
+          is_error: false,
+          duration_ms: 50,
+        },
+        timestamp: '2026-01-01T00:00:03Z',
+        sender: 'system',
+        session_id: 'sess-1',
+      });
+
+      // Still processing (waiting for LLM response)
+      expect(useSessionStore.getState().isProcessing).toBe(true);
+
+      // message_complete ends processing
+      ws.simulateMessage({
+        type: 'message_complete',
+        data: { content: 'Here are the results.', message_id: 'msg-1', tool_calls: [] },
+        timestamp: '2026-01-01T00:00:04Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      expect(useSessionStore.getState().isProcessing).toBe(false);
+    });
+
+    it('does not duplicate tool calls already received via tool_call envelope', () => {
+      useSessionStore.getState().connectWebSocket('sess-1');
+      const ws = getWs();
+      ws.simulateOpen();
+
+      // Receive tool_call envelope during agentic loop
+      ws.simulateMessage({
+        type: 'tool_call',
+        data: {
+          id: 'tc-dedup-1',
+          tool_name: 'search',
+          arguments: { query: 'test' },
+          result: null,
+          duration_ms: 0,
+          timestamp: '2026-01-01T00:00:01Z',
+          status: 'pending',
+        },
+        timestamp: '2026-01-01T00:00:01Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      expect(useSessionStore.getState().toolCalls).toHaveLength(1);
+
+      // message_complete includes the same tool call
+      ws.simulateMessage({
+        type: 'message_complete',
+        data: {
+          content: 'Done',
+          message_id: 'msg-1',
+          tool_calls: [
+            {
+              id: 'tc-dedup-1',
+              tool_name: 'search',
+              arguments: { query: 'test' },
+              result: 'found',
+              duration_ms: 100,
+              timestamp: '2026-01-01T00:00:01Z',
+              status: 'completed',
+            },
+          ],
+        },
+        timestamp: '2026-01-01T00:00:02Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      // Should still have only 1 tool call (no duplicate)
+      expect(useSessionStore.getState().toolCalls).toHaveLength(1);
     });
   });
 });

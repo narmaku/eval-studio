@@ -32,12 +32,14 @@ class AgentBackendAdapter(ABC):
         self,
         messages: list[dict[str, str]],
         system_prompt: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[AgentStreamChunk, None]:
         """Send messages to the agent and stream response chunks.
 
         Args:
             messages: Conversation history as a list of role/content dicts.
             system_prompt: Optional system prompt to prepend.
+            tools: Optional list of tool definitions in OpenAI function-calling format.
 
         Yields:
             AgentStreamChunk for each piece of the response.

@@ -66,6 +66,7 @@ export interface CreateSessionRequest {
     api_base?: string;
     system_prompt?: string;
     evaluator_id?: string;
+    tool_server_ids?: string[];
   };
   judge_config?: {
     provider_id?: string;
@@ -84,6 +85,8 @@ export type WsMessageType =
   | 'message_chunk'
   | 'message_complete'
   | 'tool_call'
+  | 'tool_executing'
+  | 'tool_result'
   | 'score'
   | 'status'
   | 'error';
@@ -121,6 +124,22 @@ export interface WsStatusMessage {
   data: { status: SessionStatus };
 }
 
+export interface WsToolExecutingMessage {
+  type: 'tool_executing';
+  data: { tool_call_id: string; tool_name: string };
+}
+
+export interface WsToolResultMessage {
+  type: 'tool_result';
+  data: {
+    tool_call_id: string;
+    tool_name: string;
+    result: string;
+    is_error: boolean;
+    duration_ms: number;
+  };
+}
+
 export interface WsErrorMessage {
   type: 'error';
   data: { message: string; code?: string };
@@ -130,6 +149,8 @@ export type WsMessage =
   | WsMessageChunk
   | WsMessageComplete
   | WsToolCallMessage
+  | WsToolExecutingMessage
+  | WsToolResultMessage
   | WsScoreMessage
   | WsStatusMessage
   | WsErrorMessage;

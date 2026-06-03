@@ -16,8 +16,9 @@ import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { Play, Square, RefreshCw, Wifi, WifiOff, Clock, ExternalLink } from 'lucide-react';
-import type { ModelEndpoint, JudgeReference } from '@/types';
+import { api } from '@/services/api';
+import { Play, Square, RefreshCw, Wifi, WifiOff, Clock, ExternalLink, Wrench } from 'lucide-react';
+import type { ModelEndpoint, JudgeReference, ToolServer } from '@/types';
 
 type PagePhase = 'configure' | 'active' | 'review';
 
@@ -27,6 +28,8 @@ export default function AgentEvaluation() {
   const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
   const [systemPrompt, setSystemPrompt] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [toolServers, setToolServers] = useState<ToolServer[]>([]);
+  const [selectedToolServerIds, setSelectedToolServerIds] = useState<string[]>([]);
 
   const { isLoading: evalLoading, setLoading: setEvalLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
@@ -48,6 +51,16 @@ export default function AgentEvaluation() {
   } = useSessionStore();
 
   const isConfigValid = Boolean(modelEndpoint && judgeConfig && selectedEvaluatorId);
+
+  // Load available tool servers
+  useEffect(() => {
+    api
+      .listToolServers({ enabled: true })
+      .then(setToolServers)
+      .catch(() => {
+        /* ignore — tool servers are optional */
+      });
+  }, []);
 
   // Session timer
   useEffect(() => {
@@ -106,6 +119,9 @@ export default function AgentEvaluation() {
           api_base: modelEndpoint.api_base,
           ...(systemPrompt.trim() && { system_prompt: systemPrompt.trim() }),
           ...(selectedEvaluatorId && { evaluator_id: selectedEvaluatorId }),
+          ...(selectedToolServerIds.length > 0 && {
+            tool_server_ids: selectedToolServerIds,
+          }),
         },
         judge_config: {
           provider_id: judgeConfig.provider_id,
@@ -135,6 +151,7 @@ export default function AgentEvaluation() {
     judgeConfig,
     systemPrompt,
     selectedEvaluatorId,
+    selectedToolServerIds,
     setEvalLoading,
     createSession,
     connectWebSocket,
@@ -163,6 +180,7 @@ export default function AgentEvaluation() {
     setJudgeConfig(undefined);
     setSystemPrompt('');
     setElapsedSeconds(0);
+    setSelectedToolServerIds([]);
     useEvaluatorStore.getState().resetSelection();
   }, [resetSession]);
 
@@ -199,6 +217,49 @@ export default function AgentEvaluation() {
                   rows={4}
                 />
               </div>
+              {toolServers.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <Wrench className="h-3.5 w-3.5" />
+                    Tool Servers (optional)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Select MCP tool servers the agent can use during the session.
+                  </p>
+                  <div className="space-y-2 rounded-md border p-3">
+                    {toolServers.map((server) => (
+                      <label
+                        key={server.id}
+                        className="flex items-center gap-2 text-sm cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-input"
+                          checked={selectedToolServerIds.includes(server.id)}
+                          onChange={(e) => {
+                            setSelectedToolServerIds((prev) =>
+                              e.target.checked
+                                ? [...prev, server.id]
+                                : prev.filter((id) => id !== server.id),
+                            );
+                          }}
+                        />
+                        <span className="font-medium">{server.name}</span>
+                        {server.type === 'mcp_stdio' && (
+                          <Badge variant="outline" className="text-[10px]">
+                            MCP
+                          </Badge>
+                        )}
+                        {server.type === 'standalone' && (
+                          <Badge variant="outline" className="text-[10px]">
+                            Standalone
+                          </Badge>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />

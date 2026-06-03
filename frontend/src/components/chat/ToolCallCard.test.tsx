@@ -94,4 +94,51 @@ describe('ToolCallCard', () => {
 
     expect(screen.getByText('Show in chat')).toBeInTheDocument();
   });
+
+  it('shows spinner when status is executing', () => {
+    const executingToolCall: ToolCall = {
+      ...mockToolCall,
+      status: 'executing',
+    };
+
+    render(<ToolCallCard toolCall={executingToolCall} />);
+
+    expect(screen.getByText('Executing...')).toBeInTheDocument();
+  });
+
+  it('shows checkmark and duration when status is completed', () => {
+    const completedToolCall: ToolCall = {
+      ...mockToolCall,
+      status: 'completed',
+      duration_ms: 150,
+    };
+
+    render(<ToolCallCard toolCall={completedToolCall} />);
+
+    expect(screen.getByText('150ms')).toBeInTheDocument();
+  });
+
+  it('shows error indicator when status is error', () => {
+    const errorToolCall: ToolCall = {
+      ...mockToolCall,
+      status: 'error',
+      result: 'Tool crashed',
+    };
+
+    render(<ToolCallCard toolCall={errorToolCall} />);
+
+    expect(screen.getByText('Error')).toBeInTheDocument();
+  });
+
+  it('shows "Pending" badge when status is pending and no duration', () => {
+    const pendingToolCall: ToolCall = {
+      ...mockToolCall,
+      status: undefined,
+      duration_ms: undefined as unknown as number,
+    };
+
+    render(<ToolCallCard toolCall={pendingToolCall} />);
+
+    expect(screen.getByText('Pending')).toBeInTheDocument();
+  });
 });
