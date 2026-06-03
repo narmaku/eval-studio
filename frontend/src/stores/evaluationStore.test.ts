@@ -5,6 +5,8 @@ vi.mock('@/services/api', () => ({
   api: {
     listEvaluations: vi.fn(),
     getEvaluation: vi.fn(),
+    createEvaluation: vi.fn(),
+    rerunEvaluation: vi.fn(),
   },
 }));
 
@@ -33,6 +35,10 @@ Object.defineProperty(window, 'sessionStorage', { value: sessionStorageMock });
 // Mock WebSocket
 class MockWebSocket {
   static instances: MockWebSocket[] = [];
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
   url: string;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onclose: (() => void) | null = null;
@@ -70,6 +76,7 @@ describe('evaluationStore', () => {
       logs: [],
       progress: null,
       wsConnection: null,
+      _connectedEvaluationId: null,
     });
     vi.clearAllMocks();
     sessionStorageMock.clear();
@@ -92,6 +99,7 @@ describe('evaluationStore', () => {
     expect(state.error).toBeNull();
     expect(state.logs).toEqual([]);
     expect(state.progress).toBeNull();
+    expect(state._connectedEvaluationId).toBeNull();
   });
 
   it('can set and clear error', () => {
@@ -308,10 +316,109 @@ describe('evaluationStore', () => {
       const state = useEvaluationStore.getState();
       expect(state.progress?.contestantModel).toBe('model-a');
     });
+
+    it('skips reconnect if already connected to the same evaluation', () => {
+      useEvaluationStore.getState().connectToEvaluation('eval-123');
+      expect(MockWebSocket.instances).toHaveLength(1);
+
+      // Simulate logs arriving on the first connection
+      const ws = MockWebSocket.instances[0]!;
+      ws.simulateMessage({
+        type: 'log',
+        evaluation_id: 'eval-123',
+        timestamp: '2026-06-02T10:00:00Z',
+        level: 'info',
+        message: 'First log',
+      });
+      expect(useEvaluationStore.getState().logs).toHaveLength(1);
+
+      // Second call for the same evaluation should be a no-op
+      useEvaluationStore.getState().connectToEvaluation('eval-123');
+
+      // No new WebSocket was created
+      expect(MockWebSocket.instances).toHaveLength(1);
+      // Logs were NOT wiped
+      expect(useEvaluationStore.getState().logs).toHaveLength(1);
+      expect(useEvaluationStore.getState().logs[0]!.message).toBe('First log');
+    });
+
+    it('reconnects when connecting to a different evaluation', () => {
+      useEvaluationStore.getState().connectToEvaluation('eval-123');
+      expect(MockWebSocket.instances).toHaveLength(1);
+      const firstWs = MockWebSocket.instances[0]!;
+
+      useEvaluationStore.getState().connectToEvaluation('eval-456');
+      expect(MockWebSocket.instances).toHaveLength(2);
+      expect(firstWs.close).toHaveBeenCalled();
+      expect(useEvaluationStore.getState()._connectedEvaluationId).toBe('eval-456');
+    });
+
+    it('tracks _connectedEvaluationId', () => {
+      useEvaluationStore.getState().connectToEvaluation('eval-123');
+      expect(useEvaluationStore.getState()._connectedEvaluationId).toBe('eval-123');
+    });
+  });
+
+  describe('createAndRunEvaluation', () => {
+    it('connects WebSocket before triggering the background task', async () => {
+      vi.useFakeTimers();
+
+      const pendingEval = {
+        id: 'eval-new',
+        name: 'New Eval',
+        mode: 'qa' as const,
+        status: 'pending' as const,
+        dataset_id: 'd1',
+        environment_id: null,
+        judge_config_id: null,
+        config: {
+          model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+          judge_config: { preset: 'default' },
+        },
+        result_count: null,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      };
+      const runningEval = { ...pendingEval, status: 'running' as const };
+
+      // Track call order
+      const callOrder: string[] = [];
+      mockedApi.createEvaluation.mockImplementation(async () => {
+        callOrder.push('createEvaluation');
+        return pendingEval;
+      });
+      mockedApi.rerunEvaluation.mockImplementation(async () => {
+        callOrder.push('rerunEvaluation');
+        // Verify WS was connected before this call
+        expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+        return runningEval;
+      });
+
+      const promise = useEvaluationStore.getState().createAndRunEvaluation({
+        name: 'New Eval',
+        mode: 'qa',
+        dataset_id: 'd1',
+        config: {
+          model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+          judge_config: { preset: 'default' },
+        },
+      });
+
+      // Advance past the 200ms delay
+      await vi.advanceTimersByTimeAsync(300);
+      const result = await promise;
+
+      expect(callOrder).toEqual(['createEvaluation', 'rerunEvaluation']);
+      expect(result.status).toBe('running');
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(useEvaluationStore.getState()._connectedEvaluationId).toBe('eval-new');
+
+      vi.useRealTimers();
+    });
   });
 
   describe('disconnectFromEvaluation', () => {
-    it('closes the WebSocket connection', () => {
+    it('closes the WebSocket connection and clears tracked evaluation ID', () => {
       useEvaluationStore.getState().connectToEvaluation('eval-123');
       const ws = MockWebSocket.instances[0]!;
 
@@ -319,6 +426,7 @@ describe('evaluationStore', () => {
 
       expect(ws.close).toHaveBeenCalled();
       expect(useEvaluationStore.getState().wsConnection).toBeNull();
+      expect(useEvaluationStore.getState()._connectedEvaluationId).toBeNull();
     });
   });
 
