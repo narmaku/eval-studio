@@ -156,7 +156,9 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 count=len(resolved_contestants),
             )
             evaluation.status = "failed"
-            evaluation.error = f"Not enough contestants could be resolved ({len(resolved_contestants)} of {len(contestants)})"
+            evaluation.error = (
+                f"Not enough contestants could be resolved ({len(resolved_contestants)} of {len(contestants)})"
+            )
             await db.commit()
             await broadcast_status(evaluation_id, "failed", error=evaluation.error)
             return
