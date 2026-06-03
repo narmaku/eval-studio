@@ -51,8 +51,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         if not evaluation.dataset_id:
             logger.error("evaluation.no_dataset", evaluation_id=evaluation_id)
             evaluation.status = "failed"
+            evaluation.error = "Dataset not configured"
             await db.commit()
-            await broadcast_status(evaluation_id, "failed")
+            await broadcast_status(evaluation_id, "failed", error=evaluation.error)
             return
 
         dataset_result = await db.execute(select(Dataset).where(Dataset.id == evaluation.dataset_id))
@@ -60,8 +61,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         if not dataset:
             logger.error("dataset.not_found", dataset_id=evaluation.dataset_id, evaluation_id=evaluation_id)
             evaluation.status = "failed"
+            evaluation.error = f"Dataset '{evaluation.dataset_id}' not found"
             await db.commit()
-            await broadcast_status(evaluation_id, "failed")
+            await broadcast_status(evaluation_id, "failed", error=evaluation.error)
             return
 
         # 4. Load judge config
@@ -76,8 +78,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                     evaluation_id=evaluation_id,
                 )
                 evaluation.status = "failed"
+                evaluation.error = "Judge configuration not found"
                 await db.commit()
-                await broadcast_status(evaluation_id, "failed")
+                await broadcast_status(evaluation_id, "failed", error=evaluation.error)
                 return
 
         judge_params = _to_judge_params(judge_config)
@@ -98,8 +101,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         except ValueError:
             logger.error("evaluation.no_model", evaluation_id=evaluation_id)
             evaluation.status = "failed"
+            evaluation.error = "Model resolution failed"
             await db.commit()
-            await broadcast_status(evaluation_id, "failed")
+            await broadcast_status(evaluation_id, "failed", error=evaluation.error)
             return
 
         model_under_test = resolved.model
@@ -128,8 +132,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         except ValueError:
             logger.error("evaluation.no_judge_model", evaluation_id=evaluation_id)
             evaluation.status = "failed"
+            evaluation.error = "Judge model resolution failed"
             await db.commit()
-            await broadcast_status(evaluation_id, "failed")
+            await broadcast_status(evaluation_id, "failed", error=evaluation.error)
             return
 
         logger.info(
@@ -281,10 +286,11 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         # 9. Update evaluation status
         if error_count == total:
             evaluation.status = "failed"
+            evaluation.error = f"All {total} items failed"
         else:
             evaluation.status = "completed"
         await db.commit()
-        await broadcast_status(evaluation_id, evaluation.status)
+        await broadcast_status(evaluation_id, evaluation.status, error=evaluation.error)
 
         avg_score = total_score / scored_count if scored_count > 0 else 0.0
         await broadcast_log(
@@ -293,14 +299,15 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             message=f"Evaluation completed: {passed_count}/{total} passed, avg score: {avg_score:.2f}",
         )
 
-    except Exception:
+    except Exception as exc:
         logger.exception("evaluation.unhandled_error", evaluation_id=evaluation_id)
         try:
             eval_result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
             evaluation = eval_result.scalar_one_or_none()
             if evaluation:
                 evaluation.status = "failed"
+                evaluation.error = f"Unexpected error: {exc}"
                 await db.commit()
-                await broadcast_status(evaluation_id, "failed")
+                await broadcast_status(evaluation_id, "failed", error=evaluation.error)
         except Exception:
             logger.exception("evaluation.status_update_failed", evaluation_id=evaluation_id)
