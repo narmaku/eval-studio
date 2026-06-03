@@ -26,6 +26,7 @@ interface EvaluationStore {
   logs: LogEntry[];
   progress: EvaluationProgress | null;
   wsConnection: WebSocket | null;
+  _connectedEvaluationId: string | null;
 
   setEvaluations: (evaluations: Evaluation[]) => void;
   setCurrentEvaluation: (evaluation: Evaluation | null) => void;
@@ -67,6 +68,7 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
   logs: [],
   progress: null,
   wsConnection: null,
+  _connectedEvaluationId: null,
 
   setEvaluations: (evaluations) => set({ evaluations }),
   setCurrentEvaluation: (currentEvaluation) => set({ currentEvaluation }),
@@ -95,16 +97,26 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
   createAndRunEvaluation: async (request: CreateEvaluationRequest) => {
     set({ isLoading: true, error: null });
     try {
+      // Step 1: Create the evaluation (status=pending, no background task yet)
       const evaluation = await api.createEvaluation(request);
-      const runningEvaluation = await api.rerunEvaluation(evaluation.id);
-      set({ currentEvaluation: runningEvaluation, isLoading: false });
+      set({ currentEvaluation: evaluation, isLoading: false });
 
-      // Persist to sessionStorage
+      // Step 2: Persist to sessionStorage
       get().persistRunningEvaluation({
-        id: runningEvaluation.id,
-        name: runningEvaluation.name,
-        mode: runningEvaluation.mode,
+        id: evaluation.id,
+        name: evaluation.name,
+        mode: evaluation.mode,
       });
+
+      // Step 3: Connect WebSocket BEFORE triggering the background task
+      get().connectToEvaluation(evaluation.id);
+
+      // Step 4: Brief delay to let WebSocket connect, then trigger run
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Step 5: Now start the background task — WS is ready for first log
+      const runningEvaluation = await api.rerunEvaluation(evaluation.id);
+      set({ currentEvaluation: runningEvaluation });
 
       return runningEvaluation;
     } catch (err) {
@@ -137,14 +149,23 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
   },
 
   connectToEvaluation: (evaluationId: string) => {
-    // Close existing connection if any
+    // Skip if already connected (or connecting) to this evaluation
     const existing = get().wsConnection;
+    if (
+      existing &&
+      (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING) &&
+      get()._connectedEvaluationId === evaluationId
+    ) {
+      return;
+    }
+
+    // Close existing connection if any
     if (existing) {
       existing.close();
     }
 
     // Reset logs and progress
-    set({ logs: [], progress: null });
+    set({ logs: [], progress: null, _connectedEvaluationId: evaluationId });
 
     const wsUrl = getWsUrl(evaluationId);
     const ws = new WebSocket(wsUrl);
@@ -211,7 +232,7 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
     if (ws) {
       ws.close();
     }
-    set({ wsConnection: null });
+    set({ wsConnection: null, _connectedEvaluationId: null });
   },
 
   clearLogs: () => set({ logs: [], progress: null }),

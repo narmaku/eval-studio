@@ -14,12 +14,17 @@ let mockProgress: {
 } | null = null;
 let mockLogs: unknown[] = [];
 
+let mockWsConnection: { readyState: number } | null = null;
+let mockConnectedEvaluationId: string | null = null;
+
 const getState = () => ({
   currentEvaluation: mockCurrentEvaluation,
   progress: mockProgress,
   connectToEvaluation: mockConnectToEvaluation,
   disconnectFromEvaluation: mockDisconnectFromEvaluation,
   logs: mockLogs,
+  wsConnection: mockWsConnection,
+  _connectedEvaluationId: mockConnectedEvaluationId,
 });
 
 vi.mock('@/stores/evaluationStore', () => ({
@@ -38,6 +43,8 @@ describe('EvaluationProgress', () => {
     mockCurrentEvaluation = { status: 'running' };
     mockProgress = null;
     mockLogs = [];
+    mockWsConnection = null;
+    mockConnectedEvaluationId = null;
   });
 
   it('renders with running status', () => {
