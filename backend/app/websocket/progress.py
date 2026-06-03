@@ -99,7 +99,7 @@ async def broadcast_log(
                 conns.discard(ws)
 
 
-async def broadcast_status(evaluation_id: str, status: str) -> None:
+async def broadcast_status(evaluation_id: str, status: str, error: str | None = None) -> None:
     """Send status update to all WebSocket clients watching this evaluation."""
     async with _lock:
         websockets = _connections.get(evaluation_id, set()).copy()
@@ -109,6 +109,8 @@ async def broadcast_status(evaluation_id: str, status: str) -> None:
         "evaluation_id": evaluation_id,
         "status": status,
     }
+    if error:
+        message["error"] = error
 
     dead_connections: list[WebSocket] = []
     for ws in websockets:
