@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.websocket.progress import _connections, _lock, broadcast_log, broadcast_progress
+from app.websocket.progress import _connections, _lock, broadcast_log, broadcast_progress, broadcast_status
 
 
 @pytest.fixture(autouse=True)
@@ -263,3 +263,95 @@ async def test_progress_and_log_on_same_connection():
     log_msg = ws.send_json.call_args_list[1][0][0]
     assert progress_msg["type"] == "progress"
     assert log_msg["type"] == "log"
+
+
+# ── broadcast_status tests ──
+
+
+@pytest.mark.asyncio
+async def test_broadcast_status_sends_correct_format():
+    """broadcast_status sends a message with type='status', evaluation_id, and status."""
+    ws = AsyncMock()
+    async with _lock:
+        _connections["eval-status-1"] = {ws}
+
+    await broadcast_status(
+        evaluation_id="eval-status-1",
+        status="completed",
+    )
+
+    ws.send_json.assert_called_once()
+    msg = ws.send_json.call_args[0][0]
+    assert msg["type"] == "status"
+    assert msg["evaluation_id"] == "eval-status-1"
+    assert msg["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_broadcast_status_failed():
+    """broadcast_status correctly sends 'failed' status."""
+    ws = AsyncMock()
+    async with _lock:
+        _connections["eval-status-2"] = {ws}
+
+    await broadcast_status(
+        evaluation_id="eval-status-2",
+        status="failed",
+    )
+
+    msg = ws.send_json.call_args[0][0]
+    assert msg["status"] == "failed"
+    assert msg["type"] == "status"
+
+
+@pytest.mark.asyncio
+async def test_broadcast_status_no_subscribers():
+    """broadcast_status does not raise when no connections exist."""
+    await broadcast_status(
+        evaluation_id="nobody-listening",
+        status="completed",
+    )
+
+
+@pytest.mark.asyncio
+async def test_broadcast_status_cleans_dead_connections():
+    """Dead connections are cleaned up during status broadcast."""
+    live_ws = AsyncMock()
+    dead_ws = AsyncMock()
+    dead_ws.send_json.side_effect = RuntimeError("Connection closed")
+
+    async with _lock:
+        _connections["eval-status-3"] = {live_ws, dead_ws}
+
+    await broadcast_status(
+        evaluation_id="eval-status-3",
+        status="completed",
+    )
+
+    live_ws.send_json.assert_called_once()
+
+    async with _lock:
+        remaining = _connections.get("eval-status-3", set())
+    assert dead_ws not in remaining
+    assert live_ws in remaining
+
+
+@pytest.mark.asyncio
+async def test_broadcast_status_multiple_subscribers():
+    """broadcast_status sends to all connected WebSocket clients."""
+    ws1 = AsyncMock()
+    ws2 = AsyncMock()
+    async with _lock:
+        _connections["eval-status-4"] = {ws1, ws2}
+
+    await broadcast_status(
+        evaluation_id="eval-status-4",
+        status="completed",
+    )
+
+    assert ws1.send_json.call_count == 1
+    assert ws2.send_json.call_count == 1
+    msg1 = ws1.send_json.call_args[0][0]
+    msg2 = ws2.send_json.call_args[0][0]
+    assert msg1["status"] == "completed"
+    assert msg2["status"] == "completed"
