@@ -10,3 +10,4 @@ export * from './provider';
 export * from './rubric';
 export * from './toolServer';
 export * from './evaluator';
+export * from './harness';

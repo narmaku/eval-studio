@@ -67,6 +67,7 @@ export interface CreateSessionRequest {
     system_prompt?: string;
     evaluator_id?: string;
     tool_server_ids?: string[];
+    harness_id?: string;
   };
   judge_config?: {
     provider_id?: string;

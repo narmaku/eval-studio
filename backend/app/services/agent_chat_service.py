@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.base import JudgeConfigParams, Message, ToolCall
 from app.adapters.factory import create_evaluation_adapter
 from app.agent_backends.factory import create_agent_backend
+from app.harnesses.factory import create_harness
+from app.harnesses.registry import harness_registry
 from app.mcp.manager import cleanup_manager, get_or_create_manager
 from app.models.session import Session
 from app.services.provider_utils import resolve_model_config
@@ -66,11 +68,20 @@ async def process_user_message(
     if session.status != "active":
         raise ValueError(f"Session '{session_id}' is not active (status: {session.status})")
 
-    # 2. Resolve provider from agent_config and create backend adapter
+    # 2. Check for harness dispatch
     agent_config = session.agent_config or {}
+    harness_id = agent_config.get("harness_id")
+    if harness_id:
+        profile = harness_registry.get_harness(harness_id)
+        if profile and profile.type == "subprocess":
+            async for envelope in _subprocess_process(session_id, content, db, session, agent_config, harness_id):
+                yield envelope
+            return
+
+    # 3. Resolve provider from agent_config and create backend adapter (builtin path)
     adapter = create_agent_backend(agent_config)
 
-    # 3. Set up MCP servers if configured
+    # 4. Set up MCP servers if configured
     tool_server_ids = agent_config.get("tool_server_ids", [])
     openai_tools: list[dict] | None = None
 
@@ -86,7 +97,7 @@ async def process_user_message(
             tool_count=len(openai_tools) if openai_tools else 0,
         )
 
-    # 4. Build messages array from transcript + new user message
+    # 5. Build messages array from transcript + new user message
     transcript = list(session.transcript or [])
     messages_for_llm: list[dict] = []
 
@@ -112,7 +123,7 @@ async def process_user_message(
     }
     messages_for_llm.append({"role": "user", "content": content})
 
-    # 5. Persist user message to transcript
+    # 6. Persist user message to transcript
     transcript.append(user_message)
     session.transcript = transcript
     await db.commit()
@@ -124,7 +135,7 @@ async def process_user_message(
         message_count=len(messages_for_llm),
     )
 
-    # 6. Agentic loop
+    # 7. Agentic loop
     round_count = 0
     all_tool_calls_for_complete: list[dict] = []
     final_content = ""
@@ -346,7 +357,7 @@ async def process_user_message(
 
             break
 
-    # 7. Yield message_complete
+    # 8. Yield message_complete
     yield {
         "type": "message_complete",
         "data": {
@@ -358,7 +369,7 @@ async def process_user_message(
         "session_id": session_id,
     }
 
-    # 8. Persist final assistant message to transcript (only if we broke out with text)
+    # 9. Persist final assistant message to transcript (only if we broke out with text)
     if not (tool_calls_list and openai_tools and tool_server_ids):
         # The last response was text-only, persist it
         assistant_message: dict = {
@@ -382,6 +393,108 @@ async def process_user_message(
         tool_call_count=len(all_tool_calls_for_complete),
         tool_rounds=round_count,
     )
+
+
+async def _subprocess_process(
+    session_id: str,
+    content: str,
+    db: AsyncSession,
+    session: Session,
+    agent_config: dict,
+    harness_id: str,
+) -> AsyncGenerator[dict, None]:
+    """Process a message using a subprocess harness.
+
+    Creates a SubprocessHarness, sends the message, converts HarnessEvents
+    to WebSocket envelopes, and persists to the transcript.
+    """
+    # Persist user message to transcript
+    transcript = list(session.transcript or [])
+    user_message = {
+        "role": "user",
+        "content": content,
+        "timestamp": _iso_now(),
+    }
+    transcript.append(user_message)
+    session.transcript = transcript
+    await db.commit()
+
+    # Build history from transcript
+    history = [
+        {"role": e.get("role", "user"), "content": e.get("content", "")}
+        for e in transcript
+        if e.get("role") in ("user", "assistant", "system")
+    ]
+
+    # Create and start harness
+    harness = create_harness(harness_id)
+    await harness.start_session(agent_config)
+
+    try:
+        all_tool_calls: list[dict] = []
+        async for event in harness.send_message(content, history):
+            if event.type == "message_chunk":
+                yield {
+                    "type": "message_chunk",
+                    "data": {"content": event.data.get("content", "")},
+                    "timestamp": _iso_now(),
+                    "sender": "agent",
+                    "session_id": session_id,
+                }
+            elif event.type == "tool_call":
+                all_tool_calls.append(event.data)
+                yield {
+                    "type": "tool_call",
+                    "data": event.data,
+                    "timestamp": _iso_now(),
+                    "sender": "agent",
+                    "session_id": session_id,
+                }
+            elif event.type == "tool_result":
+                yield {
+                    "type": "tool_result",
+                    "data": event.data,
+                    "timestamp": _iso_now(),
+                    "sender": "system",
+                    "session_id": session_id,
+                }
+            elif event.type == "message_complete":
+                final_content = event.data.get("content", "")
+                yield {
+                    "type": "message_complete",
+                    "data": {
+                        "content": final_content,
+                        "tool_calls": all_tool_calls,
+                    },
+                    "timestamp": _iso_now(),
+                    "sender": "agent",
+                    "session_id": session_id,
+                }
+
+                # Persist assistant message to transcript
+                assistant_message: dict = {
+                    "role": "assistant",
+                    "content": final_content,
+                    "timestamp": _iso_now(),
+                }
+                if all_tool_calls:
+                    assistant_message["tool_calls"] = all_tool_calls
+
+                await db.refresh(session)
+                transcript = list(session.transcript or [])
+                transcript.append(assistant_message)
+                session.transcript = transcript
+                await db.commit()
+            elif event.type == "error":
+                yield {
+                    "type": "error",
+                    "data": {"message": event.data.get("message", "Unknown error")},
+                    "timestamp": _iso_now(),
+                    "sender": "system",
+                    "session_id": session_id,
+                }
+    finally:
+        await harness.stop_session()
 
 
 async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:

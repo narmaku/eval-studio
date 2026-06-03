@@ -33,6 +33,7 @@ import type {
   ToolServer,
   CreateToolServerRequest,
   UpdateToolServerRequest,
+  Harness,
 } from '@/types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
@@ -327,6 +328,20 @@ export const api = {
     request<void>(`/api/v1/tool-servers/${id}`, { method: 'DELETE' }),
   validateToolServer: (id: string) =>
     request<{ available: boolean; path: string | null }>(`/api/v1/tool-servers/${id}/validate`, {
+      method: 'POST',
+    }),
+
+  // --- Harnesses ---
+  listHarnesses: (params?: { type?: string; enabled?: boolean }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.type) searchParams.set('type', params.type);
+    if (params?.enabled !== undefined) searchParams.set('enabled', String(params.enabled));
+    const query = searchParams.toString();
+    return request<Harness[]>(`/api/v1/harnesses${query ? `?${query}` : ''}`);
+  },
+  getHarness: (id: string) => request<Harness>(`/api/v1/harnesses/${id}`),
+  checkHarness: (id: string) =>
+    request<{ available: boolean; version: string | null }>(`/api/v1/harnesses/${id}/check`, {
       method: 'POST',
     }),
 };

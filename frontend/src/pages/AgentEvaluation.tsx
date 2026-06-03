@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
+import { HarnessSelector } from '@/components/evaluation/HarnessSelector';
 import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
@@ -30,6 +31,8 @@ export default function AgentEvaluation() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [toolServers, setToolServers] = useState<ToolServer[]>([]);
   const [selectedToolServerIds, setSelectedToolServerIds] = useState<string[]>([]);
+  const [selectedHarnessId, setSelectedHarnessId] = useState<string | undefined>();
+  const [selectedHarnessType, setSelectedHarnessType] = useState<string>('builtin');
 
   const { isLoading: evalLoading, setLoading: setEvalLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
@@ -50,7 +53,10 @@ export default function AgentEvaluation() {
     resetSession,
   } = useSessionStore();
 
-  const isConfigValid = Boolean(modelEndpoint && judgeConfig && selectedEvaluatorId);
+  const isSubprocessHarness = selectedHarnessType === 'subprocess';
+  const isConfigValid = Boolean(
+    (isSubprocessHarness || modelEndpoint) && judgeConfig && selectedEvaluatorId,
+  );
 
   // Load available tool servers
   useEffect(() => {
@@ -104,24 +110,40 @@ export default function AgentEvaluation() {
     return unsubscribe;
   }, []);
 
+  const handleHarnessChange = useCallback((harnessId: string, harnessType: string) => {
+    setSelectedHarnessId(harnessId);
+    setSelectedHarnessType(harnessType);
+  }, []);
+
   const handleStart = useCallback(async () => {
-    if (!modelEndpoint || !judgeConfig) return;
+    if (!judgeConfig) return;
+    if (!isSubprocessHarness && !modelEndpoint) return;
 
     try {
       setEvalLoading(true);
 
+      const sessionName = isSubprocessHarness
+        ? `Agent Chat - ${selectedHarnessId}`
+        : `Agent Chat - ${modelEndpoint?.name}`;
+
       await createSession({
-        name: `Agent Chat - ${modelEndpoint.name}`,
+        name: sessionName,
         mode: 'live',
         agent_config: {
-          provider_id: modelEndpoint.provider_id,
-          litellm_model: modelEndpoint.litellm_model,
-          api_base: modelEndpoint.api_base,
+          ...(modelEndpoint && {
+            provider_id: modelEndpoint.provider_id,
+            litellm_model: modelEndpoint.litellm_model,
+            api_base: modelEndpoint.api_base,
+          }),
           ...(systemPrompt.trim() && { system_prompt: systemPrompt.trim() }),
           ...(selectedEvaluatorId && { evaluator_id: selectedEvaluatorId }),
           ...(selectedToolServerIds.length > 0 && {
             tool_server_ids: selectedToolServerIds,
           }),
+          ...(selectedHarnessId &&
+            selectedHarnessId !== 'builtin-litellm' && {
+              harness_id: selectedHarnessId,
+            }),
         },
         judge_config: {
           provider_id: judgeConfig.provider_id,
@@ -152,6 +174,8 @@ export default function AgentEvaluation() {
     systemPrompt,
     selectedEvaluatorId,
     selectedToolServerIds,
+    selectedHarnessId,
+    isSubprocessHarness,
     setEvalLoading,
     createSession,
     connectWebSocket,
@@ -181,6 +205,8 @@ export default function AgentEvaluation() {
     setSystemPrompt('');
     setElapsedSeconds(0);
     setSelectedToolServerIds([]);
+    setSelectedHarnessId(undefined);
+    setSelectedHarnessType('builtin');
     useEvaluatorStore.getState().resetSelection();
   }, [resetSession]);
 
@@ -204,9 +230,15 @@ export default function AgentEvaluation() {
       {phase === 'configure' && (
         <>
           <EvaluatorSelector mode="agent" />
+          <HarnessSelector
+            value={selectedHarnessId}
+            onChange={handleHarnessChange}
+          />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-4">
-              <ProviderSelector value={modelEndpoint} onChange={setModelEndpoint} />
+              {!isSubprocessHarness && (
+                <ProviderSelector value={modelEndpoint} onChange={setModelEndpoint} />
+              )}
               <div className="space-y-2">
                 <Label htmlFor="system-prompt">System Prompt (optional)</Label>
                 <Textarea
