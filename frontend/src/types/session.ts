@@ -36,6 +36,8 @@ export interface Message {
   tool_calls?: ToolCall[];
 }
 
+export type ToolCallStatus = 'pending' | 'executing' | 'completed' | 'error';
+
 export interface ToolCall {
   id: string;
   tool_name: string;
@@ -43,6 +45,8 @@ export interface ToolCall {
   result: unknown;
   duration_ms: number;
   timestamp: string;
+  message_id?: string;
+  status?: ToolCallStatus;
 }
 
 export interface SessionScore {

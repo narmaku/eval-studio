@@ -41,13 +41,12 @@ describe('ConversationPanel', () => {
     expect(screen.getByText('Session started')).toBeInTheDocument();
   });
 
-  it('disables chat input when disabled prop is true', () => {
+  it('hides chat input when disabled prop is true', () => {
     render(
       <ConversationPanel messages={[]} isProcessing={false} onSend={vi.fn()} disabled={true} />,
     );
 
-    const textarea = screen.getByPlaceholderText('Type a message...');
-    expect(textarea).toBeDisabled();
+    expect(screen.queryByPlaceholderText('Type a message...')).not.toBeInTheDocument();
   });
 
   it('disables chat input when isProcessing is true', () => {

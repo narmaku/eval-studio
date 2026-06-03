@@ -56,4 +56,42 @@ describe('ToolCallCard', () => {
 
     expect(screen.getByText('2.5s')).toBeInTheDocument();
   });
+
+  it('shows "Show in chat" button when message_id is present and expanded', async () => {
+    const user = userEvent.setup();
+    const toolCallWithMessageId: ToolCall = {
+      ...mockToolCall,
+      message_id: 'msg-123',
+    };
+
+    render(<ToolCallCard toolCall={toolCallWithMessageId} />);
+
+    // Expand the card
+    const trigger = screen.getByRole('button', { name: /search_files/i });
+    await user.click(trigger);
+
+    expect(screen.getByText('Show in chat')).toBeInTheDocument();
+  });
+
+  it('does not show "Show in chat" button when no message_id', async () => {
+    const user = userEvent.setup();
+    render(<ToolCallCard toolCall={mockToolCall} />);
+
+    // Expand the card
+    const trigger = screen.getByRole('button', { name: /search_files/i });
+    await user.click(trigger);
+
+    expect(screen.queryByText('Show in chat')).not.toBeInTheDocument();
+  });
+
+  it('accepts messageId prop to override toolCall.message_id', async () => {
+    const user = userEvent.setup();
+    render(<ToolCallCard toolCall={mockToolCall} messageId="msg-override" />);
+
+    // Expand the card
+    const trigger = screen.getByRole('button', { name: /search_files/i });
+    await user.click(trigger);
+
+    expect(screen.getByText('Show in chat')).toBeInTheDocument();
+  });
 });

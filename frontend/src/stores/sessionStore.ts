@@ -227,10 +227,15 @@ function handleWsMessage(
           messages.push(finalMessage);
         }
 
-        // Add any tool calls from the completed message
+        // Add any tool calls from the completed message, tagging each with message_id
         let toolCalls = state.toolCalls;
         if (complete.data.tool_calls && complete.data.tool_calls.length > 0) {
-          toolCalls = [...toolCalls, ...complete.data.tool_calls];
+          const taggedToolCalls = complete.data.tool_calls.map((tc) => ({
+            ...tc,
+            message_id: complete.data.message_id,
+            status: tc.status ?? ('completed' as const),
+          }));
+          toolCalls = [...toolCalls, ...taggedToolCalls];
         }
 
         return { messages, toolCalls, isProcessing: false };

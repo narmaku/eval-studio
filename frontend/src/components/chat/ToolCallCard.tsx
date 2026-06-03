@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ChevronRight, ChevronDown, MessageSquare } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { ToolCall } from '@/types';
 
 interface ToolCallCardProps {
   toolCall: ToolCall;
+  messageId?: string;
 }
 
 function formatDuration(ms: number): string {
@@ -15,8 +17,17 @@ function formatDuration(ms: number): string {
   return `${ms}ms`;
 }
 
-export function ToolCallCard({ toolCall }: ToolCallCardProps) {
+export function ToolCallCard({ toolCall, messageId }: ToolCallCardProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const resolvedMessageId = messageId ?? toolCall.message_id;
+
+  const handleShowInChat = useCallback(() => {
+    if (!resolvedMessageId) return;
+    const el = document.querySelector(`[data-message-id="${resolvedMessageId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [resolvedMessageId]);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -49,12 +60,23 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
             {toolCall.result !== undefined && toolCall.result !== null && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-1">Result</p>
-                <pre className="text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap">
+                <pre className="max-h-[200px] overflow-y-auto text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap">
                   {typeof toolCall.result === 'string'
                     ? toolCall.result
                     : JSON.stringify(toolCall.result, null, 2)}
                 </pre>
               </div>
+            )}
+            {resolvedMessageId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs text-muted-foreground"
+                onClick={handleShowInChat}
+              >
+                <MessageSquare className="h-3 w-3" />
+                Show in chat
+              </Button>
             )}
           </div>
         </CollapsibleContent>
