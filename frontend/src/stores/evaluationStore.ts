@@ -169,7 +169,13 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
         } else if (data.type === 'status') {
           const currentEval = get().currentEvaluation;
           if (currentEval) {
-            set({ currentEvaluation: { ...currentEval, status: data.status } });
+            set({
+              currentEvaluation: {
+                ...currentEval,
+                status: data.status,
+                error: data.error ?? currentEval.error,
+              },
+            });
           }
           if (
             data.status === 'completed' ||

@@ -9,6 +9,7 @@ export interface Evaluation {
   name: string;
   mode: EvaluationMode;
   status: EvaluationStatus;
+  error?: string | null;
   dataset_id: string | null;
   environment_id: string | null;
   judge_config_id: string | null;
@@ -112,6 +113,7 @@ export interface StatusMessage {
   type: 'status';
   evaluation_id: string;
   status: EvaluationStatus;
+  error?: string;
 }
 
 export interface RunningEvaluation {
