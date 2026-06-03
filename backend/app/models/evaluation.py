@@ -16,6 +16,7 @@ class Evaluation(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     mode: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
     config: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     dataset_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     environment_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

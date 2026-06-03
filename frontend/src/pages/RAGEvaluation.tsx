@@ -134,11 +134,12 @@ export default function RAGEvaluation() {
       void fetchResults(evaluation.id);
       setPhase('complete');
     } else if (evaluation?.status === 'failed') {
-      toast.error('Evaluation failed');
+      const errorMsg = evaluation.error || 'Unknown error';
+      toast.error(`Evaluation failed: ${errorMsg}`);
       addNotification({
         type: 'error',
         title: 'RAG Evaluation Failed',
-        message: `"${evaluation.name}" failed`,
+        message: `"${evaluation.name}" failed: ${errorMsg}`,
         evaluationId: evaluation.id,
       });
       setPhase('configure');

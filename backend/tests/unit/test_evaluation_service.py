@@ -91,6 +91,7 @@ async def test_run_qa_evaluation_happy_path(db_session: AsyncSession, evaluation
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "completed"
+    assert eval_obj.error is None
 
     # Verify results
     results_result = await db_session.execute(select(Result).where(Result.evaluation_id == evaluation.id))
@@ -104,7 +105,7 @@ async def test_run_qa_evaluation_happy_path(db_session: AsyncSession, evaluation
 
 @pytest.mark.asyncio
 async def test_run_qa_evaluation_no_dataset(db_session: AsyncSession):
-    """Evaluation without dataset_id should fail."""
+    """Evaluation without dataset_id should fail with error message."""
     evaluation = Evaluation(
         name="no dataset eval",
         mode="qa",
@@ -120,11 +121,12 @@ async def test_run_qa_evaluation_no_dataset(db_session: AsyncSession):
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "failed"
+    assert eval_obj.error == "Dataset not configured"
 
 
 @pytest.mark.asyncio
 async def test_run_qa_evaluation_missing_dataset(db_session: AsyncSession):
-    """Evaluation with nonexistent dataset_id should fail."""
+    """Evaluation with nonexistent dataset_id should fail with error message."""
     evaluation = Evaluation(
         name="missing dataset eval",
         mode="qa",
@@ -140,6 +142,7 @@ async def test_run_qa_evaluation_missing_dataset(db_session: AsyncSession):
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "failed"
+    assert eval_obj.error == "Dataset 'nonexistent-id' not found"
 
 
 @pytest.mark.asyncio
@@ -199,7 +202,7 @@ async def test_run_qa_evaluation_item_error_partial_results(db_session: AsyncSes
 
 @pytest.mark.asyncio
 async def test_run_qa_evaluation_all_items_fail(db_session: AsyncSession, evaluation_with_dataset):
-    """All items fail -- status should be failed."""
+    """All items fail -- status should be failed with error message."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
     async def mock_acompletion_fail(*args, **kwargs):
@@ -214,6 +217,7 @@ async def test_run_qa_evaluation_all_items_fail(db_session: AsyncSession, evalua
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "failed"
+    assert eval_obj.error == "All 2 items failed"
 
 
 @pytest.mark.asyncio

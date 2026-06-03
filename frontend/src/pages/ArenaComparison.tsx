@@ -123,11 +123,12 @@ export default function ArenaComparison() {
         });
       setPhase('complete');
     } else if (evaluation?.status === 'failed') {
-      toast.error('Arena failed');
+      const errorMsg = evaluation.error || 'Unknown error';
+      toast.error(`Arena failed: ${errorMsg}`);
       addNotification({
         type: 'error',
         title: 'Arena Failed',
-        message: `"${evaluation.name}" failed`,
+        message: `"${evaluation.name}" failed: ${errorMsg}`,
         evaluationId: evaluation.id,
       });
       setPhase('configure');
