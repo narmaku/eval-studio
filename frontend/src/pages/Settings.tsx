@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EvaluatorList } from '@/components/settings/EvaluatorList';
 import { RubricList } from '@/components/settings/RubricList';
 import { ProviderList } from '@/components/settings/ProviderList';
+import { ToolServerList } from '@/components/settings/ToolServerList';
 
 export default function Settings() {
   return (
@@ -19,6 +20,7 @@ export default function Settings() {
           <TabsTrigger value="evaluators">Evaluators</TabsTrigger>
           <TabsTrigger value="rubrics">Rubrics</TabsTrigger>
           <TabsTrigger value="providers">Providers</TabsTrigger>
+          <TabsTrigger value="tool-servers">Tool Servers</TabsTrigger>
         </TabsList>
         <TabsContent value="evaluators" className="mt-4">
           <EvaluatorList />
@@ -28,6 +30,9 @@ export default function Settings() {
         </TabsContent>
         <TabsContent value="providers" className="mt-4">
           <ProviderList />
+        </TabsContent>
+        <TabsContent value="tool-servers" className="mt-4">
+          <ToolServerList />
         </TabsContent>
       </Tabs>
     </div>
