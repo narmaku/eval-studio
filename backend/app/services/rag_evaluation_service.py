@@ -89,6 +89,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("evaluation.no_dataset", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         dataset_result = await db.execute(select(Dataset).where(Dataset.id == evaluation.dataset_id))
@@ -97,6 +98,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("dataset.not_found", dataset_id=evaluation.dataset_id, evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         # 4. Load judge config
@@ -112,6 +114,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 )
                 evaluation.status = "failed"
                 await db.commit()
+                await broadcast_status(evaluation_id, "failed")
                 return
 
         judge_params = _to_judge_params(judge_config)
@@ -127,6 +130,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("rag_evaluation.no_endpoint_url", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         rag_adapter_config = _build_rag_adapter_config(rag_endpoint)
@@ -141,6 +145,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("rag_evaluation.no_judge_model", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         logger.info(

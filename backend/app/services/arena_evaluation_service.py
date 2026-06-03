@@ -54,6 +54,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("arena.no_dataset", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         dataset_result = await db.execute(select(Dataset).where(Dataset.id == evaluation.dataset_id))
@@ -62,6 +63,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("arena.dataset_not_found", dataset_id=evaluation.dataset_id, evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         # 4. Validate contestants
@@ -76,6 +78,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             )
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         # 5. Load judge config
@@ -91,6 +94,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 )
                 evaluation.status = "failed"
                 await db.commit()
+                await broadcast_status(evaluation_id, "failed")
                 return
 
         judge_params = _to_judge_params(judge_config)
@@ -102,6 +106,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             logger.error("arena.no_judge_model", evaluation_id=evaluation_id)
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         logger.info(
@@ -147,6 +152,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             )
             evaluation.status = "failed"
             await db.commit()
+            await broadcast_status(evaluation_id, "failed")
             return
 
         # 8. Process each contestant x each dataset item
