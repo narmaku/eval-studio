@@ -54,6 +54,7 @@ class ArenaContestantSummary(BaseModel):
     average_score: float
     min_score: float | None
     max_score: float | None
+    average_breakdown: dict[str, float] | None = None
 
 
 class ArenaLeaderboardResponse(BaseModel):

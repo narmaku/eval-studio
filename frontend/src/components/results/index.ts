@@ -3,4 +3,6 @@ export type { EvaluationResultRow } from './EvaluationResultsList';
 export { ResultDetailView } from './ResultDetailView';
 export { ScoreDistributionChart } from './ScoreDistributionChart';
 export { PassFailChart } from './PassFailChart';
+export { ContestantScoreChart } from './ContestantScoreChart';
+export { RadarComparisonChart } from './RadarComparisonChart';
 export { bucketScores } from './scoreUtils';

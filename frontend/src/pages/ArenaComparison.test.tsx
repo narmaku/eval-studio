@@ -88,6 +88,11 @@ vi.mock('@/components/evaluation/ArenaResultsGrid', () => ({
   ArenaResultsGrid: () => <div data-testid="arena-results-grid">Results Grid</div>,
 }));
 
+vi.mock('@/components/results', () => ({
+  ContestantScoreChart: () => <div data-testid="contestant-score-chart">Score Chart</div>,
+  RadarComparisonChart: () => <div data-testid="radar-comparison-chart">Radar Chart</div>,
+}));
+
 // Mock stores
 const mockCreateAndRunEvaluation = vi.fn();
 const mockSetCurrentEvaluation = vi.fn();
