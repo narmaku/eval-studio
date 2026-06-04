@@ -10,7 +10,13 @@ from app.adapters.factory import create_evaluation_adapter
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
-from app.services.provider_utils import proxy_env, resolve_judge_config, resolve_model_config
+from app.services.provider_utils import (
+    apply_llm_params,
+    merge_llm_params,
+    proxy_env,
+    resolve_judge_config,
+    resolve_model_config,
+)
 from app.websocket.progress import broadcast_log, broadcast_progress, broadcast_status
 
 logger = structlog.get_logger()
@@ -112,6 +118,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         model_proxy = resolved.proxy
         model_ssl_cert = resolved.ssl_cert_path
 
+        # Merge LLM params: provider defaults < eval-level overrides
+        model_params = merge_llm_params(resolved.default_params, config.get("model_params"))
+
         logger.info(
             "evaluation.model_resolved",
             model=model_under_test,
@@ -137,6 +146,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             await broadcast_status(evaluation_id, "failed", error=evaluation.error)
             return
 
+        # Merge judge LLM params: judge provider defaults < eval-level judge_params
+        judge_llm_params = merge_llm_params(judge_resolved.default_params, config.get("judge_params"))
+
         logger.info(
             "evaluation.judge_resolved",
             model=judge_resolved.model,
@@ -155,6 +167,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             api_key=judge_resolved.api_key,
             api_base=judge_resolved.api_base,
             max_concurrency=config.get("max_concurrency", 10),
+            extra_params=judge_llm_params if judge_llm_params else None,
         )
 
         # 7. Process each dataset item
@@ -187,6 +200,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 litellm_kwargs["api_key"] = model_api_key
             if model_api_base:
                 litellm_kwargs["api_base"] = model_api_base
+            apply_llm_params(litellm_kwargs, model_params)
             with proxy_env(model_proxy, model_ssl_cert):
                 response = await litellm.acompletion(**litellm_kwargs)
             actual_answer = response.choices[0].message.content or ""

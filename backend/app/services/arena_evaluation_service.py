@@ -12,7 +12,14 @@ from app.adapters.factory import create_evaluation_adapter
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
-from app.services.provider_utils import ResolvedModel, proxy_env, resolve_judge_config, resolve_model_config
+from app.services.provider_utils import (
+    ResolvedModel,
+    apply_llm_params,
+    merge_llm_params,
+    proxy_env,
+    resolve_judge_config,
+    resolve_model_config,
+)
 from app.websocket.progress import broadcast_log, broadcast_progress, broadcast_status
 
 logger = structlog.get_logger()
@@ -114,6 +121,9 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             await broadcast_status(evaluation_id, "failed", error=evaluation.error)
             return
 
+        # Merge judge LLM params: judge provider defaults < eval-level judge_params
+        judge_llm_params = merge_llm_params(judge_resolved.default_params, config.get("judge_params"))
+
         logger.info(
             "arena.judge_resolved",
             model=judge_resolved.model,
@@ -132,14 +142,21 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             api_key=judge_resolved.api_key,
             api_base=judge_resolved.api_base,
             max_concurrency=config.get("max_concurrency", 10),
+            extra_params=judge_llm_params if judge_llm_params else None,
         )
 
+        # Eval-level model_params that apply to all contestants
+        eval_model_params = config.get("model_params")
+
         # 7. Resolve contestant model configs
-        resolved_contestants: list[tuple[str, ResolvedModel]] = []
+        resolved_contestants: list[tuple[str, ResolvedModel, dict]] = []
         for contestant in contestants:
             try:
                 resolved = resolve_model_config(contestant)
-                resolved_contestants.append((contestant.get("litellm_model") or resolved.model, resolved))
+                contestant_params = merge_llm_params(resolved.default_params, eval_model_params)
+                resolved_contestants.append(
+                    (contestant.get("litellm_model") or resolved.model, resolved, contestant_params)
+                )
             except ValueError as e:
                 logger.error(
                     "arena.contestant_resolve_failed",
@@ -171,7 +188,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         max_concurrency = config.get("max_concurrency", 10)
         semaphore = asyncio.Semaphore(max_concurrency)
 
-        contestant_names = [name for name, _ in resolved_contestants]
+        contestant_names = [name for name, _, _ in resolved_contestants]
         await broadcast_log(
             evaluation_id=evaluation_id,
             level="info",
@@ -181,7 +198,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 f"models: {', '.join(contestant_names)}"
             ),
         )
-        for contestant_name, resolved_model in resolved_contestants:
+        for contestant_name, resolved_model, _ in resolved_contestants:
             await broadcast_log(
                 evaluation_id=evaluation_id,
                 level="info",
@@ -192,6 +209,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         async def process_contestant_item(
             contestant_name: str,
             resolved_model: ResolvedModel,
+            contestant_params: dict,
             item: DatasetItem,
         ) -> Result:
             nonlocal completed_counter
@@ -212,6 +230,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 litellm_kwargs["api_key"] = resolved_model.api_key
             if resolved_model.api_base:
                 litellm_kwargs["api_base"] = resolved_model.api_base
+            apply_llm_params(litellm_kwargs, contestant_params)
 
             with proxy_env(resolved_model.proxy, resolved_model.ssl_cert_path):
                 response = await litellm.acompletion(**litellm_kwargs)
@@ -269,17 +288,18 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         async def bounded_process(
             contestant_name: str,
             resolved_model: ResolvedModel,
+            contestant_params: dict,
             item: DatasetItem,
         ) -> Result | Exception:
             async with semaphore:
-                return await process_contestant_item(contestant_name, resolved_model, item)
+                return await process_contestant_item(contestant_name, resolved_model, contestant_params, item)
 
         # Build tasks: all contestants x all items
         tasks = []
         task_meta = []  # Track (contestant_name, item_index) for error reporting
-        for contestant_name, resolved_model in resolved_contestants:
+        for contestant_name, resolved_model, contestant_params in resolved_contestants:
             for idx, item in enumerate(items):
-                tasks.append(bounded_process(contestant_name, resolved_model, item))
+                tasks.append(bounded_process(contestant_name, resolved_model, contestant_params, item))
                 task_meta.append((contestant_name, idx))
 
         results = await asyncio.gather(*tasks, return_exceptions=True)

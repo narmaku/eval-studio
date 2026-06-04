@@ -14,6 +14,7 @@ class ProviderCreate(BaseModel):
     ssl_cert_path: str | None = None
     tags: list[str] = Field(default_factory=list)
     purpose: str = "test"
+    default_params: dict | None = None
 
 
 class ProviderUpdate(BaseModel):
@@ -27,6 +28,7 @@ class ProviderUpdate(BaseModel):
     ssl_cert_path: str | None = None
     tags: list[str] | None = None
     purpose: str | None = None
+    default_params: dict | None = None
 
 
 class ProviderResponse(BaseModel):
@@ -41,6 +43,7 @@ class ProviderResponse(BaseModel):
     ssl_cert_path: str | None = None
     tags: list[str] = []
     purpose: str = "test"
+    default_params: dict | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
