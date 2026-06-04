@@ -17,8 +17,8 @@ def _setup_test_harnesses(tmp_path):
     The root conftest isolates all registries to temp paths automatically.
     """
     harness_registry._config_path = tmp_path / "harnesses.yaml"
-    harness_registry._harnesses["test-builtin"] = HarnessProfile(id="test-builtin", name="Test Builtin", type="builtin")
-    harness_registry._harnesses["test-subprocess"] = HarnessProfile(
+    harness_registry._items["test-builtin"] = HarnessProfile(id="test-builtin", name="Test Builtin", type="builtin")
+    harness_registry._items["test-subprocess"] = HarnessProfile(
         id="test-subprocess", name="Test Subprocess", type="subprocess", binary_path="echo"
     )
     harness_registry._persist_yaml()

@@ -57,9 +57,9 @@ class TestProviderRegistryReload:
         registry.load_from_yaml(config_file)
 
         # Record the internal dict reference — if no reload happens, it stays the same
-        providers_dict_id = id(registry._providers)
+        providers_dict_id = id(registry._items)
         _ = registry.list_providers()
-        assert id(registry._providers) == providers_dict_id
+        assert id(registry._items) == providers_dict_id
 
     def test_file_deleted_returns_empty_no_crash(self, tmp_path):
         """If the YAML file is deleted, list_providers returns empty without crashing."""
@@ -238,9 +238,9 @@ class TestEvaluatorRegistryReload:
         registry.load_from_yaml(config_file)
 
         # Record the internal dict reference
-        evaluators_dict_id = id(registry._evaluators)
+        evaluators_dict_id = id(registry._items)
         _ = registry.list_evaluators()
-        assert id(registry._evaluators) == evaluators_dict_id
+        assert id(registry._items) == evaluators_dict_id
 
     def test_file_deleted_returns_empty_no_crash(self, tmp_path):
         """If the YAML file is deleted, list_evaluators returns empty without crashing."""

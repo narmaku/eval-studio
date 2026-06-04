@@ -173,14 +173,14 @@ class TestResolveModelWithDefaultParams:
     def registry_with_params(self):
         """Registry with a provider that has default_params."""
         reg = ProviderRegistry()
-        reg._providers["llama-with-params"] = ProviderProfile(
+        reg._items["llama-with-params"] = ProviderProfile(
             id="llama-with-params",
             name="Llama With Params",
             litellm_model="openai/llama3",
             api_base="http://localhost:8080/v1",
             default_params={"max_tokens": 4096, "temperature": 0.3},
         )
-        reg._providers["llama-no-params"] = ProviderProfile(
+        reg._items["llama-no-params"] = ProviderProfile(
             id="llama-no-params",
             name="Llama No Params",
             litellm_model="openai/llama3",

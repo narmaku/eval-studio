@@ -1,13 +1,10 @@
 """Inference provider profiles loaded from YAML configuration."""
 
-import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
-
-logger = logging.getLogger(__name__)
+from app.core.registry_base import YAMLBackedRegistry
 
 
 @dataclass
@@ -33,115 +30,66 @@ class ProviderProfile:
         return None
 
 
-class ProviderRegistry:
+class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
     """Registry of provider profiles loaded from YAML config."""
 
-    def __init__(self) -> None:
-        self._providers: dict[str, ProviderProfile] = {}
-        self._config_path: Path | None = None
-        self._last_mtime: float = 0.0
+    def _get_yaml_key(self) -> str:
+        return "providers"
 
-    def load_from_yaml(self, path: Path) -> None:
-        """Load provider profiles from a YAML file."""
-        self._config_path = path
-        self._providers = {}
-        if not path.exists():
-            self._last_mtime = 0.0
-            return
-        with open(path) as f:
-            data = yaml.safe_load(f) or {}
-        for item in data.get("providers", []):
-            profile = ProviderProfile(
-                id=item["id"],
-                name=item["name"],
-                litellm_model=item["litellm_model"],
-                api_base=item.get("api_base"),
-                api_key_env=item.get("api_key_env"),
-                proxy=item.get("proxy"),
-                ssl_cert_path=item.get("ssl_cert_path"),
-                tags=item.get("tags", []),
-                purpose=item.get("purpose", "test"),
-                default_params=item.get("default_params"),
-            )
-            self._providers[profile.id] = profile
-        self._last_mtime = os.path.getmtime(path)
+    def _parse_item(self, raw: dict) -> ProviderProfile | None:
+        return ProviderProfile(
+            id=raw["id"],
+            name=raw["name"],
+            litellm_model=raw["litellm_model"],
+            api_base=raw.get("api_base"),
+            api_key_env=raw.get("api_key_env"),
+            proxy=raw.get("proxy"),
+            ssl_cert_path=raw.get("ssl_cert_path"),
+            tags=raw.get("tags", []),
+            purpose=raw.get("purpose", "test"),
+            default_params=raw.get("default_params"),
+        )
 
-    def _check_reload(self) -> None:
-        """Reload YAML config if the file's mtime has changed."""
-        if self._config_path is None:
-            return
-        if not self._config_path.exists():
-            if self._providers:
-                logger.info("Config file %s deleted, clearing providers", self._config_path)
-                self._providers = {}
-                self._last_mtime = 0.0
-            return
-        current_mtime = os.path.getmtime(self._config_path)
-        if current_mtime != self._last_mtime:
-            logger.info("Config file %s changed, reloading providers", self._config_path)
-            self.load_from_yaml(self._config_path)
+    def _serialize_item(self, item: ProviderProfile) -> dict:
+        return {
+            "id": item.id,
+            "name": item.name,
+            "litellm_model": item.litellm_model,
+            **({"api_base": item.api_base} if item.api_base else {}),
+            **({"api_key_env": item.api_key_env} if item.api_key_env else {}),
+            **({"proxy": item.proxy} if item.proxy else {}),
+            **({"ssl_cert_path": item.ssl_cert_path} if item.ssl_cert_path else {}),
+            **({"tags": item.tags} if item.tags else {}),
+            **({"purpose": item.purpose} if item.purpose != "test" else {}),
+            **({"default_params": item.default_params} if item.default_params else {}),
+        }
+
+    def _get_item_id(self, item: ProviderProfile) -> str:
+        return item.id
 
     def list_providers(self, purpose: str | None = None) -> list[ProviderProfile]:
         """Return all providers, optionally filtered by purpose."""
         self._check_reload()
-        providers = list(self._providers.values())
+        providers = list(self._items.values())
         if purpose:
             providers = [p for p in providers if p.purpose == purpose]
         return providers
 
     def get_provider(self, provider_id: str) -> ProviderProfile | None:
         """Return a single provider by ID, or None if not found."""
-        self._check_reload()
-        return self._providers.get(provider_id)
+        return self.get_item(provider_id)
 
     def add_provider(self, profile: ProviderProfile) -> None:
         """Add a new provider and persist to YAML."""
-        self._providers[profile.id] = profile
-        self._persist_yaml()
+        self.add_item(profile)
 
     def update_provider(self, provider_id: str, updates: dict) -> ProviderProfile | None:
         """Update an existing provider and persist to YAML."""
-        profile = self._providers.get(provider_id)
-        if not profile:
-            return None
-        for key, value in updates.items():
-            if hasattr(profile, key):
-                setattr(profile, key, value)
-        self._persist_yaml()
-        return profile
+        return self.update_item(provider_id, updates)
 
     def delete_provider(self, provider_id: str) -> bool:
         """Delete a provider and persist to YAML."""
-        if provider_id not in self._providers:
-            return False
-        del self._providers[provider_id]
-        self._persist_yaml()
-        return True
-
-    def _persist_yaml(self) -> None:
-        """Write current providers back to the YAML config file."""
-        if self._config_path is None:
-            return
-        data = {
-            "providers": [
-                {
-                    "id": p.id,
-                    "name": p.name,
-                    "litellm_model": p.litellm_model,
-                    **({"api_base": p.api_base} if p.api_base else {}),
-                    **({"api_key_env": p.api_key_env} if p.api_key_env else {}),
-                    **({"proxy": p.proxy} if p.proxy else {}),
-                    **({"ssl_cert_path": p.ssl_cert_path} if p.ssl_cert_path else {}),
-                    **({"tags": p.tags} if p.tags else {}),
-                    **({"purpose": p.purpose} if p.purpose != "test" else {}),
-                    **({"default_params": p.default_params} if p.default_params else {}),
-                }
-                for p in self._providers.values()
-            ]
-        }
-        with open(self._config_path, "w") as f:
-            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
-        self._last_mtime = os.path.getmtime(self._config_path)
+        return self.delete_item(provider_id)
 
 
 def _resolve_config_path() -> Path:
