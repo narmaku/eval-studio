@@ -11,10 +11,10 @@ from app.core.providers import ProviderProfile, provider_registry
 @pytest.fixture(autouse=True)
 def _seed_test_providers():
     """Seed the global registry with test providers, then restore."""
-    original_providers = provider_registry._providers.copy()
+    original_providers = provider_registry._items.copy()
 
-    provider_registry._providers.clear()
-    provider_registry._providers["with-api-base"] = ProviderProfile(
+    provider_registry._items.clear()
+    provider_registry._items["with-api-base"] = ProviderProfile(
         id="with-api-base",
         name="Local LLM",
         litellm_model="openai/default-model",
@@ -22,7 +22,7 @@ def _seed_test_providers():
         tags=["local"],
         purpose="test",
     )
-    provider_registry._providers["no-api-base"] = ProviderProfile(
+    provider_registry._items["no-api-base"] = ProviderProfile(
         id="no-api-base",
         name="Cloud Provider",
         litellm_model="gpt-4",
@@ -33,8 +33,8 @@ def _seed_test_providers():
 
     yield
 
-    provider_registry._providers.clear()
-    provider_registry._providers.update(original_providers)
+    provider_registry._items.clear()
+    provider_registry._items.update(original_providers)
 
 
 def _make_mock_client(response_data=None, side_effect=None):

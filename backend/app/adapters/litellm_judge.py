@@ -11,6 +11,7 @@ from app.adapters.base import (
     Score,
     ToolCall,
 )
+from app.core.exceptions import sanitize_error_for_client
 
 logger = structlog.get_logger()
 
@@ -191,7 +192,11 @@ Respond with ONLY a JSON object:
                 result = json.loads(content)
             except (json.JSONDecodeError, TypeError) as exc:
                 logger.error("judge.parse_failed", error=str(exc), raw_content=content)
-                return Score(value=0.0, passed=False, reasoning=f"Failed to parse judge response: {exc}")
+                return Score(
+                    value=0.0,
+                    passed=False,
+                    reasoning=f"Failed to parse judge response: {sanitize_error_for_client(exc)}",
+                )
             score_value = float(result.get("score", 0.0))
             reasoning = result.get("reasoning", "")
             passed = score_value >= (judge_config.pass_threshold or 0.7)
@@ -288,7 +293,11 @@ Respond with ONLY a JSON object:
                 result = json.loads(content)
             except (json.JSONDecodeError, TypeError) as exc:
                 logger.error("judge.parse_failed", error=str(exc), raw_content=content)
-                return Score(value=0.0, passed=False, reasoning=f"Failed to parse judge response: {exc}")
+                return Score(
+                    value=0.0,
+                    passed=False,
+                    reasoning=f"Failed to parse judge response: {sanitize_error_for_client(exc)}",
+                )
 
             breakdown = {dim: float(result.get(dim, 0.0)) for dim in self._CONVERSATION_DIMENSIONS}
             overall = sum(breakdown.values()) / len(self._CONVERSATION_DIMENSIONS)
@@ -364,7 +373,11 @@ Respond with ONLY a JSON object:
             except (json.JSONDecodeError, TypeError) as exc:
                 logger.error("judge.parse_failed", error=str(exc), raw_content=content)
                 return {
-                    dim: Score(value=0.0, passed=False, reasoning=f"Failed to parse judge response: {exc}")
+                    dim: Score(
+                        value=0.0,
+                        passed=False,
+                        reasoning=f"Failed to parse judge response: {sanitize_error_for_client(exc)}",
+                    )
                     for dim in self._RAG_DIMENSIONS
                     if dim in requested
                 }

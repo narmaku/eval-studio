@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import Score
 from app.adapters.factory import create_evaluation_adapter
+from app.core.exceptions import sanitize_error_for_client
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
@@ -265,7 +266,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 await broadcast_log(
                     evaluation_id=evaluation_id,
                     level="error",
-                    message=f"Error on item {i + 1}: {r}",
+                    message=f"Error on item {i + 1}: {sanitize_error_for_client(r)}",
                 )
                 error_result = Result(
                     evaluation_id=evaluation_id,
@@ -307,7 +308,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             evaluation = eval_result.scalar_one_or_none()
             if evaluation:
                 evaluation.status = "failed"
-                evaluation.error = f"Unexpected error: {exc}"
+                evaluation.error = sanitize_error_for_client(exc)
                 await db.commit()
                 await broadcast_status(evaluation_id, "failed", error=evaluation.error)
         except Exception:

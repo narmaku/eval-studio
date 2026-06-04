@@ -355,7 +355,9 @@ async def test_tool_call_error_continues(db_session: AsyncSession, session_with_
     tool_results = [m for m in messages if m["type"] == "tool_result"]
     assert len(tool_results) == 1
     assert tool_results[0]["data"]["is_error"] is True
-    assert "Tool crashed" in tool_results[0]["data"]["result"]
+    # RuntimeError details should be sanitized — the raw message must NOT leak
+    assert "Tool crashed" not in tool_results[0]["data"]["result"]
+    assert "Error executing tool" in tool_results[0]["data"]["result"]
 
     # Should still get message_complete with text response
     complete = [m for m in messages if m["type"] == "message_complete"]
