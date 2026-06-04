@@ -390,6 +390,37 @@ export function ResultDetailView({
         </div>
       )}
 
+      {/* RAG metrics radar */}
+      {evaluationMode === 'rag' &&
+        (() => {
+          const allBreakdowns = results
+            .map((r) => r.scores_breakdown)
+            .filter(
+              (b): b is Record<string, number> => b != null && Object.keys(b).length > 0,
+            );
+
+          if (allBreakdowns.length === 0) return null;
+
+          const allKeys = new Set<string>();
+          allBreakdowns.forEach((b) => Object.keys(b).forEach((k) => allKeys.add(k)));
+
+          if (allKeys.size < 2) return null;
+
+          const avgData: Record<string, number> = {};
+          for (const key of allKeys) {
+            const values = allBreakdowns.filter((b) => key in b).map((b) => b[key]);
+            avgData[key] =
+              values.length > 0 ? values.reduce((a, c) => a + c, 0) / values.length : 0;
+          }
+
+          return (
+            <RadarComparisonChart
+              series={[{ name: 'Average', data: avgData }]}
+              title="RAG Metrics Profile"
+            />
+          );
+        })()}
+
       {/* Per-Item Results Table */}
       <Card>
         <CardHeader>
