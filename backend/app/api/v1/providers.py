@@ -27,6 +27,7 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
         ssl_cert_path=p.ssl_cert_path,
         tags=p.tags,
         purpose=p.purpose,
+        default_params=p.default_params,
     )
 
 
@@ -61,6 +62,7 @@ async def create_provider(payload: ProviderCreate) -> ProviderResponse:
         ssl_cert_path=payload.ssl_cert_path,
         tags=payload.tags,
         purpose=payload.purpose,
+        default_params=payload.default_params,
     )
     provider_registry.add_provider(profile)
     logger.info("provider.created", id=profile.id, name=profile.name)
