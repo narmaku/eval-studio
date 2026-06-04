@@ -4,13 +4,14 @@ import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import { ResultDetailView } from '@/components/results';
 import { api } from '@/services/api';
-import type { DatasetItem } from '@/types';
+import type { DatasetItem, ArenaLeaderboardResponse } from '@/types';
 
 export default function ResultDetail() {
   const { resultId } = useParams<{ resultId: string }>();
   const { results, isLoading, error, fetchResults } = useResultStore();
   const { evaluations, fetchEvaluations } = useEvaluationStore();
   const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
+  const [arenaLeaderboard, setArenaLeaderboard] = useState<ArenaLeaderboardResponse | null>(null);
 
   useEffect(() => {
     if (resultId) {
@@ -29,6 +30,15 @@ export default function ResultDetail() {
         .catch(() => setDatasetItems([]));
     }
   }, [evaluation?.dataset_id]);
+
+  useEffect(() => {
+    if (evaluation?.mode === 'arena' && resultId) {
+      api
+        .getArenaLeaderboard(resultId)
+        .then(setArenaLeaderboard)
+        .catch(() => setArenaLeaderboard(null));
+    }
+  }, [evaluation?.mode, resultId]);
 
   if (isLoading) {
     return (
@@ -81,6 +91,7 @@ export default function ResultDetail() {
       evaluationName={evaluation?.name}
       evaluationMode={evaluation?.mode}
       datasetItems={datasetItems}
+      arenaLeaderboard={arenaLeaderboard}
     />
   );
 }

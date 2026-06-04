@@ -9,6 +9,7 @@ import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { ArenaLeaderboard } from '@/components/evaluation/ArenaLeaderboard';
 import { ArenaResultsGrid } from '@/components/evaluation/ArenaResultsGrid';
+import { ContestantScoreChart, RadarComparisonChart } from '@/components/results';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
@@ -228,6 +229,26 @@ export default function ArenaComparison() {
       {phase === 'complete' && (
         <>
           {leaderboard && <ArenaLeaderboard leaderboard={leaderboard} />}
+
+          {leaderboard && (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <ContestantScoreChart contestants={leaderboard.contestants} />
+              {leaderboard.contestants.some(
+                (c) =>
+                  c.average_breakdown && Object.keys(c.average_breakdown).length >= 2,
+              ) && (
+                <RadarComparisonChart
+                  series={leaderboard.contestants
+                    .filter((c) => c.average_breakdown)
+                    .map((c) => ({
+                      name: c.contestant_model,
+                      data: c.average_breakdown!,
+                    }))}
+                  title="Per-Metric Comparison"
+                />
+              )}
+            </div>
+          )}
 
           <ArenaResultsGrid results={results} contestants={contestantModels} />
 

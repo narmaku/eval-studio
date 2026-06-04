@@ -125,6 +125,18 @@ async def get_arena_leaderboard(
         errored_count = sum(1 for r in model_results if r.score is None)
         failed_count = sum(1 for r in model_results if r.passed is False and r.score is not None)
 
+        # Aggregate per-metric scores_breakdown across all results for this contestant
+        all_breakdowns = [r.scores_breakdown for r in model_results if r.scores_breakdown]
+        average_breakdown: dict[str, float] | None = None
+        if all_breakdowns:
+            all_keys: set[str] = set()
+            for bd in all_breakdowns:
+                all_keys.update(bd.keys())
+            average_breakdown = {}
+            for key in sorted(all_keys):
+                values = [bd[key] for bd in all_breakdowns if key in bd]
+                average_breakdown[key] = sum(values) / len(values) if values else 0.0
+
         summaries.append(
             ArenaContestantSummary(
                 contestant_model=model_name,
@@ -135,6 +147,7 @@ async def get_arena_leaderboard(
                 average_score=sum(scores) / len(scores) if scores else 0.0,
                 min_score=min(scores) if scores else None,
                 max_score=max(scores) if scores else None,
+                average_breakdown=average_breakdown,
             )
         )
 

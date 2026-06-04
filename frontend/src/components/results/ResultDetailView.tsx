@@ -24,7 +24,9 @@ import {
 import { ChunkDisplay } from '@/components/evaluation/ChunkDisplay';
 import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { PassFailChart } from './PassFailChart';
-import type { Result, AggregateMetrics, DatasetItem } from '@/types';
+import { ContestantScoreChart } from './ContestantScoreChart';
+import { RadarComparisonChart } from './RadarComparisonChart';
+import type { Result, AggregateMetrics, DatasetItem, ArenaLeaderboardResponse } from '@/types';
 
 interface ResultDetailViewProps {
   results: Result[];
@@ -32,6 +34,7 @@ interface ResultDetailViewProps {
   evaluationName?: string;
   evaluationMode?: string;
   datasetItems?: DatasetItem[];
+  arenaLeaderboard?: ArenaLeaderboardResponse | null;
 }
 
 function ScoreBreakdownBadges({
@@ -261,6 +264,7 @@ export function ResultDetailView({
   evaluationName,
   evaluationMode,
   datasetItems,
+  arenaLeaderboard,
 }: ResultDetailViewProps) {
   const metrics = aggregateMetrics ?? EMPTY_METRICS;
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -365,10 +369,26 @@ export function ResultDetailView({
       </Card>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <ScoreDistributionChart results={results} />
-        <PassFailChart passedItems={metrics.passed_items} failedItems={metrics.failed_items} />
-      </div>
+      {evaluationMode === 'arena' && arenaLeaderboard ? (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <ContestantScoreChart contestants={arenaLeaderboard.contestants} />
+          {arenaLeaderboard.contestants.some(
+            (c) => c.average_breakdown && Object.keys(c.average_breakdown).length >= 2,
+          ) && (
+            <RadarComparisonChart
+              series={arenaLeaderboard.contestants
+                .filter((c) => c.average_breakdown)
+                .map((c) => ({ name: c.contestant_model, data: c.average_breakdown! }))}
+              title="Per-Metric Comparison"
+            />
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <ScoreDistributionChart results={results} />
+          <PassFailChart passedItems={metrics.passed_items} failedItems={metrics.failed_items} />
+        </div>
+      )}
 
       {/* Per-Item Results Table */}
       <Card>

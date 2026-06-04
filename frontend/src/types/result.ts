@@ -30,6 +30,7 @@ export interface ArenaContestantSummary {
   average_score: number;
   min_score: number | null;
   max_score: number | null;
+  average_breakdown: Record<string, number> | null;
 }
 
 export interface ArenaLeaderboardResponse {

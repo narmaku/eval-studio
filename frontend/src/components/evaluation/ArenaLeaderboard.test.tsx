@@ -16,6 +16,7 @@ const mockLeaderboard: ArenaLeaderboardResponse = {
       average_score: 0.85,
       min_score: 0.5,
       max_score: 1.0,
+      average_breakdown: null,
     },
     {
       contestant_model: 'anthropic/claude-3',
@@ -26,6 +27,7 @@ const mockLeaderboard: ArenaLeaderboardResponse = {
       average_score: 0.65,
       min_score: 0.2,
       max_score: 0.9,
+      average_breakdown: null,
     },
     {
       contestant_model: 'local/llama-3',
@@ -36,6 +38,7 @@ const mockLeaderboard: ArenaLeaderboardResponse = {
       average_score: 0.3,
       min_score: 0.0,
       max_score: 0.6,
+      average_breakdown: null,
     },
   ],
 };
@@ -111,6 +114,7 @@ describe('ArenaLeaderboard', () => {
           average_score: 0,
           min_score: null,
           max_score: null,
+          average_breakdown: null,
         },
       ],
     };
@@ -154,6 +158,7 @@ describe('ArenaLeaderboard', () => {
           average_score: 0.82,
           min_score: 0.5,
           max_score: 1.0,
+          average_breakdown: null,
         },
       ],
     };
@@ -180,6 +185,7 @@ describe('ArenaLeaderboard', () => {
           average_score: 0.7,
           min_score: 0.3,
           max_score: 1.0,
+          average_breakdown: null,
         },
         {
           contestant_model: 'model-b',
@@ -190,6 +196,7 @@ describe('ArenaLeaderboard', () => {
           average_score: 0.7,
           min_score: 0.3,
           max_score: 1.0,
+          average_breakdown: null,
         },
       ],
     };
@@ -226,6 +233,7 @@ describe('ArenaLeaderboard', () => {
           average_score: 0,
           min_score: null,
           max_score: null,
+          average_breakdown: null,
         },
         {
           contestant_model: 'broken-2',
@@ -236,6 +244,7 @@ describe('ArenaLeaderboard', () => {
           average_score: 0,
           min_score: null,
           max_score: null,
+          average_breakdown: null,
         },
       ],
     };
@@ -259,6 +268,7 @@ describe('ArenaLeaderboard', () => {
           average_score: 0.4,
           min_score: 0.1,
           max_score: 0.8,
+          average_breakdown: null,
         },
       ],
     };
@@ -282,6 +292,7 @@ describe('ArenaLeaderboard', () => {
           average_score: 0.7,
           min_score: 0.2,
           max_score: 1.0,
+          average_breakdown: null,
         },
       ],
     };
@@ -305,6 +316,7 @@ describe('ArenaLeaderboard', () => {
           average_score: 0.35,
           min_score: 0.0,
           max_score: 0.8,
+          average_breakdown: null,
         },
       ],
     };

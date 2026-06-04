@@ -329,6 +329,100 @@ async def test_arena_leaderboard_multiple_contestants_sorted(client, db_session)
     assert data["contestants"][2]["contestant_model"] == "model-c"
 
 
+@pytest.mark.asyncio
+async def test_arena_leaderboard_returns_average_breakdown(client, db_session):
+    """GET /results/arena/{id} returns average_breakdown when results have scores_breakdown."""
+    evaluation = Evaluation(name="Breakdown Arena", mode="arena", status="completed", config={})
+    db_session.add(evaluation)
+    await db_session.flush()
+
+    # model-a: two results with scores_breakdown
+    db_session.add(
+        Result(
+            evaluation_id=evaluation.id,
+            contestant_model="model-a",
+            score=0.8,
+            passed=True,
+            actual_answer="a1",
+            scores_breakdown={"faithfulness": 0.9, "relevance": 0.7},
+        )
+    )
+    db_session.add(
+        Result(
+            evaluation_id=evaluation.id,
+            contestant_model="model-a",
+            score=0.6,
+            passed=False,
+            actual_answer="a2",
+            scores_breakdown={"faithfulness": 0.7, "relevance": 0.5},
+        )
+    )
+    # model-b: two results with scores_breakdown
+    db_session.add(
+        Result(
+            evaluation_id=evaluation.id,
+            contestant_model="model-b",
+            score=0.9,
+            passed=True,
+            actual_answer="b1",
+            scores_breakdown={"faithfulness": 1.0, "relevance": 0.8},
+        )
+    )
+    db_session.add(
+        Result(
+            evaluation_id=evaluation.id,
+            contestant_model="model-b",
+            score=0.85,
+            passed=True,
+            actual_answer="b2",
+            scores_breakdown={"faithfulness": 0.9, "relevance": 0.8},
+        )
+    )
+    await db_session.commit()
+
+    response = await client.get(f"/api/v1/results/arena/{evaluation.id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["contestants"]) == 2
+
+    # model-b should be first (higher average_score)
+    model_b = next(c for c in data["contestants"] if c["contestant_model"] == "model-b")
+    assert model_b["average_breakdown"] is not None
+    assert model_b["average_breakdown"]["faithfulness"] == pytest.approx(0.95)
+    assert model_b["average_breakdown"]["relevance"] == pytest.approx(0.8)
+
+    model_a = next(c for c in data["contestants"] if c["contestant_model"] == "model-a")
+    assert model_a["average_breakdown"] is not None
+    assert model_a["average_breakdown"]["faithfulness"] == pytest.approx(0.8)
+    assert model_a["average_breakdown"]["relevance"] == pytest.approx(0.6)
+
+
+@pytest.mark.asyncio
+async def test_arena_leaderboard_no_breakdown_when_results_lack_scores_breakdown(client, db_session):
+    """average_breakdown is null when results have no scores_breakdown."""
+    evaluation = Evaluation(name="No Breakdown Arena", mode="arena", status="completed", config={})
+    db_session.add(evaluation)
+    await db_session.flush()
+
+    db_session.add(
+        Result(
+            evaluation_id=evaluation.id,
+            contestant_model="model-a",
+            score=0.8,
+            passed=True,
+            actual_answer="a1",
+            scores_breakdown=None,
+        )
+    )
+    await db_session.commit()
+
+    response = await client.get(f"/api/v1/results/arena/{evaluation.id}")
+    assert response.status_code == 200
+    data = response.json()
+    contestant = data["contestants"][0]
+    assert contestant["average_breakdown"] is None
+
+
 async def _seed_arena_results(db_session) -> str:
     """Seed arena evaluation with results for leaderboard testing."""
     evaluation = Evaluation(name="Leaderboard Test", mode="arena", status="completed", config={})

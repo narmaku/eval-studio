@@ -108,3 +108,73 @@ def test_arena_leaderboard_response_schema():
     assert len(leaderboard.contestants) == 2
     # First contestant has higher score (sorted desc)
     assert leaderboard.contestants[0].average_score > leaderboard.contestants[1].average_score
+
+
+def test_arena_contestant_summary_average_breakdown_default_none():
+    """average_breakdown defaults to None when not provided."""
+    summary = ArenaContestantSummary(
+        contestant_model="model-a",
+        total_items=5,
+        passed_count=4,
+        failed_count=1,
+        errored_count=0,
+        average_score=0.8,
+        min_score=0.5,
+        max_score=1.0,
+    )
+    assert summary.average_breakdown is None
+
+
+def test_arena_contestant_summary_with_average_breakdown():
+    """average_breakdown is correctly set when provided."""
+    breakdown = {"faithfulness": 0.85, "relevance": 0.72, "fluency": 0.91}
+    summary = ArenaContestantSummary(
+        contestant_model="model-a",
+        total_items=5,
+        passed_count=4,
+        failed_count=1,
+        errored_count=0,
+        average_score=0.8,
+        min_score=0.5,
+        max_score=1.0,
+        average_breakdown=breakdown,
+    )
+    assert summary.average_breakdown is not None
+    assert summary.average_breakdown["faithfulness"] == 0.85
+    assert summary.average_breakdown["relevance"] == 0.72
+    assert summary.average_breakdown["fluency"] == 0.91
+    assert len(summary.average_breakdown) == 3
+
+
+def test_arena_leaderboard_with_average_breakdown():
+    """ArenaLeaderboardResponse correctly includes average_breakdown per contestant."""
+    leaderboard = ArenaLeaderboardResponse(
+        evaluation_id="e1",
+        evaluation_name="Arena with Breakdown",
+        contestants=[
+            ArenaContestantSummary(
+                contestant_model="model-a",
+                total_items=5,
+                passed_count=4,
+                failed_count=1,
+                errored_count=0,
+                average_score=0.82,
+                min_score=0.6,
+                max_score=1.0,
+                average_breakdown={"accuracy": 0.9, "clarity": 0.74},
+            ),
+            ArenaContestantSummary(
+                contestant_model="model-b",
+                total_items=5,
+                passed_count=3,
+                failed_count=2,
+                errored_count=0,
+                average_score=0.65,
+                min_score=0.3,
+                max_score=0.9,
+                average_breakdown={"accuracy": 0.6, "clarity": 0.7},
+            ),
+        ],
+    )
+    assert leaderboard.contestants[0].average_breakdown == {"accuracy": 0.9, "clarity": 0.74}
+    assert leaderboard.contestants[1].average_breakdown == {"accuracy": 0.6, "clarity": 0.7}
