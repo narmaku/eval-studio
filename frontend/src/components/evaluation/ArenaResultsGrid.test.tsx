@@ -1,7 +1,13 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { ArenaResultsGrid } from './ArenaResultsGrid';
 import type { Result } from '@/types';
+
+vi.mock('@/services/api', () => ({
+  api: {
+    getDataset: vi.fn().mockResolvedValue({ items: [] }),
+  },
+}));
 
 function makeResult(
   overrides: Partial<Result> & { dataset_item_id: string; contestant_model: string },
@@ -68,18 +74,8 @@ describe('ArenaResultsGrid', () => {
   it('renders a row for each unique dataset item', () => {
     render(<ArenaResultsGrid results={twoContestantResults} contestants={twoContestants} />);
 
-    // Two questions, so 2 data rows + 1 header row
     const rows = screen.getAllByRole('row');
     expect(rows).toHaveLength(3); // header + 2 data rows
-  });
-
-  it('shows actual answers for each contestant in each row', () => {
-    render(<ArenaResultsGrid results={twoContestantResults} contestants={twoContestants} />);
-
-    expect(screen.getByText(/GPT answer 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Claude answer 1/)).toBeInTheDocument();
-    expect(screen.getByText(/GPT answer 2/)).toBeInTheDocument();
-    expect(screen.getByText(/Claude answer 2/)).toBeInTheDocument();
   });
 
   it('shows score badges for each result', () => {
@@ -91,6 +87,21 @@ describe('ArenaResultsGrid', () => {
     expect(screen.getByText('40%')).toBeInTheDocument();
   });
 
+  it('shows answers in expanded row when clicked', () => {
+    render(<ArenaResultsGrid results={twoContestantResults} contestants={twoContestants} />);
+
+    // Answers not visible initially
+    expect(screen.queryByText('GPT answer 1')).not.toBeInTheDocument();
+
+    // Click to expand first row
+    const rows = screen.getAllByRole('row');
+    fireEvent.click(rows[1]); // first data row
+
+    // Now answers are visible
+    expect(screen.getByText('GPT answer 1')).toBeInTheDocument();
+    expect(screen.getByText('Claude answer 1')).toBeInTheDocument();
+  });
+
   it('handles missing results for a contestant gracefully', () => {
     const partialResults: Result[] = [
       makeResult({
@@ -98,13 +109,10 @@ describe('ArenaResultsGrid', () => {
         contestant_model: 'openai/gpt-4o',
         actual_answer: 'GPT only',
       }),
-      // No result for claude on q1
     ];
 
     render(<ArenaResultsGrid results={partialResults} contestants={twoContestants} />);
 
-    expect(screen.getByText(/GPT only/)).toBeInTheDocument();
-    // Should show a placeholder for the missing result
     expect(screen.getByText('--')).toBeInTheDocument();
   });
 
@@ -114,10 +122,9 @@ describe('ArenaResultsGrid', () => {
     expect(screen.getByText(/no results/i)).toBeInTheDocument();
   });
 
-  it('renders side-by-side for 2-3 contestants', () => {
+  it('renders the table with expandable rows', () => {
     render(<ArenaResultsGrid results={twoContestantResults} contestants={twoContestants} />);
 
-    // The table should be rendered (side-by-side layout for 2 contestants)
     const table = screen.getByRole('table');
     expect(table).toBeInTheDocument();
   });
@@ -134,43 +141,9 @@ describe('ArenaResultsGrid', () => {
 
     render(<ArenaResultsGrid results={results} contestants={fiveContestants} />);
 
-    // All 5 models should still be visible as column headers
     fiveContestants.forEach((model) => {
       expect(screen.getByText(model)).toBeInTheDocument();
     });
-  });
-
-  it('truncates long answers', () => {
-    const longAnswer = 'A'.repeat(200);
-    const results: Result[] = [
-      makeResult({
-        dataset_item_id: 'q1',
-        contestant_model: 'openai/gpt-4o',
-        actual_answer: longAnswer,
-      }),
-    ];
-
-    render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);
-
-    // Should show truncated text
-    const truncated = screen.getByText(/A{1,}\.\.\.$/);
-    expect(truncated).toBeInTheDocument();
-  });
-
-  it('shows "--" for null actual_answer', () => {
-    const results: Result[] = [
-      makeResult({
-        dataset_item_id: 'q1',
-        contestant_model: 'openai/gpt-4o',
-        actual_answer: null,
-      }),
-    ];
-
-    render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);
-
-    // The truncate function returns '--' for null
-    const dashes = screen.getAllByText('--');
-    expect(dashes.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders 0% for null score', () => {
@@ -234,22 +207,6 @@ describe('ArenaResultsGrid', () => {
     expect(screen.queryByText('Fail')).not.toBeInTheDocument();
   });
 
-  it('truncates long dataset_item_id', () => {
-    const longId = 'Q'.repeat(50);
-    const results: Result[] = [
-      makeResult({
-        dataset_item_id: longId,
-        contestant_model: 'openai/gpt-4o',
-      }),
-    ];
-
-    render(<ArenaResultsGrid results={results} contestants={['openai/gpt-4o']} />);
-
-    // truncate(text, 40) should add '...'
-    const truncated = screen.getByText(/Q{1,}\.\.\./);
-    expect(truncated).toBeInTheDocument();
-  });
-
   it('renders Question column header', () => {
     render(<ArenaResultsGrid results={twoContestantResults} contestants={twoContestants} />);
 
@@ -280,7 +237,6 @@ describe('ArenaResultsGrid', () => {
   });
 
   it('shows "--" placeholder for all missing contestants in a row', () => {
-    // Results exist for one question but no contestants match the column list
     const results: Result[] = [
       makeResult({
         dataset_item_id: 'q1',
@@ -291,7 +247,6 @@ describe('ArenaResultsGrid', () => {
 
     render(<ArenaResultsGrid results={results} contestants={twoContestants} />);
 
-    // Both columns should show '--' since unknown-model is not in contestants list
     const dashes = screen.getAllByText('--');
     expect(dashes).toHaveLength(2);
   });

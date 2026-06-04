@@ -22,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ChunkDisplay } from '@/components/evaluation/ChunkDisplay';
+import { ArenaLeaderboard } from '@/components/evaluation/ArenaLeaderboard';
 import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { PassFailChart } from './PassFailChart';
 import { ContestantScoreChart } from './ContestantScoreChart';
@@ -334,44 +335,13 @@ export function ResultDetailView({
         Back to Results
       </Link>
 
-      {/* Summary Header */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3">
-            {evaluationName ?? 'Evaluation Result'}
-            {evaluationMode && (
-              <Badge variant="outline" className="text-xs">
-                {evaluationMode.toUpperCase()}
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Items</p>
-              <p className="text-2xl font-bold">{metrics.total_items || results.length}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Pass Rate</p>
-              <p className="text-2xl font-bold">{(metrics.pass_rate * 100).toFixed(1)}%</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Mean Score</p>
-              <p className="text-2xl font-bold">{metrics.mean_score.toFixed(3)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Median Score</p>
-              <p className="text-2xl font-bold">{metrics.median_score.toFixed(3)}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Charts Row */}
+      {/* Summary Header — arena gets leaderboard + charts, others get aggregate metrics */}
       {evaluationMode === 'arena' && arenaLeaderboard ? (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <ContestantScoreChart contestants={arenaLeaderboard.contestants} />
+        <>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <ArenaLeaderboard leaderboard={arenaLeaderboard} />
+            <ContestantScoreChart contestants={arenaLeaderboard.contestants} />
+          </div>
           {arenaLeaderboard.contestants.some(
             (c) => c.average_breakdown && Object.keys(c.average_breakdown).length >= 2,
           ) && (
@@ -382,12 +352,46 @@ export function ResultDetailView({
               title="Per-Metric Comparison"
             />
           )}
-        </div>
+        </>
       ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <ScoreDistributionChart results={results} />
-          <PassFailChart passedItems={metrics.passed_items} failedItems={metrics.failed_items} />
-        </div>
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                {evaluationName ?? 'Evaluation Result'}
+                {evaluationMode && (
+                  <Badge variant="outline" className="text-xs">
+                    {evaluationMode.toUpperCase()}
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Items</p>
+                  <p className="text-2xl font-bold">{metrics.total_items || results.length}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Pass Rate</p>
+                  <p className="text-2xl font-bold">{(metrics.pass_rate * 100).toFixed(1)}%</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Mean Score</p>
+                  <p className="text-2xl font-bold">{metrics.mean_score.toFixed(3)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Median Score</p>
+                  <p className="text-2xl font-bold">{metrics.median_score.toFixed(3)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <ScoreDistributionChart results={results} />
+            <PassFailChart passedItems={metrics.passed_items} failedItems={metrics.failed_items} />
+          </div>
+        </>
       )}
 
       {/* RAG metrics radar */}

@@ -228,29 +228,34 @@ export default function ArenaComparison() {
       {/* Complete Phase */}
       {phase === 'complete' && (
         <>
-          {leaderboard && <ArenaLeaderboard leaderboard={leaderboard} />}
-
           {leaderboard && (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <ArenaLeaderboard leaderboard={leaderboard} />
               <ContestantScoreChart contestants={leaderboard.contestants} />
-              {leaderboard.contestants.some(
-                (c) =>
-                  c.average_breakdown && Object.keys(c.average_breakdown).length >= 2,
-              ) && (
-                <RadarComparisonChart
-                  series={leaderboard.contestants
-                    .filter((c) => c.average_breakdown)
-                    .map((c) => ({
-                      name: c.contestant_model,
-                      data: c.average_breakdown!,
-                    }))}
-                  title="Per-Metric Comparison"
-                />
-              )}
             </div>
           )}
 
-          <ArenaResultsGrid results={results} contestants={contestantModels} />
+          {leaderboard &&
+            leaderboard.contestants.some(
+              (c) =>
+                c.average_breakdown && Object.keys(c.average_breakdown).length >= 2,
+            ) && (
+              <RadarComparisonChart
+                series={leaderboard.contestants
+                  .filter((c) => c.average_breakdown)
+                  .map((c) => ({
+                    name: c.contestant_model,
+                    data: c.average_breakdown!,
+                  }))}
+                title="Per-Metric Comparison"
+              />
+            )}
+
+          <ArenaResultsGrid
+            results={results}
+            contestants={contestantModels}
+            datasetId={selectedDatasetId}
+          />
 
           <Button variant="outline" onClick={handleNewArena}>
             New Arena
