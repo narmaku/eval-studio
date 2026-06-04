@@ -251,5 +251,7 @@ async def test_end_and_score_session_judge_error(db_session: AsyncSession, sessi
     db_result = await db_session.execute(select(Session).where(Session.id == session.id))
     updated = db_result.scalar_one()
     assert updated.error is not None
-    assert "Judge API down" in updated.error
+    assert "Judge scoring failed" in updated.error
+    # RuntimeError details should be sanitized — the raw message must NOT leak
+    assert "Judge API down" not in updated.error
     assert updated.status == "ended"

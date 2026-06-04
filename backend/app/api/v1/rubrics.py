@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import AppException, NotFoundException
+from app.core.exceptions import AppException, NotFoundException, sanitize_error_for_client
 from app.core.providers import provider_registry
 from app.models.rubric import Rubric
 from app.schemas.common import PaginatedResponse
@@ -77,7 +77,9 @@ async def generate_rubric_endpoint(
         )
     except Exception as exc:
         logger.error("rubric.generate.failed", error=str(exc))
-        raise AppException(502, "Generation Failed", f"Rubric generation failed: {exc}") from None
+        raise AppException(
+            502, "Generation Failed", f"Rubric generation failed: {sanitize_error_for_client(exc)}"
+        ) from None
 
     rubric = Rubric(
         name=rubric_data["name"],
@@ -219,7 +221,9 @@ async def refine_rubric_endpoint(
         )
     except Exception as exc:
         logger.error("rubric.refine.failed", error=str(exc), rubric_id=rubric_id)
-        raise AppException(502, "Refinement Failed", f"Rubric refinement failed: {exc}") from None
+        raise AppException(
+            502, "Refinement Failed", f"Rubric refinement failed: {sanitize_error_for_client(exc)}"
+        ) from None
 
     rubric.dimensions = refined["dimensions"]
     if refined.get("description"):

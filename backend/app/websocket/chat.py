@@ -21,6 +21,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
 from app.core.database import async_session_factory
+from app.core.exceptions import sanitize_error_for_client
 from app.mcp.manager import cleanup_manager
 from app.models.evaluation import Evaluation
 from app.models.session import Session
@@ -179,7 +180,7 @@ async def _handle_user_message(ws: WebSocket, session_id: str, raw: dict) -> Non
         await _send_error(ws, session_id, str(e))
     except Exception as exc:
         logger.exception("ws.message_error", session_id=session_id, error=str(exc))
-        await _send_error(ws, session_id, f"Error processing message: {exc}")
+        await _send_error(ws, session_id, sanitize_error_for_client(exc))
     finally:
         _processing.discard(session_id)
 

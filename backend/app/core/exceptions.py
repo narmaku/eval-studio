@@ -41,3 +41,35 @@ class ValidationException(AppException):
 
     def __init__(self, detail: str):
         super().__init__(422, "Validation Error", detail)
+
+
+_GENERIC_CLIENT_ERROR = "An internal error occurred. Check server logs for details."
+
+
+def sanitize_error_for_client(exc: Exception, *, preserve_value_error: bool = True) -> str:
+    """Return a client-safe error message for the given exception.
+
+    Internal errors (RuntimeError, KeyError, OSError, etc.) are replaced with
+    a generic message so that implementation details, file paths, credentials,
+    and stack traces are never exposed to WebSocket or HTTP clients.
+
+    ``ValueError`` is treated as a business-logic validation error whose
+    message is intentionally human-readable, so it is preserved by default.
+    Set *preserve_value_error* to ``False`` to suppress it as well.
+
+    ``AppException`` subclasses carry curated ``detail`` strings that are
+    already designed for client consumption, so those are always returned.
+
+    Args:
+        exc: The caught exception.
+        preserve_value_error: When ``True`` (default), return ``str(exc)``
+            for ``ValueError`` instances.
+
+    Returns:
+        A string safe to send to the client.
+    """
+    if isinstance(exc, AppException):
+        return exc.detail
+    if preserve_value_error and isinstance(exc, ValueError):
+        return str(exc)
+    return _GENERIC_CLIENT_ERROR
