@@ -5,11 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import structlog
-
 from app.core.registry_base import YAMLBackedRegistry
-
-logger = structlog.get_logger()
 
 
 @dataclass
