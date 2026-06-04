@@ -247,7 +247,7 @@ function RAGExpandedRowDetail({
       </div>
       <div>
         <p className="font-medium">Actual Answer</p>
-        <p className="text-muted-foreground">{result.actual_answer || 'N/A'}</p>
+        <p className="text-muted-foreground whitespace-pre-line">{result.actual_answer || 'N/A'}</p>
       </div>
       {result.retrieved_chunks && result.retrieved_chunks.length > 0 && (
         <div>
@@ -271,7 +271,7 @@ function RAGExpandedRowDetail({
       {result.judge_reasoning && (
         <div>
           <p className="font-medium">Judge Reasoning</p>
-          <blockquote className="mt-1 border-l-2 border-muted-foreground/30 pl-3 text-muted-foreground italic">
+          <blockquote className="mt-1 border-l-2 border-muted-foreground/30 pl-3 text-muted-foreground italic whitespace-pre-line">
             {result.judge_reasoning}
           </blockquote>
         </div>

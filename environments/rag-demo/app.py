@@ -409,7 +409,7 @@ def _generate_answer(query: str, context_docs: list[SourceDocument]) -> str:
             },
         ]
 
-        response = litellm.completion(model=model, messages=messages, max_tokens=512)
+        response = litellm.completion(model=model, messages=messages, max_tokens=2048)
         content = response.choices[0].message.content
         return content.strip() if content else ""
 

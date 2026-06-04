@@ -235,7 +235,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                     threshold = judge_params.pass_threshold or 0.7
                     passed = score_value >= threshold
                     reasoning_parts = [f"{k}: {v.reasoning}" for k, v in metric_scores.items() if v.reasoning]
-                    reasoning = "; ".join(reasoning_parts) if reasoning_parts else None
+                    reasoning = "\n\n".join(reasoning_parts) if reasoning_parts else None
             except NotImplementedError:
                 logger.warning(
                     "rag_evaluation.scoring_not_implemented",
