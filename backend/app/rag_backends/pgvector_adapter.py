@@ -4,12 +4,13 @@ Retrieves context chunks directly from a PostgreSQL database with pgvector,
 generates embeddings via LiteLLM, and produces an answer using an LLM.
 """
 
-import logging
 from typing import Any
+
+import structlog
 
 from app.rag_backends.base import RAGBackendAdapter, RAGResponse
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 try:
     import asyncpg
@@ -113,5 +114,5 @@ class PgVectorRAGAdapter(RAGBackendAdapter):
             await conn.close()
             return True
         except Exception:
-            logger.debug("PgVector health check failed", exc_info=True)
+            logger.debug("rag_pgvector.health_check_failed", exc_info=True)
             return False

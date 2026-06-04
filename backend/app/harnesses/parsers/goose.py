@@ -5,13 +5,14 @@ deliberately resilient — unknown lines are logged and skipped, never
 causing a crash.
 """
 
-import logging
 import re
+
+import structlog
 
 from app.harnesses.base import HarnessEvent
 from app.harnesses.parsers.base import OutputParser
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 # Patterns for tool-call markers in goose output
 _TOOL_CALL_RE = re.compile(r"^[─━═]{2,}\s*(.+)$")
@@ -101,7 +102,7 @@ class GooseOutputParser(OutputParser):
             self._buffer.append(stripped)
 
         except Exception:
-            logger.debug("goose_parser: failed to parse line: %r", stripped, exc_info=True)
+            logger.debug("goose_parser.parse_failed", line=stripped, exc_info=True)
 
         return events
 

@@ -12,30 +12,17 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.base import JudgeConfigParams, Score
+from app.adapters.base import Score
 from app.adapters.factory import create_evaluation_adapter
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.rag_backends.factory import create_rag_adapter
+from app.services.judge_utils import to_judge_params
 from app.services.provider_utils import merge_llm_params, resolve_judge_config
 from app.websocket.progress import broadcast_log, broadcast_progress, broadcast_status
 
 logger = structlog.get_logger()
-
-
-def _to_judge_params(judge_config: JudgeConfig | None) -> JudgeConfigParams:
-    """Convert ORM JudgeConfig to adapter-layer JudgeConfigParams dataclass."""
-    if judge_config is None:
-        return JudgeConfigParams()
-    return JudgeConfigParams(
-        model=judge_config.model,
-        temperature=judge_config.temperature,
-        prompt_template=judge_config.prompt_template,
-        pass_threshold=judge_config.pass_threshold,
-        dimensions=judge_config.dimensions,
-        aggregation=judge_config.aggregation,
-    )
 
 
 def _build_rag_adapter_config(rag_endpoint: dict[str, Any]) -> dict[str, Any]:
@@ -125,7 +112,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 await broadcast_status(evaluation_id, "failed", error=evaluation.error)
                 return
 
-        judge_params = _to_judge_params(judge_config)
+        judge_params = to_judge_params(judge_config)
 
         # 5. Validate RAG endpoint config and create adapter
         config = evaluation.config or {}

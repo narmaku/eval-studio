@@ -5,14 +5,14 @@ chunks from the JSON response. Refactored from inline httpx code that was
 previously in rag_evaluation_service.py.
 """
 
-import logging
 from typing import Any
 
 import httpx
+import structlog
 
 from app.rag_backends.base import RAGBackendAdapter, RAGResponse, normalize_chunks
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 class HttpRAGAdapter(RAGBackendAdapter):
@@ -67,7 +67,7 @@ class HttpRAGAdapter(RAGBackendAdapter):
             response = await client.get(self.url)
             return 200 <= response.status_code < 300
         except Exception:
-            logger.debug("Health check failed for %s", self.url, exc_info=True)
+            logger.debug("rag_http.health_check_failed", url=self.url, exc_info=True)
             return False
 
     async def close(self) -> None:

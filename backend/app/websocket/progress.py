@@ -1,11 +1,11 @@
 import asyncio
-import logging
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 router = APIRouter()
 
 # In-memory tracking of active WebSocket connections per evaluation
