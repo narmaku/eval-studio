@@ -103,6 +103,14 @@ export function ProviderList() {
               {provider.api_base && (
                 <p className="text-xs text-muted-foreground">API Base: {provider.api_base}</p>
               )}
+              {provider.default_params && Object.keys(provider.default_params).length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Defaults:{' '}
+                  {Object.entries(provider.default_params)
+                    .map(([k, v]) => `${k}=${v}`)
+                    .join(', ')}
+                </p>
+              )}
               {provider.tags.length > 0 && (
                 <div className="flex gap-1 pt-1">
                   {provider.tags.map((tag) => (

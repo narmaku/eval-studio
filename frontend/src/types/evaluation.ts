@@ -37,6 +37,14 @@ export interface RAGEndpointSettings {
   embedding_model?: string;
 }
 
+export interface LLMParams {
+  max_tokens?: number;
+  temperature?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+}
+
 export interface EvaluationConfig {
   model_endpoint: ModelEndpoint;
   judge_config: JudgeReference;
@@ -47,6 +55,8 @@ export interface EvaluationConfig {
   contestants?: ModelEndpoint[]; // arena mode
   rag_endpoint?: RAGEndpointSettings; // rag mode
   rag_metrics?: string[]; // rag mode
+  model_params?: LLMParams;
+  judge_params?: LLMParams;
 }
 
 export interface ModelEndpoint {
@@ -68,6 +78,7 @@ export interface Provider {
   ssl_cert_path: string | null;
   tags: string[];
   purpose: string;
+  default_params: LLMParams | null;
 }
 
 export interface ProviderModel {

@@ -7,6 +7,7 @@ export interface CreateProviderRequest {
   ssl_cert_path?: string | null;
   tags?: string[];
   purpose?: string;
+  default_params?: Record<string, number> | null;
 }
 
 export type UpdateProviderRequest = Partial<CreateProviderRequest>;
