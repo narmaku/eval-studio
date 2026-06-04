@@ -1,14 +1,15 @@
 """Tool server profiles loaded from YAML configuration."""
 
-import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
+import structlog
 
-logger = logging.getLogger(__name__)
+from app.core.registry_base import YAMLBackedRegistry
+
+logger = structlog.get_logger()
 
 
 @dataclass
@@ -36,63 +37,70 @@ class ToolServerProfile:
     enabled: bool = True
 
 
-class ToolServerRegistry:
+class ToolServerRegistry(YAMLBackedRegistry[ToolServerProfile]):
     """Registry of tool server profiles loaded from YAML config."""
 
-    def __init__(self) -> None:
-        self._servers: dict[str, ToolServerProfile] = {}
-        self._config_path: Path | None = None
-        self._last_mtime: float = 0.0
+    def _get_yaml_key(self) -> str:
+        return "tool_servers"
 
-    def load_from_yaml(self, path: Path) -> None:
-        self._config_path = path
-        self._servers = {}
-        if not path.exists():
-            self._last_mtime = 0.0
-            return
-        with open(path) as f:
-            data = yaml.safe_load(f) or {}
-        for item in data.get("tool_servers", []):
-            tools = [
-                StandaloneToolDef(
-                    name=t["name"],
-                    description=t.get("description", ""),
-                    parameters=t.get("parameters", {}),
-                )
-                for t in item.get("tools", [])
-            ]
-            profile = ToolServerProfile(
-                id=item["id"],
-                name=item["name"],
-                type=item.get("type", "mcp_stdio"),
-                command=item.get("command"),
-                args=item.get("args", []),
-                env=item.get("env", {}),
-                tools=tools,
-                description=item.get("description", ""),
-                tags=item.get("tags", []),
-                enabled=item.get("enabled", True),
+    def _parse_item(self, raw: dict) -> ToolServerProfile | None:
+        tools = [
+            StandaloneToolDef(
+                name=t["name"],
+                description=t.get("description", ""),
+                parameters=t.get("parameters", {}),
             )
-            self._servers[profile.id] = profile
-        self._last_mtime = os.path.getmtime(path)
+            for t in raw.get("tools", [])
+        ]
+        return ToolServerProfile(
+            id=raw["id"],
+            name=raw["name"],
+            type=raw.get("type", "mcp_stdio"),
+            command=raw.get("command"),
+            args=raw.get("args", []),
+            env=raw.get("env", {}),
+            tools=tools,
+            description=raw.get("description", ""),
+            tags=raw.get("tags", []),
+            enabled=raw.get("enabled", True),
+        )
 
-    def _check_reload(self) -> None:
-        if self._config_path is None:
-            return
-        if not self._config_path.exists():
-            if self._servers:
-                logger.info("Config file %s deleted, clearing tool servers", self._config_path)
-                self._servers = {}
-                self._last_mtime = 0.0
-            return
-        current_mtime = os.path.getmtime(self._config_path)
-        if current_mtime != self._last_mtime:
-            logger.info("Config file %s changed, reloading tool servers", self._config_path)
-            self.load_from_yaml(self._config_path)
+    def _serialize_item(self, item: ToolServerProfile) -> dict:
+        return {
+            "id": item.id,
+            "name": item.name,
+            "type": item.type,
+            **({"command": item.command} if item.command else {}),
+            **({"args": item.args} if item.args else {}),
+            **({"env": item.env} if item.env else {}),
+            **(
+                {
+                    "tools": [
+                        {
+                            "name": t.name,
+                            **({"description": t.description} if t.description else {}),
+                            **({"parameters": t.parameters} if t.parameters else {}),
+                        }
+                        for t in item.tools
+                    ]
+                }
+                if item.tools
+                else {}
+            ),
+            **({"description": item.description} if item.description else {}),
+            **({"tags": item.tags} if item.tags else {}),
+            "enabled": item.enabled,
+        }
 
-    def list_tool_servers(self, type_filter: str | None = None, enabled_only: bool = False) -> list[ToolServerProfile]:
+    def _get_item_id(self, item: ToolServerProfile) -> str:
+        return item.id
+
+    def list_tool_servers(
+        self, type_filter: str | None = None, enabled_only: bool = False
+    ) -> list[ToolServerProfile]:
+        """Return all tool server profiles, optionally filtered."""
         self._check_reload()
-        servers = list(self._servers.values())
+        servers = list(self._items.values())
         if type_filter:
             servers = [s for s in servers if s.type == type_filter]
         if enabled_only:
@@ -100,69 +108,24 @@ class ToolServerRegistry:
         return servers
 
     def get_tool_server(self, server_id: str) -> ToolServerProfile | None:
-        self._check_reload()
-        return self._servers.get(server_id)
+        """Return a single tool server by ID, or None if not found."""
+        return self.get_item(server_id)
 
     def add_tool_server(self, profile: ToolServerProfile) -> None:
-        self._servers[profile.id] = profile
-        self._persist_yaml()
+        """Add a tool server and persist to YAML."""
+        self.add_item(profile)
 
     def update_tool_server(self, server_id: str, updates: dict) -> ToolServerProfile | None:
-        profile = self._servers.get(server_id)
-        if not profile:
-            return None
-        for key, value in updates.items():
-            if hasattr(profile, key):
-                setattr(profile, key, value)
-        self._persist_yaml()
-        return profile
+        """Update a tool server and persist to YAML."""
+        return self.update_item(server_id, updates)
 
     def delete_tool_server(self, server_id: str) -> bool:
-        if server_id not in self._servers:
-            return False
-        del self._servers[server_id]
-        self._persist_yaml()
-        return True
-
-    def _persist_yaml(self) -> None:
-        if self._config_path is None:
-            return
-        data = {
-            "tool_servers": [
-                {
-                    "id": s.id,
-                    "name": s.name,
-                    "type": s.type,
-                    **({"command": s.command} if s.command else {}),
-                    **({"args": s.args} if s.args else {}),
-                    **({"env": s.env} if s.env else {}),
-                    **(
-                        {
-                            "tools": [
-                                {
-                                    "name": t.name,
-                                    **({"description": t.description} if t.description else {}),
-                                    **({"parameters": t.parameters} if t.parameters else {}),
-                                }
-                                for t in s.tools
-                            ]
-                        }
-                        if s.tools
-                        else {}
-                    ),
-                    **({"description": s.description} if s.description else {}),
-                    **({"tags": s.tags} if s.tags else {}),
-                    "enabled": s.enabled,
-                }
-                for s in self._servers.values()
-            ]
-        }
-        with open(self._config_path, "w") as f:
-            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
-        self._last_mtime = os.path.getmtime(self._config_path)
+        """Delete a tool server and persist to YAML."""
+        return self.delete_item(server_id)
 
 
 def _resolve_config_path() -> Path:
+    """Resolve the tool_servers.yaml config path."""
     env_path = os.environ.get("TOOL_SERVERS_CONFIG_PATH")
     if env_path:
         return Path(env_path)
