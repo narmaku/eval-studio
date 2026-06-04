@@ -1,0 +1,24 @@
+# Dockerfile.dev -- Development image for the eval-studio backend
+# Used by docker-compose.yml; source code is volume-mounted at /app.
+
+FROM python:3.11-slim
+
+# Install system dependencies (curl required for healthcheck)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Create working directory and data directory for SQLite
+RUN mkdir -p /app/data
+
+WORKDIR /app
+
+# Source code is mounted via docker-compose volume -- nothing to COPY.
+# Dependencies are installed at container start via the compose `command`.
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "uv sync && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
