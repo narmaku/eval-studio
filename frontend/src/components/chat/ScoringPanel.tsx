@@ -74,7 +74,7 @@ export function ScoringPanel({ scores, isSessionEnded }: ScoringPanelProps) {
                 <Separator />
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-1">Judge Reasoning</p>
-                  <blockquote className="border-l-2 pl-3 text-xs text-muted-foreground italic">
+                  <blockquote className="border-l-2 pl-3 text-xs text-muted-foreground italic whitespace-pre-line">
                     {score.judge_reasoning}
                   </blockquote>
                 </div>

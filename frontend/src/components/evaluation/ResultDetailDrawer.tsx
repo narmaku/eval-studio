@@ -68,7 +68,7 @@ export function ResultDetailDrawer({
           {/* Expected Answer */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Expected Answer</h3>
-            <p className="text-sm text-muted-foreground">{datasetItem?.expected_answer ?? 'N/A'}</p>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">{datasetItem?.expected_answer ?? 'N/A'}</p>
           </div>
 
           <Separator />
@@ -76,7 +76,7 @@ export function ResultDetailDrawer({
           {/* Actual Answer */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Actual Answer</h3>
-            <p className="text-sm text-muted-foreground">{result.actual_answer || 'N/A'}</p>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">{result.actual_answer || 'N/A'}</p>
           </div>
 
           <Separator />
@@ -102,7 +102,7 @@ export function ResultDetailDrawer({
           {/* Judge Reasoning */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Judge Reasoning</h3>
-            <blockquote className="border-l-2 border-muted-foreground/30 pl-3 text-sm text-muted-foreground italic">
+            <blockquote className="border-l-2 border-muted-foreground/30 pl-3 text-sm text-muted-foreground italic whitespace-pre-line">
               {result.judge_reasoning || 'No reasoning provided.'}
             </blockquote>
           </div>

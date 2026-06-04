@@ -75,14 +75,14 @@ function ExpandableText({
   }
 
   if (content.length <= maxLength) {
-    return <span className="whitespace-pre-line text-sm">{content}</span>;
+    return <span className="text-sm whitespace-pre-line">{content}</span>;
   }
 
   return (
-    <span className="whitespace-pre-line text-sm">
+    <span className="text-sm whitespace-pre-line">
       {expanded ? content : `${content.slice(0, maxLength)}...`}
       <button
-        className="ml-1 text-primary underline text-xs"
+        className="ml-1 text-primary underline text-xs whitespace-nowrap"
         onClick={(e) => {
           e.stopPropagation();
           setExpanded(!expanded);

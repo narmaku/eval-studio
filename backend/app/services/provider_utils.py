@@ -26,6 +26,7 @@ class ResolvedModel:
     api_base: str | None = None
     proxy: str | None = None
     ssl_cert_path: str | None = None
+    default_params: dict | None = None
 
 
 def resolve_model_config(
@@ -57,6 +58,7 @@ def resolve_model_config(
     api_key: str | None = None
     api_base: str | None = None
     proxy: str | None = None
+    default_params: dict | None = None
 
     # 1. Try provider profile
     provider_id = config.get("provider_id")
@@ -70,6 +72,7 @@ def resolve_model_config(
         api_key = provider.api_key
         proxy = provider.proxy
         ssl_cert_path = provider.ssl_cert_path
+        default_params = provider.default_params
     else:
         # 2. Direct config fields
         model = config.get("litellm_model") or config.get("model")
@@ -93,7 +96,14 @@ def resolve_model_config(
     if not ssl_cert_path:
         ssl_cert_path = settings.ssl_cert_file
 
-    return ResolvedModel(model=model, api_key=api_key, api_base=api_base, proxy=proxy, ssl_cert_path=ssl_cert_path)
+    return ResolvedModel(
+        model=model,
+        api_key=api_key,
+        api_base=api_base,
+        proxy=proxy,
+        ssl_cert_path=ssl_cert_path,
+        default_params=default_params,
+    )
 
 
 def resolve_judge_config(
@@ -133,6 +143,44 @@ def resolve_judge_config(
         )
 
     raise ValueError("No judge model configured")
+
+
+# Allowed LLM parameter names for merging into litellm calls.
+ALLOWED_LLM_PARAMS = frozenset({"max_tokens", "temperature", "top_p", "frequency_penalty", "presence_penalty"})
+
+
+def merge_llm_params(
+    provider_defaults: dict | None,
+    eval_overrides: dict | None,
+) -> dict:
+    """Merge provider default params with evaluation-level overrides.
+
+    Only whitelisted LLM parameters are kept. Eval overrides take precedence.
+
+    Args:
+        provider_defaults: Default params from the provider profile (may be None).
+        eval_overrides: Per-evaluation param overrides (may be None).
+
+    Returns:
+        Merged dict of LLM parameters (may be empty).
+    """
+    merged: dict = {}
+    if provider_defaults:
+        for k, v in provider_defaults.items():
+            if k in ALLOWED_LLM_PARAMS:
+                merged[k] = v
+    if eval_overrides:
+        for k, v in eval_overrides.items():
+            if k in ALLOWED_LLM_PARAMS:
+                merged[k] = v
+    return merged
+
+
+def apply_llm_params(litellm_kwargs: dict, params: dict) -> None:
+    """Apply merged LLM parameters to a litellm kwargs dict in-place."""
+    for param in ALLOWED_LLM_PARAMS:
+        if param in params:
+            litellm_kwargs[param] = params[param]
 
 
 @contextmanager
@@ -215,6 +263,7 @@ async def resolve_provider(
             proxy=db_provider.proxy,
             tags=db_provider.tags or [],
             purpose=db_provider.purpose,
+            default_params=getattr(db_provider, "default_params", None),
         )
 
     return None

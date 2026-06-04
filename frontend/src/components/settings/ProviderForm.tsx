@@ -10,8 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
 import { useProviderStore } from '@/stores/providerStore';
-import type { Provider, CreateProviderRequest } from '@/types';
+import type { Provider, CreateProviderRequest, LLMParams } from '@/types';
 
 interface ProviderFormProps {
   open: boolean;
@@ -74,6 +75,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
   const [sslCertPath, setSslCertPath] = useState(provider?.ssl_cert_path ?? '');
   const [purpose, setPurpose] = useState(provider?.purpose ?? 'test');
   const [tagsInput, setTagsInput] = useState(provider?.tags?.join(', ') ?? '');
+  const [defaultParams, setDefaultParams] = useState<LLMParams>(provider?.default_params ?? {});
   const [errors, setErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -108,6 +110,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         ssl_cert_path: sslCertPath.trim() || null,
         tags,
         purpose,
+        default_params: Object.keys(defaultParams).length > 0 ? defaultParams : null,
       };
 
       if (isEditMode && provider) {
@@ -213,6 +216,8 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
           </SelectContent>
         </Select>
       </div>
+
+      <LLMParamsPanel label="Default LLM Parameters" value={defaultParams} onChange={setDefaultParams} />
 
       <div className="space-y-2">
         <Label htmlFor="provider-tags">Tags (optional, comma-separated)</Label>
