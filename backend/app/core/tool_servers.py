@@ -95,9 +95,7 @@ class ToolServerRegistry(YAMLBackedRegistry[ToolServerProfile]):
     def _get_item_id(self, item: ToolServerProfile) -> str:
         return item.id
 
-    def list_tool_servers(
-        self, type_filter: str | None = None, enabled_only: bool = False
-    ) -> list[ToolServerProfile]:
+    def list_tool_servers(self, type_filter: str | None = None, enabled_only: bool = False) -> list[ToolServerProfile]:
         """Return all tool server profiles, optionally filtered."""
         self._check_reload()
         servers = list(self._items.values())

@@ -3,7 +3,6 @@
 import time
 from dataclasses import dataclass, field
 
-import pytest
 import yaml
 
 from app.core.registry_base import YAMLBackedRegistry
