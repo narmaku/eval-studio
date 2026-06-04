@@ -80,7 +80,7 @@ export function RadarComparisonChart({
               />
             ))}
             <Legend />
-            <Tooltip formatter={(value: number) => `${(value * 100).toFixed(0)}%`} />
+            <Tooltip formatter={(value) => `${(Number(value) * 100).toFixed(0)}%`} />
           </RadarChart>
         </ResponsiveContainer>
       </CardContent>

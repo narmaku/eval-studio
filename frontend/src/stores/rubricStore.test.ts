@@ -51,7 +51,7 @@ describe('rubricStore', () => {
   describe('fetchRubrics', () => {
     it('sets loading, stores rubrics, clears loading on success', async () => {
       const mockRubrics = [makeRubric(), makeRubric({ id: 'r-2', name: 'Second Rubric' })];
-      mockedApi.listRubrics.mockResolvedValue({ items: mockRubrics, total: mockRubrics.length });
+      mockedApi.listRubrics.mockResolvedValue({ items: mockRubrics, total: mockRubrics.length, page: 1, page_size: 20, pages: 1 });
 
       const promise = useRubricStore.getState().fetchRubrics();
       expect(useRubricStore.getState().isLoading).toBe(true);
@@ -65,7 +65,7 @@ describe('rubricStore', () => {
     });
 
     it('passes name filter when provided', async () => {
-      mockedApi.listRubrics.mockResolvedValue({ items: [], total: 0 });
+      mockedApi.listRubrics.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 });
 
       await useRubricStore.getState().fetchRubrics('quality');
 

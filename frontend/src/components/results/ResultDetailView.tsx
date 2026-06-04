@@ -412,9 +412,9 @@ export function ResultDetailView({
 
           const avgData: Record<string, number> = {};
           for (const key of allKeys) {
-            const values = allBreakdowns.filter((b) => key in b).map((b) => b[key]);
+            const values = allBreakdowns.filter((b) => key in b).map((b) => b[key] ?? 0);
             avgData[key] =
-              values.length > 0 ? values.reduce((a, c) => a + c, 0) / values.length : 0;
+              values.length > 0 ? values.reduce((a, c) => (a ?? 0) + (c ?? 0), 0) / values.length : 0;
           }
 
           return (

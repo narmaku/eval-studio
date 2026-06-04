@@ -12,8 +12,10 @@ const mockProviders: Provider[] = [
     api_base: 'https://staging.example.com',
     has_api_key: true,
     proxy: null,
+    ssl_cert_path: null,
     tags: ['staging'],
     purpose: 'test',
+    default_params: null,
   },
   {
     id: 'rls-prod',
@@ -22,8 +24,10 @@ const mockProviders: Provider[] = [
     api_base: null,
     has_api_key: false,
     proxy: 'http://proxy.example.com',
+    ssl_cert_path: null,
     tags: ['prod', 'v2'],
     purpose: 'test',
+    default_params: null,
   },
 ];
 

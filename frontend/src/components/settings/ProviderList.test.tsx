@@ -13,8 +13,10 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   api_base: 'https://api.openai.com/v1',
   has_api_key: true,
   proxy: null,
+  ssl_cert_path: null,
   tags: ['general'],
   purpose: 'test',
+  default_params: null,
   ...overrides,
 });
 

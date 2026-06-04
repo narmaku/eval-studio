@@ -110,7 +110,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         ssl_cert_path: sslCertPath.trim() || null,
         tags,
         purpose,
-        default_params: Object.keys(defaultParams).length > 0 ? defaultParams : null,
+        default_params: Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, number>) : null,
       };
 
       if (isEditMode && provider) {

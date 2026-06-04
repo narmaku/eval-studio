@@ -22,8 +22,10 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   api_base: null,
   has_api_key: false,
   proxy: null,
+  ssl_cert_path: null,
   tags: [],
   purpose: 'test',
+  default_params: null,
   ...overrides,
 });
 
