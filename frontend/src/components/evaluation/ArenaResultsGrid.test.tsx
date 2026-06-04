@@ -95,7 +95,7 @@ describe('ArenaResultsGrid', () => {
 
     // Click to expand first row
     const rows = screen.getAllByRole('row');
-    fireEvent.click(rows[1]); // first data row
+    fireEvent.click(rows[1]!); // first data row
 
     // Now answers are visible
     expect(screen.getByText('GPT answer 1')).toBeInTheDocument();
