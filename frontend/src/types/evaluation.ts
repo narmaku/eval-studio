@@ -78,7 +78,7 @@ export interface Provider {
   ssl_cert_path: string | null;
   tags: string[];
   purpose: string;
-  default_params: LLMParams | null;
+  default_params: Record<string, number> | null;
 }
 
 export interface ProviderModel {

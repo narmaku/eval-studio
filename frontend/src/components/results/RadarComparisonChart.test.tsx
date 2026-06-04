@@ -61,8 +61,8 @@ describe('RadarComparisonChart', () => {
 
   it('handles series with different metric keys', () => {
     const series = [
-      { name: 'model-a', data: { accuracy: 0.8, clarity: 0.7 } },
-      { name: 'model-b', data: { accuracy: 0.6, fluency: 0.9 } },
+      { name: 'model-a', data: { accuracy: 0.8, clarity: 0.7 } as Record<string, number> },
+      { name: 'model-b', data: { accuracy: 0.6, fluency: 0.9 } as Record<string, number> },
     ];
 
     // Should render with all 3 unique metrics (accuracy, clarity, fluency)

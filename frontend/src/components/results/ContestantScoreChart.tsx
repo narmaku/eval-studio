@@ -37,7 +37,7 @@ export function ContestantScoreChart({ contestants }: ContestantScoreChartProps)
               tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
             />
             <YAxis type="category" dataKey="name" width={150} fontSize={12} />
-            <Tooltip formatter={(value: number) => `${(value * 100).toFixed(0)}%`} />
+            <Tooltip formatter={(value) => `${(Number(value) * 100).toFixed(0)}%`} />
             <Bar dataKey="score" radius={[0, 4, 4, 0]}>
               {data.map((_entry, index) => (
                 <Cell key={index} fill={COLORS[index % COLORS.length]} />

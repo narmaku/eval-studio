@@ -17,7 +17,7 @@ export function TopNav() {
   const { unreadCount, toggleOpen } = useNotificationStore();
   const getRunningEvaluation = useEvaluationStore((state) => state.getRunningEvaluation);
   // Subscribe to currentEvaluation to trigger re-renders when running state changes
-  const _currentEvaluation = useEvaluationStore((state) => state.currentEvaluation);
+  useEvaluationStore((state) => state.currentEvaluation);
 
   // Read from sessionStorage
   const runningEvaluation = getRunningEvaluation();

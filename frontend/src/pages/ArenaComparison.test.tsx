@@ -487,7 +487,7 @@ describe('ArenaComparison page', () => {
       expect(mockCreateAndRunEvaluation).toHaveBeenCalledTimes(1);
     });
 
-    const request = mockCreateAndRunEvaluation.mock.calls[0][0];
+    const request = mockCreateAndRunEvaluation.mock.calls[0]![0];
     expect(request.mode).toBe('arena');
     expect(request.dataset_id).toBe('ds-1');
     expect(request.config.contestants).toHaveLength(2);

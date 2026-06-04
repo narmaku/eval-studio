@@ -12,8 +12,10 @@ const mockProviders: Provider[] = [
     api_base: 'https://alpha.example.com',
     has_api_key: true,
     proxy: null,
+    ssl_cert_path: null,
     tags: ['fast'],
     purpose: 'test',
+    default_params: null,
   },
   {
     id: 'provider-2',
@@ -22,8 +24,10 @@ const mockProviders: Provider[] = [
     api_base: null,
     has_api_key: true,
     proxy: null,
+    ssl_cert_path: null,
     tags: [],
     purpose: 'test',
+    default_params: null,
   },
 ];
 

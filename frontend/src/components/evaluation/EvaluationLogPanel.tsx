@@ -19,7 +19,7 @@ const levelLabels: Record<LogLevel, string> = {
 function formatTimestamp(iso: string): string {
   try {
     const date = new Date(iso);
-    return date.toLocaleTimeString('en-US', { hour12: false, fractionalSecondDigits: 0 });
+    return date.toLocaleTimeString('en-US', { hour12: false });
   } catch {
     return iso;
   }
