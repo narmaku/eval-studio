@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import importlib
-import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
+import structlog
+
+from app.core.registry_base import YAMLBackedRegistry
 
 if TYPE_CHECKING:
     from app.adapters.base import EvaluationAdapter
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 # Only adapter_class values under these module prefixes are allowed.
 _ALLOWED_ADAPTER_PREFIXES = ("app.adapters.",)
@@ -35,61 +36,41 @@ class EvaluatorInfo:
     available: bool = True
 
 
-class EvaluatorRegistry:
+class EvaluatorRegistry(YAMLBackedRegistry[EvaluatorInfo]):
     """Registry of evaluator definitions loaded from YAML config."""
 
     _REQUIRED_FIELDS = ("id", "name", "adapter_class")
 
-    def __init__(self) -> None:
-        self._evaluators: dict[str, EvaluatorInfo] = {}
-        self._config_path: Path | None = None
-        self._last_mtime: float = 0.0
+    def _get_yaml_key(self) -> str:
+        return "evaluators"
 
-    def load_from_yaml(self, path: Path) -> None:
-        """Load evaluator definitions from a YAML file.
+    def _parse_item(self, raw: dict) -> EvaluatorInfo | None:
+        # Validate required fields
+        missing = [f for f in self._REQUIRED_FIELDS if f not in raw]
+        if missing:
+            logger.warning("skipping_evaluator_missing_fields", missing=missing, entry=raw)
+            return None
 
-        Malformed entries are skipped with a warning. Entries whose
-        adapter_class cannot be resolved are marked as unavailable.
-        """
-        self._config_path = path
-        self._evaluators = {}
-        if not path.exists():
-            self._last_mtime = 0.0
-            return
-        with open(path) as f:
-            data = yaml.safe_load(f) or {}
+        # Check if adapter class is importable
+        available = self._check_adapter_available(raw["adapter_class"])
 
-        for item in data.get("evaluators", []):
-            if not isinstance(item, dict):
-                logger.warning("Skipping non-dict evaluator entry: %s", item)
-                continue
+        return EvaluatorInfo(
+            id=raw["id"],
+            name=raw["name"],
+            adapter_class=raw["adapter_class"],
+            modes=raw.get("modes", []),
+            description=raw.get("description", ""),
+            builtin=raw.get("builtin", False),
+            defaults=raw.get("defaults", {}),
+            requires_config=raw.get("requires_config", False),
+            available=available,
+        )
 
-            # Validate required fields
-            missing = [f for f in self._REQUIRED_FIELDS if f not in item]
-            if missing:
-                logger.warning(
-                    "Skipping evaluator entry with missing fields %s: %s",
-                    missing,
-                    item,
-                )
-                continue
+    def _serialize_item(self, item: EvaluatorInfo) -> dict:
+        raise NotImplementedError("EvaluatorRegistry is read-only")
 
-            # Check if adapter class is importable
-            available = self._check_adapter_available(item["adapter_class"])
-
-            info = EvaluatorInfo(
-                id=item["id"],
-                name=item["name"],
-                adapter_class=item["adapter_class"],
-                modes=item.get("modes", []),
-                description=item.get("description", ""),
-                builtin=item.get("builtin", False),
-                defaults=item.get("defaults", {}),
-                requires_config=item.get("requires_config", False),
-                available=available,
-            )
-            self._evaluators[info.id] = info
-        self._last_mtime = os.path.getmtime(path)
+    def _get_item_id(self, item: EvaluatorInfo) -> str:
+        return item.id
 
     @staticmethod
     def _validate_adapter_namespace(adapter_class: str) -> bool:
@@ -104,9 +85,9 @@ class EvaluatorRegistry:
         """
         if not self._validate_adapter_namespace(adapter_class):
             logger.warning(
-                "Adapter class %s is outside allowed namespaces %s",
-                adapter_class,
-                _ALLOWED_ADAPTER_PREFIXES,
+                "adapter_outside_allowed_namespaces",
+                adapter_class=adapter_class,
+                allowed=_ALLOWED_ADAPTER_PREFIXES,
             )
             return False
         try:
@@ -114,36 +95,20 @@ class EvaluatorRegistry:
             module = importlib.import_module(module_path)
             return hasattr(module, _class_name)
         except (ImportError, ValueError, AttributeError) as exc:
-            logger.warning("Adapter class %s is not importable: %s", adapter_class, exc)
+            logger.warning("adapter_not_importable", adapter_class=adapter_class, error=str(exc))
             return False
-
-    def _check_reload(self) -> None:
-        """Reload YAML config if the file's mtime has changed."""
-        if self._config_path is None:
-            return
-        if not self._config_path.exists():
-            if self._evaluators:
-                logger.info("Config file %s deleted, clearing evaluators", self._config_path)
-                self._evaluators = {}
-                self._last_mtime = 0.0
-            return
-        current_mtime = os.path.getmtime(self._config_path)
-        if current_mtime != self._last_mtime:
-            logger.info("Config file %s changed, reloading evaluators", self._config_path)
-            self.load_from_yaml(self._config_path)
 
     def list_evaluators(self, mode: str | None = None) -> list[EvaluatorInfo]:
         """Return all evaluators, optionally filtered by supported mode."""
         self._check_reload()
-        evaluators = list(self._evaluators.values())
+        evaluators = list(self._items.values())
         if mode:
             evaluators = [e for e in evaluators if mode in e.modes]
         return evaluators
 
     def get_evaluator(self, evaluator_id: str) -> EvaluatorInfo | None:
         """Return a single evaluator by ID, or None if not found."""
-        self._check_reload()
-        return self._evaluators.get(evaluator_id)
+        return self.get_item(evaluator_id)
 
     def create_adapter(self, evaluator_id: str, **config: Any) -> EvaluationAdapter:
         """Create an adapter instance for the given evaluator ID.
@@ -161,7 +126,7 @@ class EvaluatorRegistry:
         """
         from app.adapters.base import EvaluationAdapter
 
-        info = self._evaluators.get(evaluator_id)
+        info = self._items.get(evaluator_id)
         if info is None:
             raise ValueError(f"Unknown evaluator: {evaluator_id}")
         if not info.available:
