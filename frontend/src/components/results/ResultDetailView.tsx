@@ -48,14 +48,14 @@ function JudgeReasoning({ reasoning }: { reasoning: string | null | undefined })
   const maxLength = 100;
 
   if (text.length <= maxLength) {
-    return <span className="text-sm">{text || '--'}</span>;
+    return <span className="text-sm whitespace-pre-line">{text || '--'}</span>;
   }
 
   return (
-    <span className="text-sm">
+    <span className="text-sm whitespace-pre-line">
       {expanded ? text : `${text.slice(0, maxLength)}...`}
       <button
-        className="ml-1 text-primary underline text-xs"
+        className="ml-1 text-primary underline text-xs whitespace-nowrap"
         onClick={(e) => {
           e.stopPropagation();
           setExpanded(!expanded);
