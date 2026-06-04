@@ -1,13 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import { ResultDetailView } from '@/components/results';
+import { api } from '@/services/api';
+import type { DatasetItem } from '@/types';
 
 export default function ResultDetail() {
   const { resultId } = useParams<{ resultId: string }>();
   const { results, isLoading, error, fetchResults } = useResultStore();
   const { evaluations, fetchEvaluations } = useEvaluationStore();
+  const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
 
   useEffect(() => {
     if (resultId) {
@@ -17,6 +20,15 @@ export default function ResultDetail() {
   }, [resultId, fetchResults, fetchEvaluations]);
 
   const evaluation = evaluations.find((e) => e.id === resultId);
+
+  useEffect(() => {
+    if (evaluation?.dataset_id) {
+      api
+        .getDataset(evaluation.dataset_id)
+        .then((detail) => setDatasetItems(detail.items))
+        .catch(() => setDatasetItems([]));
+    }
+  }, [evaluation?.dataset_id]);
 
   if (isLoading) {
     return (
@@ -45,7 +57,6 @@ export default function ResultDetail() {
     );
   }
 
-  // Compute aggregate metrics from per-item results
   const scores = results.filter((r) => r.score != null).map((r) => r.score!);
   const passedCount = results.filter((r) => r.passed === true).length;
   const failedCount = results.filter((r) => r.passed === false).length;
@@ -69,6 +80,7 @@ export default function ResultDetail() {
       aggregateMetrics={aggregateMetrics}
       evaluationName={evaluation?.name}
       evaluationMode={evaluation?.mode}
+      datasetItems={datasetItems}
     />
   );
 }
