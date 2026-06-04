@@ -30,6 +30,23 @@ logger = structlog.get_logger()
 MAX_TOOL_ROUNDS = 10
 
 
+def _serialize_tool_arguments(arguments: object) -> str:
+    """Serialize tool arguments to JSON string for LLM messages.
+
+    Works around a LiteLLM bug where Gemini's converter crashes on empty
+    arguments ('{}') because its loop never creates a FunctionCall object.
+    """
+    if isinstance(arguments, dict):
+        if not arguments:
+            return '{"_": ""}'
+        return json.dumps(arguments)
+    if isinstance(arguments, str):
+        if arguments in ("", "{}"):
+            return '{"_": ""}'
+        return arguments
+    return "{}"
+
+
 def _iso_now() -> str:
     """Return current UTC time as ISO 8601 string."""
     return datetime.now(UTC).isoformat()
@@ -110,12 +127,31 @@ async def process_user_message(
         system_prompt = None
 
     for entry in transcript:
-        msg: dict = {"role": entry["role"], "content": entry.get("content", "")}
-        if entry.get("tool_calls"):
-            msg["tool_calls"] = entry["tool_calls"]
-        if entry.get("tool_call_id"):
-            msg["tool_call_id"] = entry["tool_call_id"]
-        messages_for_llm.append(msg)
+        role = entry["role"]
+        if role == "assistant" and entry.get("tool_calls"):
+            msg: dict = {"role": "assistant", "content": entry.get("content") or None}
+            msg["tool_calls"] = [
+                {
+                    "id": tc.get("id", ""),
+                    "type": "function",
+                    "function": {
+                        "name": tc.get("tool_name", tc.get("name", "")),
+                        "arguments": _serialize_tool_arguments(tc.get("arguments", {})),
+                    },
+                }
+                for tc in entry["tool_calls"]
+            ]
+            messages_for_llm.append(msg)
+        elif role == "tool":
+            messages_for_llm.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": entry.get("tool_call_id", ""),
+                    "content": entry.get("content", ""),
+                }
+            )
+        else:
+            messages_for_llm.append({"role": role, "content": entry.get("content", "")})
 
     # Append the new user message
     user_message = {
@@ -236,7 +272,7 @@ async def process_user_message(
                         "type": "function",
                         "function": {
                             "name": tc["tool_name"],
-                            "arguments": json.dumps(tc["arguments"]),
+                            "arguments": _serialize_tool_arguments(tc["arguments"]),
                         },
                     }
                     for tc in tool_calls_list

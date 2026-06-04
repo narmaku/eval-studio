@@ -17,6 +17,7 @@ import type {
 } from '@/types';
 import { api } from '@/services/api';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { generateId } from '@/lib/utils';
 
 function buildWsUrl(sessionId: string): string {
   const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
@@ -82,7 +83,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (!currentSession || !wsRef || wsRef.readyState !== WebSocket.OPEN) return;
 
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       sender: 'user',
       content,
       timestamp: new Date().toISOString(),
@@ -308,11 +309,14 @@ function handleWsMessage(
 
     case 'error': {
       const errorMsg = envelope as unknown as WsErrorMessage;
-      set({ error: errorMsg.data.message, isProcessing: false });
+      const errText = errorMsg.data.message;
+      const shortMsg = errText.length > 120 ? errText.slice(0, 120) + '...' : errText;
+      set({ error: errText, isProcessing: false });
       useNotificationStore.getState().addNotification({
         type: 'error',
         title: 'Session Error',
-        message: errorMsg.data.message,
+        message: shortMsg,
+        details: errText,
       });
       break;
     }

@@ -18,10 +18,60 @@ import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { api } from '@/services/api';
-import { Play, Square, RefreshCw, Wifi, WifiOff, Clock, ExternalLink, Wrench } from 'lucide-react';
+import {
+  Play,
+  Square,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  Clock,
+  ExternalLink,
+  Wrench,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+} from 'lucide-react';
 import type { ModelEndpoint, JudgeReference, ToolServer } from '@/types';
 
 type PagePhase = 'configure' | 'active' | 'review';
+
+function SessionErrorBanner({ error }: { error: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const firstLine = error.split('\n')[0];
+  const hasMultipleLines = error.includes('\n');
+
+  return (
+    <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2">
+      <div className="flex items-start gap-2">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-destructive">{firstLine}</p>
+          {hasMultipleLines && (
+            <>
+              <button
+                type="button"
+                className="mt-1 flex items-center gap-1 text-xs font-medium text-destructive/70 hover:text-destructive"
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? (
+                  <ChevronUp className="h-3 w-3" />
+                ) : (
+                  <ChevronDown className="h-3 w-3" />
+                )}
+                {expanded ? 'Hide details' : 'Show details'}
+              </button>
+              {expanded && (
+                <pre className="mt-2 max-h-60 overflow-auto rounded bg-zinc-950 p-3 text-xs text-zinc-300 whitespace-pre-wrap">
+                  {error}
+                </pre>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AgentEvaluation() {
   const [phase, setPhase] = useState<PagePhase>('configure');
@@ -329,7 +379,7 @@ export default function AgentEvaluation() {
             </Button>
           </div>
 
-          {/* Connection lost banner */}
+          {/* Error banners */}
           {error && !isConnected && currentSession?.status === 'active' && (
             <div className="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2">
               <p className="text-sm text-destructive">{error}</p>
@@ -339,6 +389,7 @@ export default function AgentEvaluation() {
               </Button>
             </div>
           )}
+          {error && isConnected && <SessionErrorBanner error={error} />}
 
           {/* Chat-primary layout with collapsible tool panel */}
           <div className="flex flex-1 gap-4" style={{ minHeight: '500px' }}>

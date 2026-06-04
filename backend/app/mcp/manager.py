@@ -12,6 +12,16 @@ from app.mcp.client import McpStdioClient, McpToolDefinition, McpToolResult
 logger = structlog.get_logger()
 
 
+def _clean_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Strip JSON Schema meta-properties that LLM APIs don't accept (e.g. Gemini rejects $schema)."""
+    cleaned = {k: v for k, v in schema.items() if k != "$schema"}
+    if "properties" in cleaned and isinstance(cleaned["properties"], dict):
+        cleaned["properties"] = {k: _clean_schema(v) for k, v in cleaned["properties"].items()}
+    if "items" in cleaned and isinstance(cleaned["items"], dict):
+        cleaned["items"] = _clean_schema(cleaned["items"])
+    return cleaned
+
+
 def _tool_def_to_openai(tool_def: McpToolDefinition) -> dict[str, Any]:
     """Convert an McpToolDefinition to OpenAI function-calling format."""
     return {
@@ -19,7 +29,7 @@ def _tool_def_to_openai(tool_def: McpToolDefinition) -> dict[str, Any]:
         "function": {
             "name": tool_def.name,
             "description": tool_def.description,
-            "parameters": tool_def.parameters,
+            "parameters": _clean_schema(tool_def.parameters),
         },
     }
 

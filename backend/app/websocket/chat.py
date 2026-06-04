@@ -177,9 +177,9 @@ async def _handle_user_message(ws: WebSocket, session_id: str, raw: dict) -> Non
                 await ws.send_json(envelope)
     except ValueError as e:
         await _send_error(ws, session_id, str(e))
-    except Exception:
-        logger.exception("ws.message_error", session_id=session_id)
-        await _send_error(ws, session_id, "Internal error processing message.")
+    except Exception as exc:
+        logger.exception("ws.message_error", session_id=session_id, error=str(exc))
+        await _send_error(ws, session_id, f"Error processing message: {exc}")
     finally:
         _processing.discard(session_id)
 
