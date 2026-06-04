@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.base import JudgeConfigParams, Message, ToolCall
 from app.adapters.factory import create_evaluation_adapter
 from app.agent_backends.factory import create_agent_backend
+from app.core.exceptions import sanitize_error_for_client
 from app.harnesses.factory import create_harness
 from app.harnesses.registry import harness_registry
 from app.mcp.manager import cleanup_manager, get_or_create_manager
@@ -310,7 +311,7 @@ async def process_user_message(
                         session_id=session_id,
                         tool_name=tool_name,
                     )
-                    result_text = f"Error executing tool: {exc}"
+                    result_text = f"Error executing tool: {sanitize_error_for_client(exc)}"
                     is_error = True
                     duration_ms = 0
 
@@ -632,7 +633,7 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
 
         except Exception as exc:
             logger.exception("agent_chat.judge_error", session_id=session_id)
-            session.error = f"Judge scoring failed: {exc}"
+            session.error = f"Judge scoring failed: {sanitize_error_for_client(exc)}"
 
     # Create Result and update Evaluation if session is linked to one
     if session.evaluation_id:

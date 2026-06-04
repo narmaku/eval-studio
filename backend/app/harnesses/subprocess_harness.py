@@ -8,6 +8,7 @@ from typing import Any
 
 import structlog
 
+from app.core.exceptions import sanitize_error_for_client
 from app.harnesses.base import AgentHarness, HarnessEvent
 from app.harnesses.factory import get_parser
 from app.harnesses.registry import HarnessProfile
@@ -150,7 +151,7 @@ class SubprocessHarness(AgentHarness):
             logger.exception("subprocess_harness.error", harness_id=self._profile.id)
             yield HarnessEvent(
                 type="error",
-                data={"message": f"Subprocess error: {exc}"},
+                data={"message": f"Subprocess error: {sanitize_error_for_client(exc)}"},
             )
         finally:
             self._process = None

@@ -71,6 +71,26 @@ confidence.
   judge. Configure single-model or multi-model panel judges with
   customizable scoring dimensions.
 
+## Security Considerations
+
+eval-studio is designed as a **localhost development tool** and does not
+include built-in authentication or authorization. All API endpoints and
+WebSocket connections are open by default.
+
+**If you need to expose eval-studio over a network:**
+
+- Place it behind a reverse proxy (e.g., nginx, Caddy, or Envoy) that
+  handles authentication.
+- Use an SSH tunnel (`ssh -L 8000:localhost:8000 remote-host`) for
+  remote access without exposing the service.
+- Restrict access at the firewall level so that only trusted networks
+  can reach the application ports.
+
+Error messages returned to clients are sanitized to prevent leaking
+internal details such as file paths, database connection strings, or
+stack traces. Full error information is always available in the
+server-side logs.
+
 ## Quick Start
 
 See the [Getting Started](getting-started.md) guide to set up your
