@@ -573,19 +573,19 @@ async def test_arena_unhandled_exception_sets_failed(db_session: AsyncSession, a
 
 
 def test_to_judge_params_with_none():
-    """_to_judge_params returns default JudgeConfigParams when None is passed."""
+    """to_judge_params returns default JudgeConfigParams when None is passed."""
     from app.adapters.base import JudgeConfigParams
-    from app.services.arena_evaluation_service import _to_judge_params
+    from app.services.judge_utils import to_judge_params
 
-    result = _to_judge_params(None)
+    result = to_judge_params(None)
     assert isinstance(result, JudgeConfigParams)
     assert result.model is None
 
 
 def test_to_judge_params_with_judge_config():
-    """_to_judge_params converts JudgeConfig ORM fields to JudgeConfigParams."""
+    """to_judge_params converts JudgeConfig ORM fields to JudgeConfigParams."""
     from app.models.evaluation import JudgeConfig
-    from app.services.arena_evaluation_service import _to_judge_params
+    from app.services.judge_utils import to_judge_params
 
     jc = JudgeConfig(
         name="test judge",
@@ -596,7 +596,7 @@ def test_to_judge_params_with_judge_config():
         dimensions={"accuracy": 0.5, "completeness": 0.5},
         aggregation="weighted_average",
     )
-    result = _to_judge_params(jc)
+    result = to_judge_params(jc)
     assert result.model == "gpt-4"
     assert result.temperature == 0.5
     assert result.prompt_template == "Rate this: {answer}"

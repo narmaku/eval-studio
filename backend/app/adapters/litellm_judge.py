@@ -1,8 +1,8 @@
 import json
-import logging
 from typing import Any
 
 import litellm
+import structlog
 
 from app.adapters.base import (
     EvaluationAdapter,
@@ -13,7 +13,7 @@ from app.adapters.base import (
 )
 from app.core.exceptions import sanitize_error_for_client
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 class LiteLLMJudgeAdapter(EvaluationAdapter):
@@ -186,12 +186,12 @@ Respond with ONLY a JSON object:
             response = await litellm.acompletion(**kwargs)
             content = response.choices[0].message.content
             if content is None:
-                logger.warning("LLM returned empty content for Q&A evaluation")
+                logger.warning("judge.empty_response", mode="qa")
                 return Score(value=0.0, passed=False, reasoning="LLM returned empty response")
             try:
                 result = json.loads(content)
             except (json.JSONDecodeError, TypeError) as exc:
-                logger.error("Failed to parse LLM judge response: %s", exc, extra={"raw_content": content})
+                logger.error("judge.parse_failed", error=str(exc), raw_content=content)
                 return Score(
                     value=0.0,
                     passed=False,
@@ -286,13 +286,13 @@ Respond with ONLY a JSON object:
             content = response.choices[0].message.content
 
             if content is None:
-                logger.warning("LLM returned empty content for conversation evaluation")
+                logger.warning("judge.empty_response", mode="conversation")
                 return Score(value=0.0, passed=False, reasoning="LLM returned empty response")
 
             try:
                 result = json.loads(content)
             except (json.JSONDecodeError, TypeError) as exc:
-                logger.error("Failed to parse LLM judge response: %s", exc, extra={"raw_content": content})
+                logger.error("judge.parse_failed", error=str(exc), raw_content=content)
                 return Score(
                     value=0.0,
                     passed=False,
@@ -361,7 +361,7 @@ Respond with ONLY a JSON object:
             content = response.choices[0].message.content
 
             if content is None:
-                logger.warning("LLM returned empty content for RAG evaluation")
+                logger.warning("judge.empty_response", mode="rag")
                 return {
                     dim: Score(value=0.0, passed=False, reasoning="LLM returned empty response")
                     for dim in self._RAG_DIMENSIONS
@@ -371,7 +371,7 @@ Respond with ONLY a JSON object:
             try:
                 result = json.loads(content)
             except (json.JSONDecodeError, TypeError) as exc:
-                logger.error("Failed to parse LLM judge response: %s", exc, extra={"raw_content": content})
+                logger.error("judge.parse_failed", error=str(exc), raw_content=content)
                 return {
                     dim: Score(
                         value=0.0,
