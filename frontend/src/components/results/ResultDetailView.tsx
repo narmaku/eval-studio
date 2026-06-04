@@ -34,12 +34,6 @@ interface ResultDetailViewProps {
   datasetItems?: DatasetItem[];
 }
 
-function truncate(text: string | null | undefined, maxLength: number): string {
-  if (!text) return '--';
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '...';
-}
-
 function ScoreBreakdownBadges({
   breakdown,
 }: {
@@ -82,7 +76,7 @@ function ExpandableText({
     <span className="whitespace-pre-line text-sm">
       {expanded ? content : `${content.slice(0, maxLength)}...`}
       <button
-        className="ml-1 text-primary underline text-xs"
+        className="ml-1 text-primary underline text-xs whitespace-nowrap"
         onClick={(e) => {
           e.stopPropagation();
           setExpanded(!expanded);
@@ -289,7 +283,7 @@ export function ResultDetailView({
       },
       cell: ({ getValue }) => (
         <span className="block max-w-[250px] truncate" title={getValue<string>()}>
-          {truncate(getValue<string>(), 80)}
+          {getValue<string>()}
         </span>
       ),
     }),
@@ -311,7 +305,8 @@ export function ResultDetailView({
     }
   }, [evaluationMode, questionColumn]);
 
-  const isExpandable = evaluationMode !== 'agent';
+  const isExpandable =
+    evaluationMode === 'qa' || evaluationMode === 'rag' || evaluationMode === 'arena';
 
   const table = useReactTable({
     data: results,
