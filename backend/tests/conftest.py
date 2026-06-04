@@ -50,30 +50,25 @@ def _isolate_yaml_registries(tmp_path):
     Prevents tests from reading or writing real config/*.yaml files.
     Integration tests that need seeded data add their own fixtures on top.
     """
-    registries_info = [
-        (provider_registry, "_providers"),
-        (tool_server_registry, "_servers"),
-        (harness_registry, "_harnesses"),
-    ]
+    registries = [provider_registry, tool_server_registry, harness_registry]
     originals = []
-    for registry, dict_attr in registries_info:
+    for registry in registries:
         originals.append(
             {
                 "registry": registry,
-                "dict_attr": dict_attr,
-                "data": getattr(registry, dict_attr).copy(),
+                "data": registry._items.copy(),
                 "config_path": registry._config_path,
                 "last_mtime": registry._last_mtime,
             }
         )
         config_name = registry._config_path.name if registry._config_path else "config.yaml"
         registry._config_path = tmp_path / config_name
-        getattr(registry, dict_attr).clear()
+        registry._items.clear()
         registry._last_mtime = 0.0
 
     # Seed a minimal test judge provider (many evaluation tests need one)
     # and persist so _check_reload() doesn't wipe it when the file is missing
-    provider_registry._providers["__test__"] = ProviderProfile(
+    provider_registry._items["__test__"] = ProviderProfile(
         id="__test__",
         name="Test Judge",
         litellm_model="test-judge-model",
@@ -85,8 +80,7 @@ def _isolate_yaml_registries(tmp_path):
 
     for orig in originals:
         reg = orig["registry"]
-        attr = orig["dict_attr"]
-        getattr(reg, attr).clear()
-        getattr(reg, attr).update(orig["data"])
+        reg._items.clear()
+        reg._items.update(orig["data"])
         reg._config_path = orig["config_path"]
         reg._last_mtime = orig["last_mtime"]

@@ -12,7 +12,7 @@ def _seed_test_tool_servers(tmp_path):
     The root conftest isolates all registries to temp paths automatically.
     """
     tool_server_registry._config_path = tmp_path / "tool_servers.yaml"
-    tool_server_registry._servers["test-mcp"] = ToolServerProfile(
+    tool_server_registry._items["test-mcp"] = ToolServerProfile(
         id="test-mcp",
         name="Test MCP Server",
         type="mcp_stdio",
@@ -23,7 +23,7 @@ def _seed_test_tool_servers(tmp_path):
         tags=["test"],
         enabled=True,
     )
-    tool_server_registry._servers["test-standalone"] = ToolServerProfile(
+    tool_server_registry._items["test-standalone"] = ToolServerProfile(
         id="test-standalone",
         name="Test Standalone",
         type="standalone",

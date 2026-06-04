@@ -19,14 +19,14 @@ def _extract_log_messages(mock_broadcast_log: AsyncMock) -> list[str]:
 
 @pytest.fixture(autouse=True)
 def _register_test_judge_provider():
-    provider_registry._providers["__test__"] = ProviderProfile(
+    provider_registry._items["__test__"] = ProviderProfile(
         id="__test__",
         name="Test Judge",
         litellm_model="test-judge-model",
         purpose="judge",
     )
     yield
-    provider_registry._providers.pop("__test__", None)
+    provider_registry._items.pop("__test__", None)
 
 
 @pytest.fixture

@@ -12,7 +12,7 @@ from app.services.provider_utils import ResolvedModel, resolve_model_config
 def registry():
     """Create a fresh provider registry for each test."""
     reg = ProviderRegistry()
-    reg._providers["local-llama"] = ProviderProfile(
+    reg._items["local-llama"] = ProviderProfile(
         id="local-llama",
         name="Local Llama",
         litellm_model="openai/llama3",
@@ -20,7 +20,7 @@ def registry():
         api_key_env=None,
         proxy="http://proxy:8888",
     )
-    reg._providers["cloud-gpt"] = ProviderProfile(
+    reg._items["cloud-gpt"] = ProviderProfile(
         id="cloud-gpt",
         name="Cloud GPT",
         litellm_model="gpt-4",

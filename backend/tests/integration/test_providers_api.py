@@ -13,8 +13,8 @@ def _seed_test_providers(tmp_path):
     This fixture only needs to seed test data.
     """
     provider_registry._config_path = tmp_path / "providers.yaml"
-    provider_registry._providers.clear()
-    provider_registry._providers["test-model"] = ProviderProfile(
+    provider_registry._items.clear()
+    provider_registry._items["test-model"] = ProviderProfile(
         id="test-model",
         name="Test Model",
         litellm_model="gpt-4",
@@ -23,7 +23,7 @@ def _seed_test_providers(tmp_path):
         tags=["test"],
         purpose="test",
     )
-    provider_registry._providers["test-judge"] = ProviderProfile(
+    provider_registry._items["test-judge"] = ProviderProfile(
         id="test-judge",
         name="Test Judge",
         litellm_model="gpt-4.1",
@@ -32,7 +32,7 @@ def _seed_test_providers(tmp_path):
         tags=["judge"],
         purpose="judge",
     )
-    provider_registry._providers["no-key-provider"] = ProviderProfile(
+    provider_registry._items["no-key-provider"] = ProviderProfile(
         id="no-key-provider",
         name="No Key Provider",
         litellm_model="ollama/llama3",
