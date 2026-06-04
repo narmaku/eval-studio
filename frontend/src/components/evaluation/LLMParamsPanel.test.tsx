@@ -1,7 +1,27 @@
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { LLMParamsPanel } from './LLMParamsPanel';
+import type { LLMParams } from '@/types';
+
+/** Wrapper that manages state so controlled inputs work correctly in tests. */
+function Wrapper({
+  initial = {},
+  onChange,
+  label,
+}: {
+  initial?: LLMParams;
+  onChange?: (params: LLMParams) => void;
+  label?: string;
+}) {
+  const [value, setValue] = useState<LLMParams>(initial);
+  const handleChange = (next: LLMParams) => {
+    setValue(next);
+    onChange?.(next);
+  };
+  return <LLMParamsPanel label={label} value={value} onChange={handleChange} />;
+}
 
 describe('LLMParamsPanel', () => {
   it('renders the toggle button with default label', () => {
@@ -48,14 +68,14 @@ describe('LLMParamsPanel', () => {
   it('calls onChange with updated value when input changes', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(<LLMParamsPanel value={{}} onChange={onChange} />);
+    render(<Wrapper onChange={onChange} />);
 
     await user.click(screen.getByText('Advanced Parameters'));
     await user.type(screen.getByLabelText('Max Tokens'), '1024');
 
-    // onChange should have been called (potentially multiple times during typing)
+    // onChange should have been called (multiple times during typing)
     expect(onChange).toHaveBeenCalled();
-    // The last call should have max_tokens set
+    // The last call should have max_tokens set to 1024
     const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1]![0] as Record<
       string,
       number
@@ -66,9 +86,7 @@ describe('LLMParamsPanel', () => {
   it('removes param from value when input is cleared', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(
-      <LLMParamsPanel value={{ temperature: 0.7 }} onChange={onChange} />,
-    );
+    render(<Wrapper initial={{ temperature: 0.7 }} onChange={onChange} />);
 
     await user.click(screen.getByText('Advanced Parameters'));
     const tempInput = screen.getByLabelText('Temperature');

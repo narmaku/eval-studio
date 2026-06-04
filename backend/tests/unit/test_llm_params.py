@@ -42,11 +42,7 @@ class TestProviderDefaultParams:
 
     def test_default_params_none_when_not_set(self, tmp_path):
         """default_params is None when not specified in YAML."""
-        config = {
-            "providers": [
-                {"id": "no-defaults", "name": "No Defaults", "litellm_model": "gpt-4"}
-            ]
-        }
+        config = {"providers": [{"id": "no-defaults", "name": "No Defaults", "litellm_model": "gpt-4"}]}
         config_file = tmp_path / "providers.yaml"
         config_file.write_text(yaml.dump(config))
 
@@ -226,4 +222,4 @@ class TestAllowedLLMParams:
     def test_allowed_params_set(self):
         """The allowed params set contains exactly the expected names."""
         expected = {"max_tokens", "temperature", "top_p", "frequency_penalty", "presence_penalty"}
-        assert ALLOWED_LLM_PARAMS == expected
+        assert expected == ALLOWED_LLM_PARAMS
