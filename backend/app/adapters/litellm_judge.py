@@ -145,11 +145,13 @@ Respond with ONLY a JSON object:
         api_key: str | None = None,
         api_base: str | None = None,
         max_concurrency: int = 10,
+        extra_params: dict | None = None,
     ):
         super().__init__(max_concurrency=max_concurrency)
         self.model = model
         self.api_key = api_key
         self.api_base = api_base
+        self.extra_params = extra_params or {}
 
     async def evaluate_qa(
         self,
@@ -176,6 +178,10 @@ Respond with ONLY a JSON object:
                 kwargs["api_key"] = self.api_key
             if self.api_base:
                 kwargs["api_base"] = self.api_base
+            # Apply extra LLM params (e.g. max_tokens from provider/eval config)
+            for k, v in self.extra_params.items():
+                if k not in kwargs:
+                    kwargs[k] = v
             response = await litellm.acompletion(**kwargs)
             content = response.choices[0].message.content
             if content is None:
@@ -267,6 +273,9 @@ Respond with ONLY a JSON object:
                 kwargs["api_key"] = self.api_key
             if self.api_base:
                 kwargs["api_base"] = self.api_base
+            for k, v in self.extra_params.items():
+                if k not in kwargs:
+                    kwargs[k] = v
 
             response = await litellm.acompletion(**kwargs)
             content = response.choices[0].message.content
@@ -335,6 +344,9 @@ Respond with ONLY a JSON object:
                 kwargs["api_key"] = self.api_key
             if self.api_base:
                 kwargs["api_base"] = self.api_base
+            for k, v in self.extra_params.items():
+                if k not in kwargs:
+                    kwargs[k] = v
 
             response = await litellm.acompletion(**kwargs)
             content = response.choices[0].message.content

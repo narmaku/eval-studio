@@ -23,6 +23,7 @@ class ProviderProfile:
     ssl_cert_path: str | None = None
     tags: list[str] = field(default_factory=list)
     purpose: str = "test"  # "test" (model under test) or "judge"
+    default_params: dict | None = None  # e.g. {"max_tokens": 2048, "temperature": 0.7}
 
     @property
     def api_key(self) -> str | None:
@@ -60,6 +61,7 @@ class ProviderRegistry:
                 ssl_cert_path=item.get("ssl_cert_path"),
                 tags=item.get("tags", []),
                 purpose=item.get("purpose", "test"),
+                default_params=item.get("default_params"),
             )
             self._providers[profile.id] = profile
         self._last_mtime = os.path.getmtime(path)
@@ -132,6 +134,7 @@ class ProviderRegistry:
                     **({"ssl_cert_path": p.ssl_cert_path} if p.ssl_cert_path else {}),
                     **({"tags": p.tags} if p.tags else {}),
                     **({"purpose": p.purpose} if p.purpose != "test" else {}),
+                    **({"default_params": p.default_params} if p.default_params else {}),
                 }
                 for p in self._providers.values()
             ]

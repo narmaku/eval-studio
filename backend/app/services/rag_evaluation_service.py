@@ -18,7 +18,7 @@ from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.rag_backends.factory import create_rag_adapter
-from app.services.provider_utils import resolve_judge_config
+from app.services.provider_utils import merge_llm_params, resolve_judge_config
 from app.websocket.progress import broadcast_log, broadcast_progress, broadcast_status
 
 logger = structlog.get_logger()
@@ -158,6 +158,9 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             await broadcast_status(evaluation_id, "failed", error=evaluation.error)
             return
 
+        # Merge judge LLM params: judge provider defaults < eval-level judge_params
+        judge_llm_params = merge_llm_params(judge_resolved.default_params, config.get("judge_params"))
+
         logger.info(
             "rag_evaluation.judge_resolved",
             model=judge_resolved.model,
@@ -176,6 +179,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             api_key=judge_resolved.api_key,
             api_base=judge_resolved.api_base,
             max_concurrency=config.get("max_concurrency", 10),
+            extra_params=judge_llm_params if judge_llm_params else None,
         )
 
         # 7. Process each dataset item

@@ -15,7 +15,8 @@ import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
-import type { JudgeReference, Result, CreateEvaluationRequest } from '@/types';
+import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
+import type { JudgeReference, Result, CreateEvaluationRequest, LLMParams } from '@/types';
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
@@ -52,6 +53,7 @@ export default function RAGEvaluation() {
   const [ragEndpoint, setRagEndpoint] = useState<RAGEndpointSettings>();
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(ALL_RAG_METRICS);
   const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
+  const [judgeParams, setJudgeParams] = useState<LLMParams>({});
   const [selectedResult, setSelectedResult] = useState<Result | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -101,6 +103,7 @@ export default function RAGEvaluation() {
         evaluator_id: selectedEvaluatorId ?? undefined,
         rag_endpoint: ragEndpoint,
         rag_metrics: selectedMetrics,
+        ...(Object.keys(judgeParams).length > 0 && { judge_params: judgeParams }),
       },
     };
 
@@ -166,6 +169,7 @@ export default function RAGEvaluation() {
     setRagEndpoint(undefined);
     setSelectedMetrics(ALL_RAG_METRICS);
     setJudgeConfig(undefined);
+    setJudgeParams({});
     setSelectedResult(null);
     setDrawerOpen(false);
     useEvaluatorStore.getState().resetSelection();
@@ -199,6 +203,7 @@ export default function RAGEvaluation() {
               <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
             </div>
           </div>
+          <LLMParamsPanel label="Judge Parameters" value={judgeParams} onChange={setJudgeParams} />
           <Button
             className="w-full"
             disabled={!isConfigValid || isLoading}

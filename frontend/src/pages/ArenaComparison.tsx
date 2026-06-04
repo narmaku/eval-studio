@@ -14,11 +14,13 @@ import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { api } from '@/services/api';
+import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
 import type {
   ModelEndpoint,
   JudgeReference,
   CreateEvaluationRequest,
   ArenaLeaderboardResponse,
+  LLMParams,
 } from '@/types';
 
 type PagePhase = 'configure' | 'running' | 'complete';
@@ -55,6 +57,8 @@ export default function ArenaComparison() {
   const [contestants, setContestants] = useState<ModelEndpoint[]>([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>();
   const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
+  const [modelParams, setModelParams] = useState<LLMParams>({});
+  const [judgeParams, setJudgeParams] = useState<LLMParams>({});
   const [leaderboard, setLeaderboard] = useState<ArenaLeaderboardResponse | null>(null);
 
   const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
@@ -84,6 +88,8 @@ export default function ArenaComparison() {
         judge_config: judgeConfig,
         evaluator_id: selectedEvaluatorId ?? undefined,
         contestants: validContestants,
+        ...(Object.keys(modelParams).length > 0 && { model_params: modelParams }),
+        ...(Object.keys(judgeParams).length > 0 && { judge_params: judgeParams }),
       },
     };
 
@@ -149,6 +155,8 @@ export default function ArenaComparison() {
     setContestants([]);
     setSelectedDatasetId(undefined);
     setJudgeConfig(undefined);
+    setModelParams({});
+    setJudgeParams({});
     setLeaderboard(null);
     useEvaluatorStore.getState().resetSelection();
   };
@@ -179,9 +187,13 @@ export default function ArenaComparison() {
               </div>
               <ContestantSelector value={contestants} onChange={setContestants} />
             </div>
-            <div>
+            <div className="space-y-4">
               <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
             </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <LLMParamsPanel label="Model Parameters" value={modelParams} onChange={setModelParams} />
+            <LLMParamsPanel label="Judge Parameters" value={judgeParams} onChange={setJudgeParams} />
           </div>
           <Button
             className="w-full"
