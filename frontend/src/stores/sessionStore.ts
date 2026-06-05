@@ -42,6 +42,7 @@ interface SessionStore {
   error: string | null;
 
   // Actions
+  clearError: () => void;
   createSession: (config: CreateSessionRequest) => Promise<void>;
   sendMessage: (content: string) => void;
   endSession: () => Promise<void>;
@@ -61,6 +62,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   isConnected: false,
   isProcessing: false,
   error: null,
+
+  clearError: () => set({ error: null }),
 
   createSession: async (config: CreateSessionRequest) => {
     set({ error: null });
