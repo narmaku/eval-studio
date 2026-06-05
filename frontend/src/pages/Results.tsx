@@ -1,16 +1,22 @@
 import { useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import { EvaluationResultsList } from '@/components/results';
 import type { EvaluationResultRow } from '@/components/results';
 
 export default function Results() {
+  const navigate = useNavigate();
   const {
     results,
     isLoading: resultsLoading,
     error: resultsError,
     fetchResults,
+    selectedEvaluationIds,
+    referenceEvaluationId,
+    clearSelection,
   } = useResultStore();
 
   const {
@@ -65,6 +71,17 @@ export default function Results() {
     });
   }, [results, evaluations]);
 
+  const canCompare = selectedEvaluationIds.length >= 2;
+
+  const handleCompare = () => {
+    const params = new URLSearchParams();
+    selectedEvaluationIds.forEach((id) => params.append('ids', id));
+    if (referenceEvaluationId) {
+      params.set('ref', referenceEvaluationId);
+    }
+    navigate(`/results/compare?${params.toString()}`);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -91,6 +108,22 @@ export default function Results() {
       )}
 
       {!isLoading && !error && <EvaluationResultsList rows={rows} />}
+
+      {selectedEvaluationIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2" data-testid="compare-action-bar">
+          <div className="flex items-center gap-4 rounded-lg border bg-background px-6 py-3 shadow-lg">
+            <span className="text-sm text-muted-foreground">
+              {selectedEvaluationIds.length} evaluation{selectedEvaluationIds.length !== 1 ? 's' : ''} selected
+            </span>
+            <Button variant="outline" size="sm" onClick={clearSelection}>
+              Clear Selection
+            </Button>
+            <Button size="sm" disabled={!canCompare} onClick={handleCompare}>
+              Compare
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
