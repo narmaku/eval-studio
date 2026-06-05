@@ -11,27 +11,38 @@ vi.mock('react-router-dom', () => ({
 }));
 
 const mockFetchComparison = vi.fn();
+const mockClearSelection = vi.fn();
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SelectorFn = (state: any) => unknown;
+
+const defaultStoreState = {
+  comparisonData: null,
+  isLoading: false,
+  error: null,
+  fetchComparison: mockFetchComparison,
+  clearSelection: mockClearSelection,
+};
 
 vi.mock('@/stores/resultStore', () => ({
-  useResultStore: vi.fn((selector: (state: Record<string, unknown>) => unknown) => {
-    const state = {
-      comparisonData: null as Record<string, unknown> | null,
-      isLoading: false,
-      error: null as string | null,
-      fetchComparison: mockFetchComparison,
-      clearSelection: vi.fn(),
-    };
-    return selector(state);
-  }),
+  useResultStore: vi.fn((selector: SelectorFn) => selector(defaultStoreState)),
 }));
 
 import { useResultStore } from '@/stores/resultStore';
 const mockedUseResultStore = vi.mocked(useResultStore);
 
+function mockStoreWith(overrides: Record<string, unknown>) {
+  const state = { ...defaultStoreState, ...overrides };
+  mockedUseResultStore.mockImplementation((selector: SelectorFn) => selector(state));
+}
+
 describe('ResultComparison', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams = new URLSearchParams('ids=e1&ids=e2&ref=e1');
+    mockedUseResultStore.mockImplementation((selector: SelectorFn) =>
+      selector(defaultStoreState),
+    );
   });
 
   it('calls fetchComparison on mount with URL params', () => {
@@ -40,167 +51,122 @@ describe('ResultComparison', () => {
   });
 
   it('shows loading state', () => {
-    mockedUseResultStore.mockImplementation(
-      (selector: (state: Record<string, unknown>) => unknown) => {
-        const state = {
-          comparisonData: null,
-          isLoading: true,
-          error: null,
-          fetchComparison: mockFetchComparison,
-          clearSelection: vi.fn(),
-        };
-        return selector(state);
-      },
-    );
-
+    mockStoreWith({ isLoading: true });
     render(<ResultComparison />);
     expect(screen.getByText(/loading comparison/i)).toBeInTheDocument();
   });
 
   it('shows error state', () => {
-    mockedUseResultStore.mockImplementation(
-      (selector: (state: Record<string, unknown>) => unknown) => {
-        const state = {
-          comparisonData: null,
-          isLoading: false,
-          error: 'Incompatible evaluations',
-          fetchComparison: mockFetchComparison,
-          clearSelection: vi.fn(),
-        };
-        return selector(state);
-      },
-    );
-
+    mockStoreWith({ error: 'Incompatible evaluations' });
     render(<ResultComparison />);
     expect(screen.getByText(/incompatible evaluations/i)).toBeInTheDocument();
   });
 
   it('renders leaderboard when comparison data is available', () => {
-    mockedUseResultStore.mockImplementation(
-      (selector: (state: Record<string, unknown>) => unknown) => {
-        const state = {
-          comparisonData: {
-            evaluations: [
-              {
-                evaluation_id: 'e1',
-                evaluation_name: 'Eval A',
-                total_items: 10,
-                passed_count: 8,
-                failed_count: 2,
-                average_score: 0.85,
-                min_score: 0.5,
-                max_score: 1.0,
-                results: [],
-              },
-              {
-                evaluation_id: 'e2',
-                evaluation_name: 'Eval B',
-                total_items: 10,
-                passed_count: 6,
-                failed_count: 4,
-                average_score: 0.72,
-                min_score: 0.3,
-                max_score: 0.95,
-                results: [],
-              },
-            ],
-            item_comparisons: [],
-            reference_evaluation_id: 'e1',
+    mockStoreWith({
+      comparisonData: {
+        evaluations: [
+          {
+            evaluation_id: 'e1',
+            evaluation_name: 'Eval A',
+            total_items: 10,
+            passed_count: 8,
+            failed_count: 2,
+            average_score: 0.85,
+            min_score: 0.5,
+            max_score: 1.0,
+            results: [],
           },
-          isLoading: false,
-          error: null,
-          fetchComparison: mockFetchComparison,
-          clearSelection: vi.fn(),
-        };
-        return selector(state);
+          {
+            evaluation_id: 'e2',
+            evaluation_name: 'Eval B',
+            total_items: 10,
+            passed_count: 6,
+            failed_count: 4,
+            average_score: 0.72,
+            min_score: 0.3,
+            max_score: 0.95,
+            results: [],
+          },
+        ],
+        item_comparisons: [],
+        reference_evaluation_id: 'e1',
       },
-    );
+    });
 
     render(<ResultComparison />);
-    // Should show evaluation names in leaderboard
     expect(screen.getByText('Eval A')).toBeInTheDocument();
     expect(screen.getByText('Eval B')).toBeInTheDocument();
-    // Should show the comparison heading
     expect(screen.getByText('Evaluation Comparison')).toBeInTheDocument();
   });
 
   it('renders per-item comparison grid when items exist', () => {
-    mockedUseResultStore.mockImplementation(
-      (selector: (state: Record<string, unknown>) => unknown) => {
-        const state = {
-          comparisonData: {
-            evaluations: [
-              {
-                evaluation_id: 'e1',
-                evaluation_name: 'Eval A',
-                total_items: 1,
-                passed_count: 1,
-                failed_count: 0,
-                average_score: 0.9,
-                min_score: 0.9,
-                max_score: 0.9,
-                results: [],
-              },
-              {
-                evaluation_id: 'e2',
-                evaluation_name: 'Eval B',
-                total_items: 1,
-                passed_count: 0,
-                failed_count: 1,
-                average_score: 0.4,
-                min_score: 0.4,
-                max_score: 0.4,
-                results: [],
-              },
-            ],
-            item_comparisons: [
-              {
-                dataset_item_id: 'item-1',
-                results: [
-                  {
-                    id: 'r1',
-                    evaluation_id: 'e1',
-                    dataset_item_id: 'item-1',
-                    session_id: null,
-                    contestant_model: null,
-                    score: 0.9,
-                    passed: true,
-                    actual_answer: 'Answer A',
-                    judge_reasoning: 'Good',
-                    scores_breakdown: null,
-                    retrieved_chunks: null,
-                    created_at: '2026-01-01T00:00:00Z',
-                  },
-                  {
-                    id: 'r2',
-                    evaluation_id: 'e2',
-                    dataset_item_id: 'item-1',
-                    session_id: null,
-                    contestant_model: null,
-                    score: 0.4,
-                    passed: false,
-                    actual_answer: 'Answer B',
-                    judge_reasoning: 'Poor',
-                    scores_breakdown: null,
-                    retrieved_chunks: null,
-                    created_at: '2026-01-01T00:00:00Z',
-                  },
-                ],
-              },
-            ],
-            reference_evaluation_id: 'e1',
+    mockStoreWith({
+      comparisonData: {
+        evaluations: [
+          {
+            evaluation_id: 'e1',
+            evaluation_name: 'Eval A',
+            total_items: 1,
+            passed_count: 1,
+            failed_count: 0,
+            average_score: 0.9,
+            min_score: 0.9,
+            max_score: 0.9,
+            results: [],
           },
-          isLoading: false,
-          error: null,
-          fetchComparison: mockFetchComparison,
-          clearSelection: vi.fn(),
-        };
-        return selector(state);
+          {
+            evaluation_id: 'e2',
+            evaluation_name: 'Eval B',
+            total_items: 1,
+            passed_count: 0,
+            failed_count: 1,
+            average_score: 0.4,
+            min_score: 0.4,
+            max_score: 0.4,
+            results: [],
+          },
+        ],
+        item_comparisons: [
+          {
+            dataset_item_id: 'item-1',
+            results: [
+              {
+                id: 'r1',
+                evaluation_id: 'e1',
+                dataset_item_id: 'item-1',
+                session_id: null,
+                contestant_model: null,
+                score: 0.9,
+                passed: true,
+                actual_answer: 'Answer A',
+                judge_reasoning: 'Good',
+                scores_breakdown: null,
+                retrieved_chunks: null,
+                created_at: '2026-01-01T00:00:00Z',
+              },
+              {
+                id: 'r2',
+                evaluation_id: 'e2',
+                dataset_item_id: 'item-1',
+                session_id: null,
+                contestant_model: null,
+                score: 0.4,
+                passed: false,
+                actual_answer: 'Answer B',
+                judge_reasoning: 'Poor',
+                scores_breakdown: null,
+                retrieved_chunks: null,
+                created_at: '2026-01-01T00:00:00Z',
+              },
+            ],
+          },
+        ],
+        reference_evaluation_id: 'e1',
       },
-    );
+    });
 
     render(<ResultComparison />);
-    // Should show the per-item section
     expect(screen.getByText(/per-item comparison/i)).toBeInTheDocument();
     expect(screen.getByText('item-1')).toBeInTheDocument();
   });

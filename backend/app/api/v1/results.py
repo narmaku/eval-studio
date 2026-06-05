@@ -88,8 +88,7 @@ async def compare_results(
     dataset_ids = {e.dataset_id for e in evaluations}
     if len(dataset_ids) > 1:
         raise ValidationException(
-            "Cannot compare evaluations with different datasets. "
-            "All evaluations must use the same dataset."
+            "Cannot compare evaluations with different datasets. All evaluations must use the same dataset."
         )
 
     # 4. Build per-evaluation comparison items

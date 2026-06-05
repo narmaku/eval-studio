@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EvaluationResultsList } from './EvaluationResultsList';
@@ -14,21 +14,28 @@ vi.mock('react-router-dom', () => ({
 const mockToggleSelection = vi.fn();
 const mockSetReference = vi.fn();
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SelectorFn = (state: any) => unknown;
+
+const defaultState = {
+  selectedEvaluationIds: [] as string[],
+  referenceEvaluationId: null as string | null,
+  toggleSelection: mockToggleSelection,
+  setReference: mockSetReference,
+};
+
 vi.mock('@/stores/resultStore', () => ({
-  useResultStore: vi.fn((selector: (state: Record<string, unknown>) => unknown) => {
-    const state = {
-      selectedEvaluationIds: [] as string[],
-      referenceEvaluationId: null as string | null,
-      toggleSelection: mockToggleSelection,
-      setReference: mockSetReference,
-    };
-    return selector(state);
-  }),
+  useResultStore: vi.fn((selector: SelectorFn) => selector(defaultState)),
 }));
 
 import { useResultStore } from '@/stores/resultStore';
 
 const mockedUseResultStore = vi.mocked(useResultStore);
+
+function mockStoreWith(overrides: Record<string, unknown>) {
+  const state = { ...defaultState, ...overrides };
+  mockedUseResultStore.mockImplementation((selector: SelectorFn) => selector(state));
+}
 
 const mockRows: EvaluationResultRow[] = [
   {
@@ -72,17 +79,7 @@ const mockRows: EvaluationResultRow[] = [
 describe('EvaluationResultsList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedUseResultStore.mockImplementation(
-      (selector: (state: Record<string, unknown>) => unknown) => {
-        const state = {
-          selectedEvaluationIds: [] as string[],
-          referenceEvaluationId: null as string | null,
-          toggleSelection: mockToggleSelection,
-          setReference: mockSetReference,
-        };
-        return selector(state);
-      },
-    );
+    mockedUseResultStore.mockImplementation((selector: SelectorFn) => selector(defaultState));
   });
 
   it('renders table with data', () => {
@@ -163,17 +160,10 @@ describe('EvaluationResultsList', () => {
 
   it('greys out incompatible rows when selection is active', () => {
     // Simulate e1 (qa, ds1) selected
-    mockedUseResultStore.mockImplementation(
-      (selector: (state: Record<string, unknown>) => unknown) => {
-        const state = {
-          selectedEvaluationIds: ['e1'],
-          referenceEvaluationId: 'e1',
-          toggleSelection: mockToggleSelection,
-          setReference: mockSetReference,
-        };
-        return selector(state);
-      },
-    );
+    mockStoreWith({
+      selectedEvaluationIds: ['e1'],
+      referenceEvaluationId: 'e1',
+    });
 
     render(<EvaluationResultsList rows={mockRows} />);
 
@@ -197,20 +187,6 @@ describe('EvaluationResultsList', () => {
   });
 
   it('shows reference star icon on reference evaluation', () => {
-    mockedUseResultStore.mockImplementation(
-      (selector: (state: Record<string, unknown>) => unknown) => {
-        const state = {
-          selectedEvaluationIds: ['e1', 'e3'],
-          referenceEvaluationId: 'e1',
-          toggleSelection: mockToggleSelection,
-          setReference: mockSetReference,
-        };
-        return selector(state);
-      },
-    );
-
-    // Need compatible rows for this test - e3 has mode=agent, different from e1=qa
-    // Make a compatible set
     const compatibleRows: EvaluationResultRow[] = [
       { ...mockRows[0]!, evaluationId: 'e1' },
       {
@@ -227,17 +203,10 @@ describe('EvaluationResultsList', () => {
       },
     ];
 
-    mockedUseResultStore.mockImplementation(
-      (selector: (state: Record<string, unknown>) => unknown) => {
-        const state = {
-          selectedEvaluationIds: ['e1', 'e4'],
-          referenceEvaluationId: 'e1',
-          toggleSelection: mockToggleSelection,
-          setReference: mockSetReference,
-        };
-        return selector(state);
-      },
-    );
+    mockStoreWith({
+      selectedEvaluationIds: ['e1', 'e4'],
+      referenceEvaluationId: 'e1',
+    });
 
     render(<EvaluationResultsList rows={compatibleRows} />);
 
@@ -247,17 +216,10 @@ describe('EvaluationResultsList', () => {
   });
 
   it('disables checkbox for incompatible rows', () => {
-    mockedUseResultStore.mockImplementation(
-      (selector: (state: Record<string, unknown>) => unknown) => {
-        const state = {
-          selectedEvaluationIds: ['e1'],
-          referenceEvaluationId: 'e1',
-          toggleSelection: mockToggleSelection,
-          setReference: mockSetReference,
-        };
-        return selector(state);
-      },
-    );
+    mockStoreWith({
+      selectedEvaluationIds: ['e1'],
+      referenceEvaluationId: 'e1',
+    });
 
     render(<EvaluationResultsList rows={mockRows} />);
 
