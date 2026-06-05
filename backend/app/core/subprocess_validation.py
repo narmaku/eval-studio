@@ -1,4 +1,4 @@
-"""Subprocess binary validation — allowlist enforcement for harness execution.
+"""Subprocess binary validation — allowlist enforcement for harness and tool server execution.
 
 This module prevents arbitrary command execution by validating binaries
 against a configurable allowlist before any subprocess is spawned.
@@ -10,6 +10,10 @@ import shutil
 import structlog
 
 logger = structlog.get_logger()
+
+
+class CommandNotAllowedError(ValueError):
+    """Raised when a command is not in the allowed binaries list."""
 
 
 def validate_command(command: str, allowed_commands: set[str], context: str = "command") -> str:
@@ -45,9 +49,9 @@ def validate_command(command: str, allowed_commands: set[str], context: str = "c
     resolved = os.path.realpath(resolved)
 
     if resolved not in allowed_commands:
-        raise ValueError(
-            f"{context} '{resolved}' is not in the allowed binaries list. "
-            f"Configure HARNESS_ALLOWED_BINARIES to permit this binary."
+        raise CommandNotAllowedError(
+            f"{context} '{resolved}' is not in the allowed list. "
+            f"Configure the appropriate allowlist environment variable to permit this binary."
         )
 
     return resolved

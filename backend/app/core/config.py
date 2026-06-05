@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Leave empty to block all harness subprocess execution (secure default).
     harness_allowed_binaries: str = ""
 
+    # Security: comma-separated list of allowed tool server commands.
+    # Leave empty to block all tool server subprocess execution (secure default).
+    tool_server_allowed_commands: str = ""
+
     # Dataset import settings
     max_import_file_size: int = 10_485_760  # 10 MB
     max_import_total_size: int = 104_857_600  # 100 MB aggregate across all files

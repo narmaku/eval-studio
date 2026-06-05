@@ -9,6 +9,20 @@ import pytest
 from app.mcp.client import McpStdioClient, McpToolDefinition, McpToolResult
 
 
+@pytest.fixture(autouse=True)
+def _bypass_command_validation():
+    """Bypass command validation for existing MCP client tests.
+
+    These tests focus on the JSON-RPC protocol behaviour, not on the
+    allowlist enforcement (which has its own dedicated test module).
+    """
+    with patch(
+        "app.core.subprocess_validation.validate_command",
+        side_effect=lambda cmd, allowed, **kw: cmd,
+    ):
+        yield
+
+
 def _make_mock_process(responses: list[dict] | None = None):
     """Create a mock asyncio subprocess with controllable stdin/stdout/stderr.
 
