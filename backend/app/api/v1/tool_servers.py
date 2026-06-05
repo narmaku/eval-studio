@@ -6,7 +6,7 @@ import structlog
 from fastapi import APIRouter, Query, Response
 
 from app.core.config import settings
-from app.core.exceptions import NotFoundException, ValidationException
+from app.core.exceptions import AppException, NotFoundException, ValidationException
 from app.core.subprocess_validation import CommandNotAllowedError, load_allowed_commands, validate_command
 from app.core.tool_servers import StandaloneToolDef, ToolServerProfile, tool_server_registry
 from app.schemas.tool_server import ToolServerCreate, ToolServerResponse, ToolServerUpdate
@@ -85,7 +85,10 @@ async def create_tool_server(payload: ToolServerCreate) -> ToolServerResponse:
         tags=payload.tags,
         enabled=payload.enabled,
     )
-    tool_server_registry.add_tool_server(profile)
+    try:
+        tool_server_registry.add_tool_server(profile)
+    except RuntimeError as exc:
+        raise AppException(500, "Internal Server Error", str(exc)) from exc
     logger.info("tool_server.created", id=profile.id, name=profile.name)
     return _to_response(profile)
 
@@ -108,7 +111,10 @@ async def update_tool_server(tool_server_id: str, payload: ToolServerUpdate) -> 
             StandaloneToolDef(name=t["name"], description=t.get("description", ""), parameters=t.get("parameters", {}))
             for t in update_data["tools"]
         ]
-    updated = tool_server_registry.update_tool_server(tool_server_id, update_data)
+    try:
+        updated = tool_server_registry.update_tool_server(tool_server_id, update_data)
+    except RuntimeError as exc:
+        raise AppException(500, "Internal Server Error", str(exc)) from exc
     if not updated:
         raise NotFoundException("Tool Server", tool_server_id)
     logger.info("tool_server.updated", id=tool_server_id)
@@ -117,7 +123,11 @@ async def update_tool_server(tool_server_id: str, payload: ToolServerUpdate) -> 
 
 @router.delete("/{tool_server_id}", status_code=204)
 async def delete_tool_server(tool_server_id: str) -> Response:
-    if not tool_server_registry.delete_tool_server(tool_server_id):
+    try:
+        deleted = tool_server_registry.delete_tool_server(tool_server_id)
+    except RuntimeError as exc:
+        raise AppException(500, "Internal Server Error", str(exc)) from exc
+    if not deleted:
         raise NotFoundException("Tool Server", tool_server_id)
     logger.info("tool_server.deleted", id=tool_server_id)
     return Response(status_code=204)

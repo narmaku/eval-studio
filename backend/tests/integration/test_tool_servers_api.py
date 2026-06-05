@@ -150,3 +150,46 @@ async def test_tool_count_standalone(client):
 async def test_tool_count_mcp_null(client):
     response = await client.get("/api/v1/tool-servers/test-mcp")
     assert response.json()["tool_count"] is None
+
+
+@pytest.mark.asyncio
+async def test_create_returns_500_on_persist_failure(client):
+    """POST returns 500 with detail when YAML persistence fails."""
+    with patch(
+        "app.core.registry_base.YAMLBackedRegistry._persist_yaml",
+        side_effect=RuntimeError("Failed to save configuration to /tmp/config.yaml: Permission denied"),
+    ):
+        payload = {"name": "Doomed Server", "type": "mcp_stdio", "command": "echo"}
+        response = await client.post("/api/v1/tool-servers", json=payload)
+        assert response.status_code == 500
+        body = response.json()
+        assert "detail" in body
+        assert "Failed to save configuration" in body["detail"]
+
+
+@pytest.mark.asyncio
+async def test_update_returns_500_on_persist_failure(client):
+    """PUT returns 500 with detail when YAML persistence fails."""
+    with patch(
+        "app.core.registry_base.YAMLBackedRegistry._persist_yaml",
+        side_effect=RuntimeError("Failed to save configuration"),
+    ):
+        response = await client.put("/api/v1/tool-servers/test-mcp", json={"name": "Updated"})
+        assert response.status_code == 500
+        body = response.json()
+        assert "detail" in body
+        assert "Failed to save configuration" in body["detail"]
+
+
+@pytest.mark.asyncio
+async def test_delete_returns_500_on_persist_failure(client):
+    """DELETE returns 500 with detail when YAML persistence fails."""
+    with patch(
+        "app.core.registry_base.YAMLBackedRegistry._persist_yaml",
+        side_effect=RuntimeError("Failed to save configuration"),
+    ):
+        response = await client.delete("/api/v1/tool-servers/test-mcp")
+        assert response.status_code == 500
+        body = response.json()
+        assert "detail" in body
+        assert "Failed to save configuration" in body["detail"]
