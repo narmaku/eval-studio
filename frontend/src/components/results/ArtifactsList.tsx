@@ -28,8 +28,17 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
+// Allowlist of content types safe for inline preview.
+// text/html and text/xml are excluded to prevent stored XSS.
+const PREVIEWABLE_TYPES = new Set([
+  'text/plain',
+  'text/csv',
+  'text/markdown',
+  'application/json',
+]);
+
 function isPreviewable(contentType: string): boolean {
-  return contentType.startsWith('text/') || contentType === 'application/json';
+  return PREVIEWABLE_TYPES.has(contentType);
 }
 
 interface ArtifactsListProps {

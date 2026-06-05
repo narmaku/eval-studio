@@ -18,13 +18,15 @@ router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 # Maximum size for inline preview (1 MB)
 PREVIEW_MAX_SIZE = 1_048_576
 
-# MIME types eligible for inline preview
-PREVIEWABLE_TYPES = {"text/plain", "text/csv", "text/html", "text/markdown", "application/json", "text/xml"}
+# MIME types eligible for inline preview.
+# text/html and text/xml are intentionally excluded to prevent stored XSS
+# (serving HTML inline would execute embedded scripts in the user's browser).
+PREVIEWABLE_TYPES = {"text/plain", "text/csv", "text/markdown", "application/json"}
 
 
 def _is_previewable(content_type: str) -> bool:
     """Check if a content type is eligible for inline preview."""
-    return content_type in PREVIEWABLE_TYPES or content_type.startswith("text/")
+    return content_type in PREVIEWABLE_TYPES
 
 
 @router.get("", response_model=list[ArtifactResponse])
@@ -81,7 +83,10 @@ async def download_artifact(
     return StreamingResponse(
         iter_file(),
         media_type=artifact.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{artifact.filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{artifact.filename}"',
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 
@@ -120,10 +125,14 @@ async def preview_artifact(
 
     content = file_path.read_text(encoding="utf-8", errors="replace")
     logger.info("artifact.preview", id=artifact_id, filename=artifact.filename)
+    # Always serve previews as text/plain to prevent stored XSS via HTML/XML content
     return StreamingResponse(
         iter([content]),
-        media_type=artifact.content_type,
-        headers={"Content-Disposition": "inline"},
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 
