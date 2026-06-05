@@ -73,6 +73,41 @@ async def _create_result(
 
 
 @pytest.mark.asyncio
+async def test_compare_requires_at_least_two_evaluations(client, db_session):
+    """Comparing fewer than 2 evaluations returns 422."""
+    ds_id = await _create_dataset(db_session)
+    eval1 = await _create_evaluation(db_session, "Only Eval", dataset_id=ds_id)
+
+    response = await client.get(
+        "/api/v1/results/compare",
+        params=[("evaluation_id", eval1)],
+    )
+    assert response.status_code == 422
+    data = response.json()
+    assert "at least 2" in data["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_compare_invalid_reference_evaluation_id(client, db_session):
+    """reference_evaluation_id must be one of the provided evaluation_ids."""
+    ds_id = await _create_dataset(db_session)
+    eval1 = await _create_evaluation(db_session, "Eval A", dataset_id=ds_id)
+    eval2 = await _create_evaluation(db_session, "Eval B", dataset_id=ds_id)
+
+    response = await client.get(
+        "/api/v1/results/compare",
+        params=[
+            ("evaluation_id", eval1),
+            ("evaluation_id", eval2),
+            ("reference_evaluation_id", "not-in-the-list"),
+        ],
+    )
+    assert response.status_code == 422
+    data = response.json()
+    assert "reference_evaluation_id" in data["detail"]
+
+
+@pytest.mark.asyncio
 async def test_compare_incompatible_modes(client, db_session):
     """Compare evaluations with different modes returns 422."""
     ds_id = await _create_dataset(db_session)

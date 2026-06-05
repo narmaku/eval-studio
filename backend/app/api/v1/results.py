@@ -67,7 +67,17 @@ async def compare_results(
     All evaluations must share the same mode and dataset_id. Returns per-evaluation
     aggregate statistics and per-item aligned comparisons grouped by dataset_item_id.
     """
-    # 1. Fetch all evaluations and validate they exist
+    # 1. Require at least 2 evaluations for comparison
+    if len(evaluation_ids) < 2:
+        raise ValidationException("At least 2 evaluation IDs are required for comparison.")
+
+    # 2. Validate reference_evaluation_id is among the provided evaluation_ids
+    if reference_evaluation_id is not None and reference_evaluation_id not in evaluation_ids:
+        raise ValidationException(
+            f"reference_evaluation_id '{reference_evaluation_id}' must be one of the provided evaluation_ids."
+        )
+
+    # 3. Fetch all evaluations and validate they exist
     evaluations: list[Evaluation] = []
     for eval_id in evaluation_ids:
         eval_result = await db.execute(select(Evaluation).where(Evaluation.id == eval_id))
@@ -76,7 +86,7 @@ async def compare_results(
             raise NotFoundException("Evaluation", eval_id)
         evaluations.append(evaluation)
 
-    # 2. Validate compatibility: same mode
+    # 4. Validate compatibility: same mode
     modes = {e.mode for e in evaluations}
     if len(modes) > 1:
         raise ValidationException(
@@ -84,14 +94,14 @@ async def compare_results(
             "All evaluations must have the same mode."
         )
 
-    # 3. Validate compatibility: same dataset_id
+    # 5. Validate compatibility: same dataset_id
     dataset_ids = {e.dataset_id for e in evaluations}
     if len(dataset_ids) > 1:
         raise ValidationException(
             "Cannot compare evaluations with different datasets. All evaluations must use the same dataset."
         )
 
-    # 4. Build per-evaluation comparison items
+    # 6. Build per-evaluation comparison items
     comparisons: list[EvaluationComparisonItem] = []
     all_results_by_eval: dict[str, list[Result]] = {}
 
@@ -118,7 +128,7 @@ async def compare_results(
             )
         )
 
-    # 5. Build per-item aligned comparisons grouped by dataset_item_id
+    # 7. Build per-item aligned comparisons grouped by dataset_item_id
     item_results_map: dict[str, list[Result]] = {}
     for results in all_results_by_eval.values():
         for r in results:

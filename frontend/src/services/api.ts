@@ -9,7 +9,6 @@ import type {
   AnalyzeResponse,
   ImportRequest,
   Result,
-  ResultComparison,
   ComparisonResponse,
   ArenaLeaderboardResponse,
   Session,
@@ -205,11 +204,6 @@ export const api = {
     return request<PaginatedResponse<Result>>(`/api/v1/results${qs ? `?${qs}` : ''}`);
   },
   getResult: (id: string) => request<Result>(`/api/v1/results/${id}`),
-  compareResults: (evaluationIds: string[]) => {
-    const query = new URLSearchParams();
-    evaluationIds.forEach((id) => query.append('evaluation_id', id));
-    return request<ResultComparison>(`/api/v1/results/compare?${query.toString()}`);
-  },
   compareEvaluations: (evaluationIds: string[], referenceId?: string) => {
     const query = new URLSearchParams();
     evaluationIds.forEach((id) => query.append('evaluation_id', id));
