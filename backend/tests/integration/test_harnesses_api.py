@@ -167,3 +167,46 @@ async def test_update_subprocess_harness_rejects_unlisted_binary(client):
         response = await client.put("/api/v1/harnesses/test-goose", json=payload)
         assert response.status_code == 422
         assert "not in the allowed" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_returns_500_on_persist_failure(client):
+    """POST returns 500 with sanitized detail when YAML persistence fails."""
+    with patch(
+        "app.core.registry_base.YAMLBackedRegistry._persist_yaml",
+        side_effect=RuntimeError("Failed to save configuration to /tmp/config.yaml: Permission denied"),
+    ):
+        payload = {"name": "Doomed Harness", "type": "builtin"}
+        response = await client.post("/api/v1/harnesses", json=payload)
+        assert response.status_code == 500
+        body = response.json()
+        assert "detail" in body
+        assert "An internal error occurred" in body["detail"]
+
+
+@pytest.mark.asyncio
+async def test_update_returns_500_on_persist_failure(client):
+    """PUT returns 500 with sanitized detail when YAML persistence fails."""
+    with patch(
+        "app.core.registry_base.YAMLBackedRegistry._persist_yaml",
+        side_effect=RuntimeError("Failed to save configuration"),
+    ):
+        response = await client.put("/api/v1/harnesses/test-builtin", json={"name": "Updated"})
+        assert response.status_code == 500
+        body = response.json()
+        assert "detail" in body
+        assert "An internal error occurred" in body["detail"]
+
+
+@pytest.mark.asyncio
+async def test_delete_returns_500_on_persist_failure(client):
+    """DELETE returns 500 with sanitized detail when YAML persistence fails."""
+    with patch(
+        "app.core.registry_base.YAMLBackedRegistry._persist_yaml",
+        side_effect=RuntimeError("Failed to save configuration"),
+    ):
+        response = await client.delete("/api/v1/harnesses/test-goose")
+        assert response.status_code == 500
+        body = response.json()
+        assert "detail" in body
+        assert "An internal error occurred" in body["detail"]

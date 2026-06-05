@@ -374,6 +374,27 @@ class TestPersistYAML:
         # The item should still have the original name
         assert registry.get_item("x").name == "Original"
 
+    def test_add_item_overwrites_rolls_back_to_previous_on_persist_failure(self, tmp_path):
+        """add_item restores the previous item when overwriting an existing ID and persist fails."""
+        config = tmp_path / "config.yaml"
+        registry = FakeRegistry()
+        registry._config_path = config
+
+        # Add an item successfully first
+        registry.add_item(FakeItem(id="x", name="Original"))
+        assert registry.get_item("x").name == "Original"
+
+        # Make the file read-only so the next persist fails
+        config.chmod(0o444)
+
+        with pytest.raises(RuntimeError, match="Failed to save configuration"):
+            registry.add_item(FakeItem(id="x", name="Replacement"))
+
+        # The original item should still be there with its original name
+        item = registry.get_item("x")
+        assert item is not None
+        assert item.name == "Original"
+
     def test_delete_item_rolls_back_on_persist_failure(self, tmp_path):
         """delete_item rolls back in-memory state when persist fails."""
         config = tmp_path / "config.yaml"

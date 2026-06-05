@@ -79,4 +79,43 @@ describe('ToolServerForm', () => {
       screen.getByText('Failed to save tool server. Please try again.'),
     ).toBeInTheDocument();
   });
+
+  it('displays backend error message when update fails in edit mode', async () => {
+    const user = userEvent.setup();
+    mockUpdateToolServer.mockRejectedValue(
+      new Error('An internal error occurred. Check server logs for details.'),
+    );
+
+    const existing = {
+      id: 'ts-1',
+      name: 'Existing Server',
+      type: 'mcp_stdio' as const,
+      command: 'echo',
+      args: [],
+      env_keys: [],
+      tools: [],
+      description: '',
+      tags: [],
+      enabled: true,
+      tool_count: null,
+    };
+
+    render(
+      <ToolServerForm
+        open={true}
+        onOpenChange={vi.fn()}
+        toolServer={existing}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText(/name/i));
+    await user.type(screen.getByLabelText(/name/i), 'Updated Name');
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(
+      screen.getByText(
+        'An internal error occurred. Check server logs for details.',
+      ),
+    ).toBeInTheDocument();
+  });
 });
