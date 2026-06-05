@@ -78,7 +78,7 @@ export interface Provider {
   ssl_cert_path: string | null;
   tags: string[];
   purpose: string;
-  default_params: Record<string, number> | null;
+  default_params: Record<string, unknown> | null;
 }
 
 export interface ProviderModel {
@@ -92,10 +92,14 @@ export interface JudgeReference {
   provider_id?: string;
 }
 
+// TODO: Backend EvaluationCreate.config is dict[str, Any] (unstructured) while frontend
+// uses the typed EvaluationConfig interface. These should be reconciled once the backend
+// schema is tightened. See https://github.com/narmaku/eval-studio/issues/106.
 export interface CreateEvaluationRequest {
   name: string;
   mode: EvaluationMode;
   dataset_id?: string;
+  environment_id?: string;
   judge_config_id?: string;
   config: EvaluationConfig;
 }

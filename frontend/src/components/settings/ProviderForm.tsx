@@ -75,7 +75,9 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
   const [sslCertPath, setSslCertPath] = useState(provider?.ssl_cert_path ?? '');
   const [purpose, setPurpose] = useState(provider?.purpose ?? 'test');
   const [tagsInput, setTagsInput] = useState(provider?.tags?.join(', ') ?? '');
-  const [defaultParams, setDefaultParams] = useState<LLMParams>(provider?.default_params ?? {});
+  const [defaultParams, setDefaultParams] = useState<LLMParams>(
+    (provider?.default_params as LLMParams) ?? {},
+  );
   const [errors, setErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -110,7 +112,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         ssl_cert_path: sslCertPath.trim() || null,
         tags,
         purpose,
-        default_params: Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, number>) : null,
+        default_params: Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, unknown>) : null,
       };
 
       if (isEditMode && provider) {
