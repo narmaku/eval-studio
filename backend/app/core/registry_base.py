@@ -113,27 +113,59 @@ class YAMLBackedRegistry(ABC, Generic[T]):
         return list(self._items.values())
 
     def add_item(self, item: T) -> None:
-        """Add an item and persist to YAML."""
-        self._items[self._get_item_id(item)] = item
-        self._persist_yaml()
+        """Add an item and persist to YAML.
+
+        If persistence fails, the in-memory addition is rolled back.
+        """
+        item_id = self._get_item_id(item)
+        previous = self._items.get(item_id)
+        self._items[item_id] = item
+        try:
+            self._persist_yaml()
+        except RuntimeError:
+            # Roll back the in-memory change
+            if previous is not None:
+                self._items[item_id] = previous
+            else:
+                self._items.pop(item_id, None)
+            raise
 
     def update_item(self, item_id: str, updates: dict) -> T | None:
-        """Update an item and persist to YAML."""
+        """Update an item and persist to YAML.
+
+        If persistence fails, the in-memory changes are rolled back.
+        """
         item = self._items.get(item_id)
         if not item:
             return None
+        # Snapshot original values for rollback
+        original_values = {key: getattr(item, key) for key in updates if hasattr(item, key)}
         for key, value in updates.items():
             if hasattr(item, key):
                 setattr(item, key, value)
-        self._persist_yaml()
+        try:
+            self._persist_yaml()
+        except RuntimeError:
+            # Roll back the in-memory changes
+            for key, value in original_values.items():
+                setattr(item, key, value)
+            raise
         return item
 
     def delete_item(self, item_id: str) -> bool:
-        """Delete an item and persist to YAML."""
+        """Delete an item and persist to YAML.
+
+        If persistence fails, the in-memory deletion is rolled back.
+        """
         if item_id not in self._items:
             return False
-        del self._items[item_id]
-        self._persist_yaml()
+        removed = self._items.pop(item_id)
+        try:
+            self._persist_yaml()
+        except RuntimeError:
+            # Roll back the in-memory deletion
+            self._items[item_id] = removed
+            raise
         return True
 
     def _persist_yaml(self) -> None:
@@ -142,6 +174,10 @@ class YAMLBackedRegistry(ABC, Generic[T]):
             return
         yaml_key = self._get_yaml_key()
         data = {yaml_key: [self._serialize_item(item) for item in self._items.values()]}
-        with open(self._config_path, "w") as f:
-            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
-        self._last_mtime = os.path.getmtime(self._config_path)
+        try:
+            with open(self._config_path, "w") as f:
+                yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+            self._last_mtime = os.path.getmtime(self._config_path)
+        except OSError as exc:
+            logger.error("config_write_failed", path=str(self._config_path), error=str(exc))
+            raise RuntimeError(f"Failed to save configuration to {self._config_path}: {exc}") from exc

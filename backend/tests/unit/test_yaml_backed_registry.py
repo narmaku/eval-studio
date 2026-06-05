@@ -3,6 +3,7 @@
 import time
 from dataclasses import dataclass, field
 
+import pytest
 import yaml
 
 from app.core.registry_base import YAMLBackedRegistry
@@ -322,3 +323,70 @@ class TestPersistYAML:
         b = reg2.get_item("b")
         assert b is not None
         assert b.name == "Beta"
+
+    def test_persist_raises_runtime_error_on_write_failure(self, tmp_path):
+        """_persist_yaml raises RuntimeError when file write fails."""
+        config = tmp_path / "config.yaml"
+        config.write_text("")
+        config.chmod(0o444)  # read-only
+
+        registry = FakeRegistry()
+        registry._config_path = config
+
+        with pytest.raises(RuntimeError, match="Failed to save configuration"):
+            registry._persist_yaml()
+
+    def test_add_item_rolls_back_on_persist_failure(self, tmp_path):
+        """add_item rolls back in-memory state when persist fails."""
+        config = tmp_path / "config.yaml"
+        registry = FakeRegistry()
+        registry._config_path = config
+
+        # Add an item successfully first
+        registry.add_item(FakeItem(id="existing", name="Existing"))
+        assert registry.get_item("existing") is not None
+
+        # Make the file read-only so the next persist fails
+        config.chmod(0o444)
+
+        with pytest.raises(RuntimeError, match="Failed to save configuration"):
+            registry.add_item(FakeItem(id="new", name="New Item"))
+
+        # The new item should NOT be in the registry
+        assert registry.get_item("new") is None
+        # The existing item should still be there
+        assert registry.get_item("existing") is not None
+
+    def test_update_item_rolls_back_on_persist_failure(self, tmp_path):
+        """update_item rolls back in-memory state when persist fails."""
+        config = tmp_path / "config.yaml"
+        registry = FakeRegistry()
+        registry._config_path = config
+
+        registry.add_item(FakeItem(id="x", name="Original"))
+
+        # Make the file read-only
+        config.chmod(0o444)
+
+        with pytest.raises(RuntimeError, match="Failed to save configuration"):
+            registry.update_item("x", {"name": "Updated"})
+
+        # The item should still have the original name
+        assert registry.get_item("x").name == "Original"
+
+    def test_delete_item_rolls_back_on_persist_failure(self, tmp_path):
+        """delete_item rolls back in-memory state when persist fails."""
+        config = tmp_path / "config.yaml"
+        registry = FakeRegistry()
+        registry._config_path = config
+
+        registry.add_item(FakeItem(id="x", name="Survivor"))
+
+        # Make the file read-only
+        config.chmod(0o444)
+
+        with pytest.raises(RuntimeError, match="Failed to save configuration"):
+            registry.delete_item("x")
+
+        # The item should still exist
+        assert registry.get_item("x") is not None
