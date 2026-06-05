@@ -94,7 +94,7 @@ describe('evaluatorStore', () => {
     it('sets error on API failure', async () => {
       mockedApi.listEvaluators.mockRejectedValue(new Error('Network error'));
 
-      await useEvaluatorStore.getState().fetchEvaluators();
+      await expect(useEvaluatorStore.getState().fetchEvaluators()).rejects.toThrow('Network error');
 
       const state = useEvaluatorStore.getState();
       expect(state.error).toBe('Network error');

@@ -31,6 +31,7 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch sessions';
       set({ error: message, isLoading: false });
+      throw err;
     }
   },
 }));

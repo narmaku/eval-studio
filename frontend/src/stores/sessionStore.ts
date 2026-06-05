@@ -104,6 +104,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const { currentSession } = get();
     if (!currentSession) return;
 
+    set({ error: null });
     try {
       if (wsRef && wsRef.readyState === WebSocket.OPEN) {
         wsRef.send(JSON.stringify({ type: 'end_session' }));
@@ -113,6 +114,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to end session';
       set({ error: message });
+      throw err;
     }
   },
 

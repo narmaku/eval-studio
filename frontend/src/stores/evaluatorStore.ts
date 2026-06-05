@@ -43,6 +43,7 @@ export const useEvaluatorStore = create<EvaluatorStore>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch evaluators';
       set({ error: message, isLoading: false });
+      throw err;
     }
   },
 

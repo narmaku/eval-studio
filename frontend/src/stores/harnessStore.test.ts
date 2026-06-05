@@ -49,7 +49,7 @@ describe('harnessStore', () => {
     const { api } = await import('@/services/api');
     vi.mocked(api.listHarnesses).mockRejectedValue(new Error('Network error'));
 
-    await useHarnessStore.getState().fetchHarnesses();
+    await expect(useHarnessStore.getState().fetchHarnesses()).rejects.toThrow('Network error');
 
     const state = useHarnessStore.getState();
     expect(state.harnesses).toEqual([]);

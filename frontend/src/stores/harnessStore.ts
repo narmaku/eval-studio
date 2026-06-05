@@ -27,10 +27,18 @@ export const useHarnessStore = create<HarnessStore>((set) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch harnesses';
       set({ error: message, isLoading: false });
+      throw err;
     }
   },
 
   checkHarness: async (id: string) => {
-    return api.checkHarness(id);
+    set({ error: null });
+    try {
+      return await api.checkHarness(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to check harness';
+      set({ error: message });
+      throw err;
+    }
   },
 }));
