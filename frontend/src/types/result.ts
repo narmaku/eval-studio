@@ -1,4 +1,8 @@
 // Types aligned with backend ResultResponse schema
+// TODO: Backend scores_breakdown is dict[str, Any] | None but frontend uses
+// Record<string, number> | null. The frontend relies on numeric values for arithmetic
+// (e.g., value * 100). Widen the backend schema to dict[str, float] or keep the frontend
+// narrow once confirmed. See https://github.com/narmaku/eval-studio/issues/106.
 
 export interface RetrievedChunk {
   content: string;
