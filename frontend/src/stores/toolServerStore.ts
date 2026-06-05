@@ -7,6 +7,7 @@ interface ToolServerStore {
   isLoading: boolean;
   error: string | null;
 
+  clearError: () => void;
   fetchToolServers: (params?: { type?: string; enabled?: boolean }) => Promise<void>;
   createToolServer: (data: CreateToolServerRequest) => Promise<ToolServer>;
   updateToolServer: (id: string, data: UpdateToolServerRequest) => Promise<ToolServer>;
@@ -17,6 +18,8 @@ export const useToolServerStore = create<ToolServerStore>((set) => ({
   toolServers: [],
   isLoading: false,
   error: null,
+
+  clearError: () => set({ error: null }),
 
   fetchToolServers: async (params?: { type?: string; enabled?: boolean }) => {
     set({ isLoading: true, error: null });
@@ -30,23 +33,44 @@ export const useToolServerStore = create<ToolServerStore>((set) => ({
   },
 
   createToolServer: async (data: CreateToolServerRequest) => {
-    const toolServer = await api.createToolServer(data);
-    set((state) => ({ toolServers: [...state.toolServers, toolServer] }));
-    return toolServer;
+    set({ error: null });
+    try {
+      const toolServer = await api.createToolServer(data);
+      set((state) => ({ toolServers: [...state.toolServers, toolServer] }));
+      return toolServer;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create tool server';
+      set({ error: message });
+      throw err;
+    }
   },
 
   updateToolServer: async (id: string, data: UpdateToolServerRequest) => {
-    const updated = await api.updateToolServer(id, data);
-    set((state) => ({
-      toolServers: state.toolServers.map((s) => (s.id === id ? updated : s)),
-    }));
-    return updated;
+    set({ error: null });
+    try {
+      const updated = await api.updateToolServer(id, data);
+      set((state) => ({
+        toolServers: state.toolServers.map((s) => (s.id === id ? updated : s)),
+      }));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update tool server';
+      set({ error: message });
+      throw err;
+    }
   },
 
   deleteToolServer: async (id: string) => {
-    await api.deleteToolServer(id);
-    set((state) => ({
-      toolServers: state.toolServers.filter((s) => s.id !== id),
-    }));
+    set({ error: null });
+    try {
+      await api.deleteToolServer(id);
+      set((state) => ({
+        toolServers: state.toolServers.filter((s) => s.id !== id),
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete tool server';
+      set({ error: message });
+      throw err;
+    }
   },
 }));

@@ -7,6 +7,7 @@ interface HarnessStore {
   isLoading: boolean;
   error: string | null;
 
+  clearError: () => void;
   fetchHarnesses: (params?: { type?: string; enabled?: boolean }) => Promise<void>;
   checkHarness: (id: string) => Promise<{ available: boolean; version: string | null }>;
 }
@@ -16,6 +17,8 @@ export const useHarnessStore = create<HarnessStore>((set) => ({
   isLoading: false,
   error: null,
 
+  clearError: () => set({ error: null }),
+
   fetchHarnesses: async (params?: { type?: string; enabled?: boolean }) => {
     set({ isLoading: true, error: null });
     try {
@@ -24,10 +27,18 @@ export const useHarnessStore = create<HarnessStore>((set) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch harnesses';
       set({ error: message, isLoading: false });
+      throw err;
     }
   },
 
   checkHarness: async (id: string) => {
-    return api.checkHarness(id);
+    set({ error: null });
+    try {
+      return await api.checkHarness(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to check harness';
+      set({ error: message });
+      throw err;
+    }
   },
 }));

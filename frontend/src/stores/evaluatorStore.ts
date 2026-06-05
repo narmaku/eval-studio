@@ -8,6 +8,7 @@ interface EvaluatorStore {
   isLoading: boolean;
   error: string | null;
 
+  clearError: () => void;
   fetchEvaluators: (mode?: string) => Promise<void>;
   selectEvaluator: (id: string) => void;
   resetSelection: () => void;
@@ -18,6 +19,8 @@ export const useEvaluatorStore = create<EvaluatorStore>((set, get) => ({
   selectedEvaluatorId: null,
   isLoading: false,
   error: null,
+
+  clearError: () => set({ error: null }),
 
   fetchEvaluators: async (mode?: string) => {
     set({ isLoading: true, error: null });
@@ -40,6 +43,7 @@ export const useEvaluatorStore = create<EvaluatorStore>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch evaluators';
       set({ error: message, isLoading: false });
+      throw err;
     }
   },
 

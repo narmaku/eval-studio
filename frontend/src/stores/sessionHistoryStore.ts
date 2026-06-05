@@ -7,6 +7,7 @@ interface SessionHistoryStore {
   isLoading: boolean;
   error: string | null;
 
+  clearError: () => void;
   fetchSessions: (params?: {
     page?: number;
     page_size?: number;
@@ -20,6 +21,8 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set) => ({
   isLoading: false,
   error: null,
 
+  clearError: () => set({ error: null }),
+
   fetchSessions: async (params) => {
     set({ isLoading: true, error: null });
     try {
@@ -28,6 +31,7 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch sessions';
       set({ error: message, isLoading: false });
+      throw err;
     }
   },
 }));
