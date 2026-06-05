@@ -26,7 +26,9 @@ class TestToolServerAPIValidation:
     @patch("app.api.v1.tool_servers.validate_command")
     @patch("app.api.v1.tool_servers.load_allowed_commands", return_value=set())
     def test_create_mcp_stdio_blocked_when_empty_allowlist(self, mock_load, mock_validate):
-        mock_validate.side_effect = CommandNotAllowedError("/bin/sh", "tool server command")
+        mock_validate.side_effect = CommandNotAllowedError(
+            "tool server command '/bin/sh' is not in the allowed list."
+        )
         response = self.client.post(
             "/api/v1/tool-servers",
             json={
@@ -38,7 +40,7 @@ class TestToolServerAPIValidation:
         )
         assert response.status_code == 422
         body = response.json()
-        assert "not in the allowed commands list" in body["detail"]
+        assert "not in the allowed list" in body["detail"]
 
     @patch("app.api.v1.tool_servers.validate_command", return_value="/usr/bin/npx")
     @patch("app.api.v1.tool_servers.load_allowed_commands", return_value={"/usr/bin/npx"})
@@ -77,7 +79,9 @@ class TestToolServerAPIValidation:
     @patch("app.api.v1.tool_servers.load_allowed_commands", return_value=set())
     def test_update_command_blocked(self, mock_load, mock_validate):
         """Updating a tool server command to a disallowed value is rejected."""
-        mock_validate.side_effect = CommandNotAllowedError("/bin/bash", "tool server command")
+        mock_validate.side_effect = CommandNotAllowedError(
+            "tool server command '/bin/bash' is not in the allowed list."
+        )
 
         # First create a valid standalone server to get an ID
         create_resp = self.client.post(
@@ -89,7 +93,9 @@ class TestToolServerAPIValidation:
 
         # Now try to update with a disallowed command
         mock_validate.reset_mock()
-        mock_validate.side_effect = CommandNotAllowedError("/bin/bash", "tool server command")
+        mock_validate.side_effect = CommandNotAllowedError(
+            "tool server command '/bin/bash' is not in the allowed list."
+        )
         response = self.client.put(
             f"/api/v1/tool-servers/{server_id}",
             json={"command": "/bin/bash", "type": "mcp_stdio"},
@@ -99,7 +105,7 @@ class TestToolServerAPIValidation:
     @patch("app.api.v1.tool_servers.validate_command")
     @patch("app.api.v1.tool_servers.load_allowed_commands", return_value=set())
     def test_create_command_not_found(self, mock_load, mock_validate):
-        mock_validate.side_effect = FileNotFoundError("tool server command: command 'nope' not found on PATH")
+        mock_validate.side_effect = ValueError("tool server command 'nope' not found on PATH")
         response = self.client.post(
             "/api/v1/tool-servers",
             json={
@@ -134,7 +140,7 @@ class TestMcpClientCommandValidation:
             patch("app.core.subprocess_validation.shutil.which", return_value="/bin/sh"),
         ):
             mock_settings.tool_server_allowed_commands = ""
-            with pytest.raises(CommandNotAllowedError, match="not in the allowed commands list"):
+            with pytest.raises(CommandNotAllowedError, match="not in the allowed list"):
                 await client.start()
 
     @pytest.mark.asyncio
@@ -150,7 +156,7 @@ class TestMcpClientCommandValidation:
             patch("app.core.subprocess_validation.shutil.which", return_value=None),
         ):
             mock_settings.tool_server_allowed_commands = "nonexistent-binary-xyz"
-            with pytest.raises(FileNotFoundError, match="not found on PATH"):
+            with pytest.raises(ValueError, match="not found on PATH"):
                 await client.start()
 
     @pytest.mark.asyncio

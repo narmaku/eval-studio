@@ -1,10 +1,10 @@
-"""Command validation for subprocess execution — prevents RCE via allowlists.
+"""Subprocess binary validation — allowlist enforcement for harness and tool server execution.
 
-This module provides shared validation logic used by any feature that spawns
-subprocesses (MCP tool servers, agent harnesses, etc.).  Each caller passes
-its own allowlist so different features can have independent policies.
+This module prevents arbitrary command execution by validating binaries
+against a configurable allowlist before any subprocess is spawned.
 """
 
+import os
 import shutil
 
 import structlog
@@ -12,85 +12,81 @@ import structlog
 logger = structlog.get_logger()
 
 
-class CommandNotAllowedError(Exception):
-    """Raised when a command is not in the configured allowlist."""
-
-    def __init__(self, command: str, context: str = "command"):
-        self.command = command
-        self.context = context
-        super().__init__(f"{context}: '{command}' is not in the allowed commands list")
+class CommandNotAllowedError(ValueError):
+    """Raised when a command is not in the allowed binaries list."""
 
 
-def load_allowed_commands(raw: str) -> set[str]:
-    """Parse a comma-separated allowlist string into a set of resolved paths.
-
-    Each entry is stripped of whitespace.  Empty entries and blank strings
-    are silently ignored, resulting in an empty set (which means "block
-    everything").
+def validate_command(command: str, allowed_commands: set[str], context: str = "command") -> str:
+    """Validate a command/binary against an allowlist.
 
     Args:
-        raw: Comma-separated string of allowed command paths,
-             e.g. ``"/usr/bin/npx,/usr/bin/node"``.
-
-    Returns:
-        A set of allowed command path strings.
-    """
-    if not raw or not raw.strip():
-        return set()
-    return {entry.strip() for entry in raw.split(",") if entry.strip()}
-
-
-def validate_command(command: str, allowed: set[str], *, context: str = "command") -> str:
-    """Validate and resolve *command* against an allowlist.
-
-    The function resolves the command to an absolute path (via
-    ``shutil.which``) and checks it against *allowed*.  Both the
-    original command string **and** the resolved path are checked so
-    that the allowlist can contain either form.
-
-    Args:
-        command: The command string to validate (may be a bare name or
-                 an absolute path).
-        allowed: Set of allowed command strings / paths.  An empty set
-                 means nothing is allowed.
-        context: Human-readable label used in error messages and logs
-                 (e.g. ``"tool server command"``).
+        command: The command or binary path to validate.
+        allowed_commands: Set of allowed absolute binary paths.
+        context: Human-readable label for error messages (e.g. "harness binary").
 
     Returns:
         The resolved absolute path of the command.
 
     Raises:
-        CommandNotAllowedError: If the command is not in *allowed*.
-        FileNotFoundError: If ``shutil.which`` cannot locate the command.
+        ValueError: If the command is empty, contains path traversal,
+            cannot be resolved, or is not in the allowlist.
     """
-    if not allowed:
-        logger.warning(
-            "subprocess.blocked_empty_allowlist",
-            command=command,
-            context=context,
-        )
-        raise CommandNotAllowedError(command, context)
+    if not command or not command.strip():
+        raise ValueError(f"{context} cannot be empty")
+
+    command = command.strip()
+
+    if ".." in command:
+        raise ValueError(f"{context} contains path traversal ('..') which is not allowed: {command}")
 
     resolved = shutil.which(command)
-    if resolved is None:
-        raise FileNotFoundError(f"{context}: command '{command}' not found on PATH")
+    if not resolved:
+        raise ValueError(f"{context} '{command}' not found on PATH")
 
-    # Accept if either the literal command string or the resolved path
-    # appears in the allowlist.
-    if command not in allowed and resolved not in allowed:
-        logger.warning(
-            "subprocess.command_not_allowed",
-            command=command,
-            resolved=resolved,
-            allowed=sorted(allowed),
-            context=context,
+    # Resolve symlinks so that a symlink to an allowed binary (or vice versa)
+    # cannot bypass the allowlist.  Both the candidate and the allowlist entries
+    # are compared after realpath resolution.
+    resolved = os.path.realpath(resolved)
+
+    if resolved not in allowed_commands:
+        raise CommandNotAllowedError(
+            f"{context} '{resolved}' is not in the allowed list. "
+            f"Configure the appropriate allowlist environment variable to permit this binary."
         )
-        raise CommandNotAllowedError(command, context)
 
-    logger.debug(
-        "subprocess.command_validated",
-        command=command,
-        resolved=resolved,
-        context=context,
-    )
     return resolved
+
+
+def load_allowed_commands(env_value: str) -> set[str]:
+    """Parse a comma-separated allowlist string into a set of resolved absolute paths.
+
+    Entries that cannot be resolved via ``shutil.which()`` are logged and
+    skipped so that a typo in the configuration does not silently allow
+    everything.
+
+    Args:
+        env_value: Comma-separated list of binary names or absolute paths.
+
+    Returns:
+        A set of resolved absolute paths.
+    """
+    if not env_value or not env_value.strip():
+        return set()
+
+    allowed: set[str] = set()
+    for entry in env_value.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+
+        resolved = shutil.which(entry)
+        if resolved:
+            allowed.add(os.path.realpath(resolved))
+        else:
+            logger.warning(
+                "subprocess_validation.unresolvable_entry",
+                entry=entry,
+                hint="This binary will NOT be allowed. Check the path.",
+            )
+
+    return allowed

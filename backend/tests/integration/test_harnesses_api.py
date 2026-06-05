@@ -1,5 +1,7 @@
 """Integration tests for the harnesses API endpoints."""
 
+from unittest.mock import patch
+
 import pytest
 
 from app.harnesses.registry import HarnessProfile, harness_registry
@@ -69,12 +71,19 @@ async def test_get_not_found(client):
 
 @pytest.mark.asyncio
 async def test_create_harness(client):
-    payload = {"name": "New Harness", "type": "subprocess", "binary_path": "ls"}
-    response = await client.post("/api/v1/harnesses", json=payload)
-    assert response.status_code == 201
-    data = response.json()
-    assert data["name"] == "New Harness"
-    assert data["id"] is not None
+    import os
+    import shutil
+
+    ls_path = shutil.which("ls") or ""
+    ls_real = os.path.realpath(ls_path) if ls_path else ""
+    with patch("app.api.v1.harnesses.settings") as mock_settings:
+        mock_settings.harness_allowed_binaries = ls_real
+        payload = {"name": "New Harness", "type": "subprocess", "binary_path": "ls"}
+        response = await client.post("/api/v1/harnesses", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "New Harness"
+        assert data["id"] is not None
 
     list_resp = await client.get("/api/v1/harnesses")
     assert len(list_resp.json()) == 3
@@ -117,3 +126,44 @@ async def test_check_subprocess(client):
     data = response.json()
     # echo should be available on most systems
     assert "available" in data
+
+
+@pytest.mark.asyncio
+async def test_create_subprocess_harness_rejects_unlisted_binary(client):
+    """Creating a subprocess harness with a binary not in the allowlist returns 422."""
+    with patch("app.api.v1.harnesses.settings") as mock_settings:
+        mock_settings.harness_allowed_binaries = ""  # block everything
+        payload = {"name": "Evil", "type": "subprocess", "binary_path": "/bin/sh"}
+        response = await client.post("/api/v1/harnesses", json=payload)
+        assert response.status_code == 422
+        assert "not in the allowed" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_subprocess_harness_rejects_path_traversal(client):
+    """Path traversal in binary_path is rejected at the API layer."""
+    with patch("app.api.v1.harnesses.settings") as mock_settings:
+        mock_settings.harness_allowed_binaries = "/bin/sh"
+        payload = {"name": "Evil", "type": "subprocess", "binary_path": "/usr/../bin/sh"}
+        response = await client.post("/api/v1/harnesses", json=payload)
+        assert response.status_code == 422
+        assert "path traversal" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_builtin_harness_skips_binary_validation(client):
+    """Builtin harnesses don't have binaries, so validation is not applied."""
+    payload = {"name": "My Builtin", "type": "builtin"}
+    response = await client.post("/api/v1/harnesses", json=payload)
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_update_subprocess_harness_rejects_unlisted_binary(client):
+    """Updating binary_path to an unlisted binary returns 422."""
+    with patch("app.api.v1.harnesses.settings") as mock_settings:
+        mock_settings.harness_allowed_binaries = ""
+        payload = {"binary_path": "/bin/sh"}
+        response = await client.put("/api/v1/harnesses/test-goose", json=payload)
+        assert response.status_code == 422
+        assert "not in the allowed" in response.json()["detail"]

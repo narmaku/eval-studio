@@ -1,5 +1,11 @@
 // TODO: Consider generating these types from the FastAPI OpenAPI spec
 // using openapi-typescript once the backend is implemented.
+//
+// TODO: Judge types have significant structural differences from backend schemas.
+// Backend JudgeConfigResponse uses flat fields (model, temperature, dimensions as
+// list[dict[str, Any]]) while frontend models a panel of members with weights and
+// typed dimensions. Needs a coordinated redesign.
+// See https://github.com/narmaku/eval-studio/issues/106.
 
 export type AggregationStrategy = 'majority_vote' | 'average' | 'max' | 'weighted_average';
 

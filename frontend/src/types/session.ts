@@ -12,6 +12,9 @@ export interface SessionScores {
   breakdown: Record<string, number> | null;
 }
 
+// TODO: Backend SessionResponse.scores is dict[str, Any] | None (unstructured) while
+// frontend uses the typed SessionScores interface. Reconcile once the backend schema is
+// tightened. See https://github.com/narmaku/eval-studio/issues/106.
 export interface Session {
   id: string;
   evaluation_id: string | null;
@@ -23,7 +26,7 @@ export interface Session {
   judge_config_snapshot: Record<string, unknown> | null;
   scores: SessionScores | null;
   error: string | null;
-  started_at: string;
+  started_at: string | null;
   ended_at: string | null;
   created_at: string;
 }
@@ -56,6 +59,9 @@ export interface SessionScore {
   judge_reasoning: string;
 }
 
+// TODO: Backend SessionCreate.agent_config and judge_config are dict[str, Any] | None
+// (unstructured) while frontend uses typed inline interfaces. Reconcile once the backend
+// schema is tightened. See https://github.com/narmaku/eval-studio/issues/106.
 export interface CreateSessionRequest {
   evaluation_id?: string;
   name?: string;

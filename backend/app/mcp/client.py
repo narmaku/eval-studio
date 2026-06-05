@@ -161,7 +161,7 @@ class McpStdioClient:
             TimeoutError: If initialization takes longer than timeout_ms.
             RuntimeError: If the server process fails to start or handshake fails.
             CommandNotAllowedError: If the command is not in the allowlist.
-            FileNotFoundError: If the command cannot be found on PATH.
+            ValueError: If the command cannot be found on PATH.
         """
         import os
 

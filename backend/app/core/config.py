@@ -22,7 +22,12 @@ class Settings(BaseSettings):
 
     evaluator_config_dir: str = "config/evaluators"
 
-    # Security — subprocess allowlists
+    # Security: comma-separated list of allowed harness binary paths.
+    # Leave empty to block all harness subprocess execution (secure default).
+    harness_allowed_binaries: str = ""
+
+    # Security: comma-separated list of allowed tool server commands.
+    # Leave empty to block all tool server subprocess execution (secure default).
     tool_server_allowed_commands: str = ""
 
     # Dataset import settings

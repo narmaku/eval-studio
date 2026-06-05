@@ -2,13 +2,14 @@
 
 import asyncio
 import contextlib
-import shutil
 from collections.abc import AsyncGenerator
 from typing import Any
 
 import structlog
 
+from app.core.config import settings
 from app.core.exceptions import sanitize_error_for_client
+from app.core.subprocess_validation import load_allowed_commands, validate_command
 from app.harnesses.base import AgentHarness, HarnessEvent
 from app.harnesses.factory import get_parser
 from app.harnesses.registry import HarnessProfile
@@ -24,6 +25,7 @@ class SubprocessHarness(AgentHarness):
     def __init__(self, profile: HarnessProfile) -> None:
         self._profile = profile
         self._config: dict[str, Any] = {}
+        self._resolved_binary: str | None = None
         self._process: asyncio.subprocess.Process | None = None
 
     @property
@@ -35,15 +37,15 @@ class SubprocessHarness(AgentHarness):
         return "tool_calls" in self._profile.supported_features
 
     async def start_session(self, config: dict[str, Any]) -> None:
-        """Validate binary exists and store config."""
+        """Validate binary exists, is allowed, and store config."""
         binary = self._profile.binary_path
         if not binary:
             raise ValueError(f"Harness '{self._profile.id}' has no binary_path configured")
 
-        resolved = shutil.which(binary)
-        if not resolved:
-            raise FileNotFoundError(f"Binary '{binary}' not found in PATH for harness '{self._profile.id}'")
+        allowed = load_allowed_commands(settings.harness_allowed_binaries)
+        resolved = validate_command(binary, allowed, context="harness binary")
 
+        self._resolved_binary = resolved
         self._config = config
         logger.info(
             "subprocess_harness.session_started",
@@ -53,9 +55,12 @@ class SubprocessHarness(AgentHarness):
 
     async def send_message(self, content: str, history: list[dict[str, Any]]) -> AsyncGenerator[HarnessEvent, None]:
         """Spawn the subprocess, write prompt to stdin, parse stdout."""
-        binary = self._profile.binary_path
+        binary = self._resolved_binary
         if not binary:
-            yield HarnessEvent(type="error", data={"message": "No binary_path configured"})
+            yield HarnessEvent(
+                type="error",
+                data={"message": "No validated binary available. Call start_session() first."},
+            )
             return
 
         cmd = [binary, *self._profile.args]
@@ -166,6 +171,7 @@ class SubprocessHarness(AgentHarness):
                 with contextlib.suppress(ProcessLookupError):
                     self._process.kill()
             self._process = None
+        self._resolved_binary = None
         self._config = {}
 
     def _build_prompt(self, content: str, history: list[dict[str, Any]]) -> str:

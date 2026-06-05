@@ -28,9 +28,7 @@ def _validate_tool_server_command(command: str | None, server_type: str) -> None
     allowed = load_allowed_commands(settings.tool_server_allowed_commands)
     try:
         validate_command(command, allowed, context="tool server command")
-    except CommandNotAllowedError as exc:
-        raise ValidationException(str(exc)) from exc
-    except FileNotFoundError as exc:
+    except (CommandNotAllowedError, ValueError) as exc:
         raise ValidationException(str(exc)) from exc
 
 
@@ -135,7 +133,7 @@ async def validate_tool_server(tool_server_id: str) -> dict:
         try:
             resolved = validate_command(server.command, allowed, context="tool server command")
             return {"available": True, "path": resolved}
-        except (CommandNotAllowedError, FileNotFoundError) as exc:
+        except (CommandNotAllowedError, ValueError) as exc:
             return {"available": False, "path": None, "error": str(exc)}
     if server.type == "standalone":
         return {"available": True, "path": None, "tool_count": len(server.tools)}
