@@ -60,6 +60,7 @@ export default function Results() {
         passRate,
         meanScore,
         createdAt: evaluation.created_at,
+        datasetId: evaluation.dataset_id,
       };
     });
   }, [results, evaluations]);
