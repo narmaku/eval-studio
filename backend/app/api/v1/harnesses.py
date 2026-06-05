@@ -7,7 +7,7 @@ import structlog
 from fastapi import APIRouter, Query, Response
 
 from app.core.config import settings
-from app.core.exceptions import NotFoundException, ValidationException
+from app.core.exceptions import AppException, NotFoundException, ValidationException, sanitize_error_for_client
 from app.core.subprocess_validation import load_allowed_commands, validate_command
 from app.harnesses.registry import HarnessProfile, harness_registry
 from app.schemas.harness import HarnessCreate, HarnessResponse, HarnessUpdate
@@ -88,7 +88,10 @@ async def create_harness(payload: HarnessCreate) -> HarnessResponse:
         default=payload.default,
         enabled=payload.enabled,
     )
-    harness_registry.add_harness(profile)
+    try:
+        harness_registry.add_harness(profile)
+    except RuntimeError as exc:
+        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
     logger.info("harness.created", id=profile.id, name=profile.name)
     return _to_response(profile)
 
@@ -106,7 +109,10 @@ async def update_harness(harness_id: str, payload: HarnessUpdate) -> HarnessResp
     _validate_binary_path(effective_binary, effective_type)
 
     update_data = payload.model_dump(exclude_unset=True)
-    updated = harness_registry.update_harness(harness_id, update_data)
+    try:
+        updated = harness_registry.update_harness(harness_id, update_data)
+    except RuntimeError as exc:
+        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
     if not updated:
         raise NotFoundException("Harness", harness_id)
     logger.info("harness.updated", id=harness_id)
@@ -116,7 +122,11 @@ async def update_harness(harness_id: str, payload: HarnessUpdate) -> HarnessResp
 @router.delete("/{harness_id}", status_code=204)
 async def delete_harness(harness_id: str) -> Response:
     """Delete a harness profile."""
-    if not harness_registry.delete_harness(harness_id):
+    try:
+        deleted = harness_registry.delete_harness(harness_id)
+    except RuntimeError as exc:
+        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
+    if not deleted:
         raise NotFoundException("Harness", harness_id)
     logger.info("harness.deleted", id=harness_id)
     return Response(status_code=204)

@@ -6,7 +6,7 @@ import structlog
 from fastapi import APIRouter, Query, Response
 
 from app.core.config import settings
-from app.core.exceptions import AppException, NotFoundException, ValidationException
+from app.core.exceptions import AppException, NotFoundException, ValidationException, sanitize_error_for_client
 from app.core.subprocess_validation import CommandNotAllowedError, load_allowed_commands, validate_command
 from app.core.tool_servers import StandaloneToolDef, ToolServerProfile, tool_server_registry
 from app.schemas.tool_server import ToolServerCreate, ToolServerResponse, ToolServerUpdate
@@ -88,7 +88,7 @@ async def create_tool_server(payload: ToolServerCreate) -> ToolServerResponse:
     try:
         tool_server_registry.add_tool_server(profile)
     except RuntimeError as exc:
-        raise AppException(500, "Internal Server Error", str(exc)) from exc
+        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
     logger.info("tool_server.created", id=profile.id, name=profile.name)
     return _to_response(profile)
 
@@ -114,7 +114,7 @@ async def update_tool_server(tool_server_id: str, payload: ToolServerUpdate) -> 
     try:
         updated = tool_server_registry.update_tool_server(tool_server_id, update_data)
     except RuntimeError as exc:
-        raise AppException(500, "Internal Server Error", str(exc)) from exc
+        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
     if not updated:
         raise NotFoundException("Tool Server", tool_server_id)
     logger.info("tool_server.updated", id=tool_server_id)
@@ -126,7 +126,7 @@ async def delete_tool_server(tool_server_id: str) -> Response:
     try:
         deleted = tool_server_registry.delete_tool_server(tool_server_id)
     except RuntimeError as exc:
-        raise AppException(500, "Internal Server Error", str(exc)) from exc
+        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
     if not deleted:
         raise NotFoundException("Tool Server", tool_server_id)
     logger.info("tool_server.deleted", id=tool_server_id)

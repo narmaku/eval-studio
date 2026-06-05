@@ -164,7 +164,7 @@ async def test_create_returns_500_on_persist_failure(client):
         assert response.status_code == 500
         body = response.json()
         assert "detail" in body
-        assert "Failed to save configuration" in body["detail"]
+        assert "An internal error occurred" in body["detail"]
 
 
 @pytest.mark.asyncio
@@ -178,7 +178,7 @@ async def test_update_returns_500_on_persist_failure(client):
         assert response.status_code == 500
         body = response.json()
         assert "detail" in body
-        assert "Failed to save configuration" in body["detail"]
+        assert "An internal error occurred" in body["detail"]
 
 
 @pytest.mark.asyncio
@@ -192,4 +192,4 @@ async def test_delete_returns_500_on_persist_failure(client):
         assert response.status_code == 500
         body = response.json()
         assert "detail" in body
-        assert "Failed to save configuration" in body["detail"]
+        assert "An internal error occurred" in body["detail"]
