@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Leave empty to block all tool server subprocess execution (secure default).
     tool_server_allowed_commands: str = ""
 
+    # Artifact storage directory (relative to backend working directory)
+    artifacts_dir: str = "data/artifacts"
+
     # Dataset import settings
     max_import_file_size: int = 10_485_760  # 10 MB
     max_import_total_size: int = 104_857_600  # 100 MB aggregate across all files

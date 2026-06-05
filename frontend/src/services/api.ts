@@ -1,6 +1,7 @@
 import type {
   PaginatedResponse,
   ApiError,
+  Artifact,
   Evaluation,
   CreateEvaluationRequest,
   Dataset,
@@ -330,6 +331,30 @@ export const api = {
     request<{ available: boolean; path: string | null }>(`/api/v1/tool-servers/${id}/validate`, {
       method: 'POST',
     }),
+
+  // --- Artifacts ---
+  listArtifacts: (evaluationId: string) =>
+    request<Artifact[]>(`/api/v1/artifacts?evaluation_id=${encodeURIComponent(evaluationId)}`),
+  getArtifact: (artifactId: string) => request<Artifact>(`/api/v1/artifacts/${artifactId}`),
+  getArtifactDownloadUrl: (artifactId: string): string =>
+    `${BASE_URL}/api/v1/artifacts/${artifactId}/download`,
+  previewArtifact: async (artifactId: string): Promise<string> => {
+    const url = `${BASE_URL}/api/v1/artifacts/${artifactId}/preview`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      const errorBody = (await response.json().catch(() => ({
+        type: 'about:blank',
+        title: 'Preview failed',
+        status: response.status,
+        detail: response.statusText,
+        instance: url,
+      }))) as ApiError;
+      throw new ApiClientError(response.status, errorBody);
+    }
+    return response.text();
+  },
+  deleteArtifact: (artifactId: string) =>
+    request<void>(`/api/v1/artifacts/${artifactId}`, { method: 'DELETE' }),
 
   // --- Harnesses ---
   listHarnesses: (params?: { type?: string; enabled?: boolean }) => {
