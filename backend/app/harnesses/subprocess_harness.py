@@ -2,13 +2,14 @@
 
 import asyncio
 import contextlib
-import shutil
 from collections.abc import AsyncGenerator
 from typing import Any
 
 import structlog
 
+from app.core.config import settings
 from app.core.exceptions import sanitize_error_for_client
+from app.core.subprocess_validation import load_allowed_commands, validate_command
 from app.harnesses.base import AgentHarness, HarnessEvent
 from app.harnesses.factory import get_parser
 from app.harnesses.registry import HarnessProfile
@@ -35,14 +36,13 @@ class SubprocessHarness(AgentHarness):
         return "tool_calls" in self._profile.supported_features
 
     async def start_session(self, config: dict[str, Any]) -> None:
-        """Validate binary exists and store config."""
+        """Validate binary exists, is allowed, and store config."""
         binary = self._profile.binary_path
         if not binary:
             raise ValueError(f"Harness '{self._profile.id}' has no binary_path configured")
 
-        resolved = shutil.which(binary)
-        if not resolved:
-            raise FileNotFoundError(f"Binary '{binary}' not found in PATH for harness '{self._profile.id}'")
+        allowed = load_allowed_commands(settings.harness_allowed_binaries)
+        resolved = validate_command(binary, allowed, context="harness binary")
 
         self._config = config
         logger.info(
