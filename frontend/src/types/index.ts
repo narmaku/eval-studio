@@ -1,3 +1,4 @@
+export * from './artifact';
 export * from './common';
 export * from './evaluation';
 export * from './evaluator';

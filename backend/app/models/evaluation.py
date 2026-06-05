@@ -27,6 +27,9 @@ class Evaluation(Base):
         "Result", back_populates="evaluation", cascade="all, delete-orphan", lazy="selectin"
     )
     sessions: Mapped[list["Session"]] = relationship("Session", back_populates="evaluation", lazy="selectin")
+    artifacts: Mapped[list["Artifact"]] = relationship(
+        "Artifact", back_populates="evaluation", cascade="all, delete-orphan", lazy="selectin"
+    )
 
 
 class JudgeConfig(Base):
@@ -44,5 +47,6 @@ class JudgeConfig(Base):
 
 
 # Avoid circular import: import at module level after class definitions
+from app.models.artifact import Artifact  # noqa: E402
 from app.models.result import Result  # noqa: E402
 from app.models.session import Session  # noqa: E402

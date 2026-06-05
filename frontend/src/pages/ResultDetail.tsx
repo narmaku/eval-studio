@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationStore } from '@/stores/evaluationStore';
-import { ResultDetailView } from '@/components/results';
+import { ArtifactsList, ResultDetailView } from '@/components/results';
 import { api } from '@/services/api';
 import type { DatasetItem, ArenaLeaderboardResponse } from '@/types';
 
@@ -85,13 +85,16 @@ export default function ResultDetail() {
   };
 
   return (
-    <ResultDetailView
-      results={results}
-      aggregateMetrics={aggregateMetrics}
-      evaluationName={evaluation?.name}
-      evaluationMode={evaluation?.mode}
-      datasetItems={datasetItems}
-      arenaLeaderboard={arenaLeaderboard}
-    />
+    <>
+      <ResultDetailView
+        results={results}
+        aggregateMetrics={aggregateMetrics}
+        evaluationName={evaluation?.name}
+        evaluationMode={evaluation?.mode}
+        datasetItems={datasetItems}
+        arenaLeaderboard={arenaLeaderboard}
+      />
+      {resultId && <ArtifactsList evaluationId={resultId} />}
+    </>
   );
 }
