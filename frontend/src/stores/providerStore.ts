@@ -7,6 +7,7 @@ interface ProviderStore {
   isLoading: boolean;
   error: string | null;
 
+  clearError: () => void;
   fetchProviders: (purpose?: string) => Promise<void>;
   createProvider: (data: CreateProviderRequest) => Promise<Provider>;
   updateProvider: (id: string, data: UpdateProviderRequest) => Promise<Provider>;
@@ -17,6 +18,8 @@ export const useProviderStore = create<ProviderStore>((set) => ({
   providers: [],
   isLoading: false,
   error: null,
+
+  clearError: () => set({ error: null }),
 
   fetchProviders: async (purpose?: string) => {
     set({ isLoading: true, error: null });
@@ -30,23 +33,44 @@ export const useProviderStore = create<ProviderStore>((set) => ({
   },
 
   createProvider: async (data: CreateProviderRequest) => {
-    const provider = await api.createProvider(data);
-    set((state) => ({ providers: [...state.providers, provider] }));
-    return provider;
+    set({ error: null });
+    try {
+      const provider = await api.createProvider(data);
+      set((state) => ({ providers: [...state.providers, provider] }));
+      return provider;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create provider';
+      set({ error: message });
+      throw err;
+    }
   },
 
   updateProvider: async (id: string, data: UpdateProviderRequest) => {
-    const updated = await api.updateProvider(id, data);
-    set((state) => ({
-      providers: state.providers.map((p) => (p.id === id ? updated : p)),
-    }));
-    return updated;
+    set({ error: null });
+    try {
+      const updated = await api.updateProvider(id, data);
+      set((state) => ({
+        providers: state.providers.map((p) => (p.id === id ? updated : p)),
+      }));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update provider';
+      set({ error: message });
+      throw err;
+    }
   },
 
   deleteProvider: async (id: string) => {
-    await api.deleteProvider(id);
-    set((state) => ({
-      providers: state.providers.filter((p) => p.id !== id),
-    }));
+    set({ error: null });
+    try {
+      await api.deleteProvider(id);
+      set((state) => ({
+        providers: state.providers.filter((p) => p.id !== id),
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete provider';
+      set({ error: message });
+      throw err;
+    }
   },
 }));
