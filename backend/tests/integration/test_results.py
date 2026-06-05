@@ -134,10 +134,25 @@ async def test_compare_results(client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_compare_results_missing_evaluation(client):
-    """Compare with nonexistent evaluation ID returns 404."""
+async def test_compare_results_single_evaluation_returns_422(client):
+    """Compare with a single evaluation ID returns 422 (at least 2 required)."""
     response = await client.get(
         "/api/v1/results/compare",
         params={"evaluation_id": "nonexistent"},
     )
+    assert response.status_code == 422
+    data = response.json()
+    assert "at least 2" in data["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_compare_results_missing_evaluation_returns_404(client, db_session):
+    """Compare with two IDs where one is nonexistent returns 404."""
+    eval_id = await _create_evaluation(db_session, "existing eval")
+    response = await client.get(
+        "/api/v1/results/compare",
+        params=[("evaluation_id", eval_id), ("evaluation_id", "nonexistent")],
+    )
     assert response.status_code == 404
+    data = response.json()
+    assert data["title"] == "Not Found"

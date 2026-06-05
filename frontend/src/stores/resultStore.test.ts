@@ -245,5 +245,58 @@ describe('resultStore', () => {
       expect(useResultStore.getState().error).toBe('Incompatible');
       expect(useResultStore.getState().comparisonData).toBeNull();
     });
+
+    it('calls compareEvaluations without referenceId when not provided', async () => {
+      mockedApi.compareEvaluations.mockResolvedValue({
+        evaluations: [],
+        item_comparisons: [],
+        reference_evaluation_id: null,
+      });
+
+      await useResultStore.getState().fetchComparison(['e1', 'e2']);
+
+      expect(mockedApi.compareEvaluations).toHaveBeenCalledWith(['e1', 'e2'], undefined);
+    });
+  });
+
+  describe('selection edge cases', () => {
+    it('toggleSelection keeps reference unchanged when deselecting a non-reference item', () => {
+      useResultStore.setState({
+        selectedEvaluationIds: ['e1', 'e2', 'e3'],
+        referenceEvaluationId: 'e1',
+      });
+      useResultStore.getState().toggleSelection('e3');
+      expect(useResultStore.getState().selectedEvaluationIds).toEqual(['e1', 'e2']);
+      expect(useResultStore.getState().referenceEvaluationId).toBe('e1');
+    });
+
+    it('toggleSelection does not change reference when adding a second item', () => {
+      useResultStore.setState({
+        selectedEvaluationIds: ['e1'],
+        referenceEvaluationId: 'e1',
+      });
+      useResultStore.getState().toggleSelection('e2');
+      expect(useResultStore.getState().selectedEvaluationIds).toEqual(['e1', 'e2']);
+      // reference should still be e1, the first selected
+      expect(useResultStore.getState().referenceEvaluationId).toBe('e1');
+    });
+
+    it('toggleSelection sets reference to null when last item is deselected', () => {
+      useResultStore.setState({
+        selectedEvaluationIds: ['e1'],
+        referenceEvaluationId: 'e1',
+      });
+      useResultStore.getState().toggleSelection('e1');
+      expect(useResultStore.getState().selectedEvaluationIds).toEqual([]);
+      expect(useResultStore.getState().referenceEvaluationId).toBeNull();
+    });
+
+    it('fetchComparison handles non-Error thrown values', async () => {
+      mockedApi.compareEvaluations.mockRejectedValue('string error');
+
+      await useResultStore.getState().fetchComparison(['e1', 'e2']);
+
+      expect(useResultStore.getState().error).toBe('Failed to fetch comparison');
+    });
   });
 });
