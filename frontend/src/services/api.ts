@@ -10,6 +10,7 @@ import type {
   ImportRequest,
   Result,
   ResultComparison,
+  ComparisonResponse,
   ArenaLeaderboardResponse,
   Session,
   CreateSessionRequest,
@@ -208,6 +209,12 @@ export const api = {
     const query = new URLSearchParams();
     evaluationIds.forEach((id) => query.append('evaluation_id', id));
     return request<ResultComparison>(`/api/v1/results/compare?${query.toString()}`);
+  },
+  compareEvaluations: (evaluationIds: string[], referenceId?: string) => {
+    const query = new URLSearchParams();
+    evaluationIds.forEach((id) => query.append('evaluation_id', id));
+    if (referenceId) query.set('reference_evaluation_id', referenceId);
+    return request<ComparisonResponse>(`/api/v1/results/compare?${query.toString()}`);
   },
   getArenaLeaderboard: (evaluationId: string) =>
     request<ArenaLeaderboardResponse>(`/api/v1/results/arena/${evaluationId}`),

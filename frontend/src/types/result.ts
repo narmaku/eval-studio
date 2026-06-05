@@ -53,6 +53,30 @@ export interface AggregateMetrics {
   failed_items: number;
 }
 
+export interface EvaluationComparisonItem {
+  evaluation_id: string;
+  evaluation_name: string;
+  total_items: number;
+  passed_count: number;
+  failed_count: number;
+  average_score: number;
+  min_score: number | null;
+  max_score: number | null;
+  results: Result[];
+}
+
+export interface CrossEvaluationItemComparison {
+  dataset_item_id: string;
+  results: Result[];
+}
+
+export interface ComparisonResponse {
+  evaluations: EvaluationComparisonItem[];
+  item_comparisons: CrossEvaluationItemComparison[];
+  reference_evaluation_id: string | null;
+}
+
+/** @deprecated Use ComparisonResponse instead */
 export interface ResultComparison {
   evaluation_ids: string[];
   results: Result[];
