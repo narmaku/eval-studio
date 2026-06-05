@@ -26,9 +26,7 @@ class TestToolServerAPIValidation:
     @patch("app.api.v1.tool_servers.validate_command")
     @patch("app.api.v1.tool_servers.load_allowed_commands", return_value=set())
     def test_create_mcp_stdio_blocked_when_empty_allowlist(self, mock_load, mock_validate):
-        mock_validate.side_effect = CommandNotAllowedError(
-            "tool server command '/bin/sh' is not in the allowed list."
-        )
+        mock_validate.side_effect = CommandNotAllowedError("tool server command '/bin/sh' is not in the allowed list.")
         response = self.client.post(
             "/api/v1/tool-servers",
             json={
