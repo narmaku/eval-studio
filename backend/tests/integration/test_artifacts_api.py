@@ -383,9 +383,7 @@ async def test_preview_not_found(client):
 async def test_download_nosniff_header(client, db_session):
     """Download response includes X-Content-Type-Options: nosniff."""
     eval_id = await _create_evaluation(db_session)
-    artifact = await _create_artifact(
-        db_session, eval_id, settings.artifacts_dir, filename="data.json", content=b"{}"
-    )
+    artifact = await _create_artifact(db_session, eval_id, settings.artifacts_dir, filename="data.json", content=b"{}")
 
     response = await client.get(f"/api/v1/artifacts/{artifact.id}/download")
     assert response.status_code == 200
