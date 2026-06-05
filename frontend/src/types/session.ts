@@ -146,12 +146,3 @@ export interface WsErrorMessage {
   data: { message: string; code?: string };
 }
 
-export type WsMessage =
-  | WsMessageChunk
-  | WsMessageComplete
-  | WsToolCallMessage
-  | WsToolExecutingMessage
-  | WsToolResultMessage
-  | WsScoreMessage
-  | WsStatusMessage
-  | WsErrorMessage;
