@@ -179,4 +179,166 @@ describe('ArtifactsList', () => {
     const dashes = screen.getAllByText('--');
     expect(dashes.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('renders nothing while loading', () => {
+    // mockListArtifacts returns a promise that never resolves
+    mockListArtifacts.mockReturnValue(new Promise(() => {}));
+    const { container } = render(<ArtifactsList evaluationId="eval-loading" />);
+    // Component returns null during loading state
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('shows preview button for text/csv artifacts', async () => {
+    const csvArtifact: Artifact[] = [
+      {
+        id: 'art-csv',
+        evaluation_id: 'eval-1',
+        filename: 'data.csv',
+        content_type: 'text/csv',
+        size_bytes: 100,
+        description: null,
+        created_at: '2026-01-15T10:00:00Z',
+      },
+    ];
+    mockListArtifacts.mockResolvedValue(csvArtifact);
+    render(<ArtifactsList evaluationId="eval-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('data.csv')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTitle('Preview')).toBeInTheDocument();
+  });
+
+  it('shows preview button for text/markdown artifacts', async () => {
+    const mdArtifact: Artifact[] = [
+      {
+        id: 'art-md',
+        evaluation_id: 'eval-1',
+        filename: 'notes.md',
+        content_type: 'text/markdown',
+        size_bytes: 50,
+        description: null,
+        created_at: '2026-01-15T10:00:00Z',
+      },
+    ];
+    mockListArtifacts.mockResolvedValue(mdArtifact);
+    render(<ArtifactsList evaluationId="eval-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('notes.md')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTitle('Preview')).toBeInTheDocument();
+  });
+
+  it('does not show preview button for text/html artifacts (XSS prevention)', async () => {
+    const htmlArtifact: Artifact[] = [
+      {
+        id: 'art-html',
+        evaluation_id: 'eval-1',
+        filename: 'page.html',
+        content_type: 'text/html',
+        size_bytes: 200,
+        description: null,
+        created_at: '2026-01-15T10:00:00Z',
+      },
+    ];
+    mockListArtifacts.mockResolvedValue(htmlArtifact);
+    render(<ArtifactsList evaluationId="eval-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('page.html')).toBeInTheDocument();
+    });
+
+    // No preview button should be rendered for HTML
+    expect(screen.queryByTitle('Preview')).not.toBeInTheDocument();
+    // Download should still be available
+    expect(screen.getByTitle('Download')).toBeInTheDocument();
+  });
+
+  it('shows error in preview dialog when preview API fails', async () => {
+    const user = userEvent.setup();
+    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockPreviewArtifact.mockRejectedValue(new Error('Server error'));
+    render(<ArtifactsList evaluationId="eval-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('report.json')).toBeInTheDocument();
+    });
+
+    const previewButtons = screen.getAllByTitle('Preview');
+    await user.click(previewButtons[0]!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Error loading preview: Server error/)).toBeInTheDocument();
+    });
+  });
+
+  it('shows non-Error preview failure message', async () => {
+    const user = userEvent.setup();
+    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockPreviewArtifact.mockRejectedValue('string error');
+    render(<ArtifactsList evaluationId="eval-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('report.json')).toBeInTheDocument();
+    });
+
+    const previewButtons = screen.getAllByTitle('Preview');
+    await user.click(previewButtons[0]!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Error loading preview: Failed to load preview/)).toBeInTheDocument();
+    });
+  });
+
+  it('shows generic error message when fetch fails with non-Error', async () => {
+    mockListArtifacts.mockRejectedValue('not an error object');
+    render(<ArtifactsList evaluationId="eval-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to load artifacts')).toBeInTheDocument();
+    });
+  });
+
+  it('formats zero-byte file size correctly', async () => {
+    const zeroByteArtifact: Artifact[] = [
+      {
+        id: 'art-zero',
+        evaluation_id: 'eval-1',
+        filename: 'empty.txt',
+        content_type: 'text/plain',
+        size_bytes: 0,
+        description: null,
+        created_at: '2026-01-15T10:00:00Z',
+      },
+    ];
+    mockListArtifacts.mockResolvedValue(zeroByteArtifact);
+    render(<ArtifactsList evaluationId="eval-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('0 B')).toBeInTheDocument();
+    });
+  });
+
+  it('formats gigabyte file size correctly', async () => {
+    const gbArtifact: Artifact[] = [
+      {
+        id: 'art-gb',
+        evaluation_id: 'eval-1',
+        filename: 'huge.bin',
+        content_type: 'application/octet-stream',
+        size_bytes: 1_073_741_824, // 1 GB
+        description: null,
+        created_at: '2026-01-15T10:00:00Z',
+      },
+    ];
+    mockListArtifacts.mockResolvedValue(gbArtifact);
+    render(<ArtifactsList evaluationId="eval-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('1.0 GB')).toBeInTheDocument();
+    });
+  });
 });

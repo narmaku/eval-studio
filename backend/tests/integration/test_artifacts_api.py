@@ -251,3 +251,268 @@ async def test_artifact_response_fields(client, db_session):
     assert expected_fields == set(data.keys())
     assert isinstance(data["size_bytes"], int)
     assert data["size_bytes"] > 0
+
+
+# --- Preview edge cases ---
+
+
+@pytest.mark.asyncio
+async def test_preview_csv_artifact(client, db_session):
+    """GET /artifacts/{id}/preview works for text/csv."""
+    eval_id = await _create_evaluation(db_session)
+    content = b"name,value\nalpha,1\nbeta,2"
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="data.csv",
+        content=content,
+        content_type="text/csv",
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 200
+    assert response.text == "name,value\nalpha,1\nbeta,2"
+
+
+@pytest.mark.asyncio
+async def test_preview_markdown_artifact(client, db_session):
+    """GET /artifacts/{id}/preview works for text/markdown."""
+    eval_id = await _create_evaluation(db_session)
+    content = b"# Heading\n\nSome text."
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="notes.md",
+        content=content,
+        content_type="text/markdown",
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 200
+    assert response.text == "# Heading\n\nSome text."
+
+
+@pytest.mark.asyncio
+async def test_preview_html_artifact_rejected(client, db_session):
+    """GET /artifacts/{id}/preview rejects text/html to prevent stored XSS."""
+    eval_id = await _create_evaluation(db_session)
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="page.html",
+        content=b"<script>alert('xss')</script>",
+        content_type="text/html",
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 415
+    data = response.json()
+    assert "Unsupported Media Type" in data["title"]
+
+
+@pytest.mark.asyncio
+async def test_preview_xml_artifact_rejected(client, db_session):
+    """GET /artifacts/{id}/preview rejects text/xml to prevent stored XSS."""
+    eval_id = await _create_evaluation(db_session)
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="data.xml",
+        content=b"<root><item>test</item></root>",
+        content_type="text/xml",
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 415
+
+
+@pytest.mark.asyncio
+async def test_preview_too_large_artifact_rejected(client, db_session):
+    """GET /artifacts/{id}/preview returns 413 for files exceeding 1 MB."""
+    eval_id = await _create_evaluation(db_session)
+    # Create a text artifact slightly over the 1 MB preview limit
+    large_content = b"x" * (1_048_576 + 1)
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="big.txt",
+        content=large_content,
+        content_type="text/plain",
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 413
+    data = response.json()
+    assert "Content Too Large" in data["title"]
+
+
+@pytest.mark.asyncio
+async def test_preview_at_exact_size_limit(client, db_session):
+    """GET /artifacts/{id}/preview succeeds for files at exactly 1 MB."""
+    eval_id = await _create_evaluation(db_session)
+    content = b"x" * 1_048_576  # exactly 1 MB
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="exact.txt",
+        content=content,
+        content_type="text/plain",
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_preview_not_found(client):
+    """GET /artifacts/nonexistent/preview returns 404."""
+    response = await client.get("/api/v1/artifacts/nonexistent-id/preview")
+    assert response.status_code == 404
+
+
+# --- Download security headers ---
+
+
+@pytest.mark.asyncio
+async def test_download_nosniff_header(client, db_session):
+    """Download response includes X-Content-Type-Options: nosniff."""
+    eval_id = await _create_evaluation(db_session)
+    artifact = await _create_artifact(
+        db_session, eval_id, settings.artifacts_dir, filename="data.json", content=b"{}"
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/download")
+    assert response.status_code == 200
+    assert response.headers.get("x-content-type-options") == "nosniff"
+
+
+@pytest.mark.asyncio
+async def test_download_content_disposition_attachment(client, db_session):
+    """Download response forces 'attachment' Content-Disposition (not inline)."""
+    eval_id = await _create_evaluation(db_session)
+    artifact = await _create_artifact(
+        db_session, eval_id, settings.artifacts_dir, filename="report.json", content=b'{"ok": true}'
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/download")
+    assert response.status_code == 200
+    disposition = response.headers.get("content-disposition", "")
+    assert disposition.startswith("attachment")
+    assert "report.json" in disposition
+
+
+@pytest.mark.asyncio
+async def test_preview_always_text_plain(client, db_session):
+    """Preview response content-type is always text/plain to prevent XSS."""
+    eval_id = await _create_evaluation(db_session)
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="data.json",
+        content=b'{"key": "value"}',
+        content_type="application/json",
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 200
+    # Even for JSON artifacts, preview serves as text/plain
+    assert "text/plain" in response.headers.get("content-type", "")
+
+
+@pytest.mark.asyncio
+async def test_preview_nosniff_header(client, db_session):
+    """Preview response includes X-Content-Type-Options: nosniff."""
+    eval_id = await _create_evaluation(db_session)
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="output.txt",
+        content=b"hello",
+        content_type="text/plain",
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 200
+    assert response.headers.get("x-content-type-options") == "nosniff"
+
+
+@pytest.mark.asyncio
+async def test_preview_inline_disposition(client, db_session):
+    """Preview response uses 'inline' Content-Disposition."""
+    eval_id = await _create_evaluation(db_session)
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="output.txt",
+        content=b"hello",
+        content_type="text/plain",
+    )
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 200
+    assert response.headers.get("content-disposition") == "inline"
+
+
+# --- File missing on disk ---
+
+
+@pytest.mark.asyncio
+async def test_download_file_missing_on_disk(client, db_session):
+    """Download returns 404 when the DB record exists but the file is gone."""
+    import os
+
+    eval_id = await _create_evaluation(db_session)
+    artifact = await _create_artifact(db_session, eval_id, settings.artifacts_dir, filename="gone.txt")
+
+    # Delete the file from disk
+    from pathlib import Path
+
+    file_path = Path(settings.artifacts_dir) / artifact.storage_path
+    os.unlink(str(file_path))
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/download")
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_preview_file_missing_on_disk(client, db_session):
+    """Preview returns 404 when the DB record exists but the file is gone."""
+    import os
+
+    eval_id = await _create_evaluation(db_session)
+    artifact = await _create_artifact(
+        db_session,
+        eval_id,
+        settings.artifacts_dir,
+        filename="gone.txt",
+        content=b"hello",
+        content_type="text/plain",
+    )
+
+    # Delete the file from disk
+    from pathlib import Path
+
+    file_path = Path(settings.artifacts_dir) / artifact.storage_path
+    os.unlink(str(file_path))
+
+    response = await client.get(f"/api/v1/artifacts/{artifact.id}/preview")
+    assert response.status_code == 404
+
+
+# --- List endpoint edge cases ---
+
+
+@pytest.mark.asyncio
+async def test_list_artifacts_requires_evaluation_id(client):
+    """GET /artifacts without evaluation_id query param returns 422."""
+    response = await client.get("/api/v1/artifacts")
+    assert response.status_code == 422
