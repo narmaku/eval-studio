@@ -12,6 +12,7 @@ const ArenaComparison = lazy(() => import('@/pages/ArenaComparison'));
 const Datasets = lazy(() => import('@/pages/Datasets'));
 const Results = lazy(() => import('@/pages/Results'));
 const ResultDetail = lazy(() => import('@/pages/ResultDetail'));
+const ResultComparison = lazy(() => import('@/pages/ResultComparison'));
 const Sessions = lazy(() => import('@/pages/Sessions'));
 const SessionDetail = lazy(() => import('@/pages/SessionDetail'));
 const Environments = lazy(() => import('@/pages/Environments'));
@@ -96,6 +97,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<Loading />}>
                     <Results />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="compare"
+                element={
+                  <Suspense fallback={<Loading />}>
+                    <ResultComparison />
                   </Suspense>
                 }
               />
