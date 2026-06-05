@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,7 +10,7 @@ import {
   type ColumnFiltersState,
 } from '@tanstack/react-table';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown, Star } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -28,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useResultStore } from '@/stores/resultStore';
 import type { EvaluationMode, EvaluationStatus } from '@/types';
 
 export interface EvaluationResultRow {
@@ -40,6 +42,7 @@ export interface EvaluationResultRow {
   passRate: number;
   meanScore: number;
   createdAt: string;
+  datasetId: string | null;
 }
 
 const modeBadgeStyles: Record<EvaluationMode, string> = {
@@ -64,6 +67,37 @@ const statusBadgeVariants: Record<string, 'default' | 'secondary' | 'destructive
   cancelled: 'outline',
 };
 
+/**
+ * Check if a row is compatible with the current selection filter.
+ * Compatible means same mode and same datasetId as the first selected evaluation.
+ */
+function isRowCompatible(
+  row: EvaluationResultRow,
+  filterMode: EvaluationMode | null,
+  filterDatasetId: string | null,
+): boolean {
+  if (filterMode === null) return true; // No selection active
+  return row.mode === filterMode && row.datasetId === filterDatasetId;
+}
+
+/**
+ * Build a tooltip explaining why a row is incompatible.
+ */
+function incompatibilityReason(
+  row: EvaluationResultRow,
+  filterMode: EvaluationMode | null,
+  filterDatasetId: string | null,
+): string {
+  const reasons: string[] = [];
+  if (filterMode !== null && row.mode !== filterMode) {
+    reasons.push(`Different mode (${row.mode} vs ${filterMode})`);
+  }
+  if (filterMode !== null && row.datasetId !== filterDatasetId) {
+    reasons.push('Different dataset');
+  }
+  return reasons.join('; ');
+}
+
 interface EvaluationResultsListProps {
   rows: EvaluationResultRow[];
 }
@@ -73,8 +107,87 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'createdAt', desc: true }]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
+  const selectedEvaluationIds = useResultStore((s) => s.selectedEvaluationIds);
+  const referenceEvaluationId = useResultStore((s) => s.referenceEvaluationId);
+  const toggleSelection = useResultStore((s) => s.toggleSelection);
+  const setReference = useResultStore((s) => s.setReference);
+
+  // Compute the compatibility filter based on the first selected evaluation
+  const { filterMode, filterDatasetId } = useMemo(() => {
+    if (selectedEvaluationIds.length === 0) {
+      return { filterMode: null, filterDatasetId: null };
+    }
+    const firstSelectedId = selectedEvaluationIds[0];
+    const firstSelected = rows.find((r) => r.evaluationId === firstSelectedId);
+    if (!firstSelected) {
+      return { filterMode: null, filterDatasetId: null };
+    }
+    return {
+      filterMode: firstSelected.mode,
+      filterDatasetId: firstSelected.datasetId,
+    };
+  }, [selectedEvaluationIds, rows]);
+
+  const handleCheckboxClick = useCallback(
+    (evaluationId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      toggleSelection(evaluationId);
+    },
+    [toggleSelection],
+  );
+
+  const handleSetReference = useCallback(
+    (evaluationId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setReference(evaluationId);
+    },
+    [setReference],
+  );
+
   const columns = useMemo<ColumnDef<EvaluationResultRow>[]>(
     () => [
+      {
+        id: 'select',
+        header: () => null,
+        cell: ({ row }) => {
+          const evalId = row.original.evaluationId;
+          const isSelected = selectedEvaluationIds.includes(evalId);
+          const isReference = referenceEvaluationId === evalId;
+          const compatible = isRowCompatible(row.original, filterMode, filterDatasetId);
+          const isDisabled = !compatible && !isSelected;
+          const tooltip = isDisabled
+            ? incompatibilityReason(row.original, filterMode, filterDatasetId)
+            : undefined;
+
+          return (
+            <div className="flex items-center gap-1">
+              <div title={tooltip}>
+                <Checkbox
+                  checked={isSelected}
+                  disabled={isDisabled}
+                  onClick={(e) => handleCheckboxClick(evalId, e)}
+                  onCheckedChange={() => {
+                    /* handled by onClick to stop propagation */
+                  }}
+                  aria-label={`Select ${row.original.name}`}
+                />
+              </div>
+              {isSelected && (
+                <button
+                  title={isReference ? 'Reference evaluation' : 'Set as reference'}
+                  onClick={(e) => handleSetReference(evalId, e)}
+                  className="p-0.5"
+                >
+                  <Star
+                    className={`h-4 w-4 ${isReference ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground'}`}
+                  />
+                </button>
+              )}
+            </div>
+          );
+        },
+        enableSorting: false,
+      },
       {
         accessorKey: 'name',
         header: ({ column }) => (
@@ -173,7 +286,14 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
         },
       },
     ],
-    [],
+    [
+      selectedEvaluationIds,
+      referenceEvaluationId,
+      filterMode,
+      filterDatasetId,
+      handleCheckboxClick,
+      handleSetReference,
+    ],
   );
 
   const table = useReactTable({
@@ -233,19 +353,31 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className="cursor-pointer"
-                onClick={() => navigate(`/results/${row.original.resultId}`)}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
+            {table.getRowModel().rows.map((row) => {
+              const evalId = row.original.evaluationId;
+              const isSelected = selectedEvaluationIds.includes(evalId);
+              const compatible = isRowCompatible(row.original, filterMode, filterDatasetId);
+              const isIncompatible = !compatible && !isSelected;
+              const isReference = referenceEvaluationId === evalId;
+              const tooltip = isIncompatible
+                ? incompatibilityReason(row.original, filterMode, filterDatasetId)
+                : undefined;
+
+              return (
+                <TableRow
+                  key={row.id}
+                  className={`cursor-pointer ${isIncompatible ? 'opacity-40' : ''} ${isReference ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}`}
+                  title={tooltip}
+                  onClick={() => navigate(`/results/${row.original.resultId}`)}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

@@ -37,10 +37,19 @@ class EvaluationComparisonItem(BaseModel):
     results: list[ResultResponse]
 
 
+class CrossEvaluationItemComparison(BaseModel):
+    """Groups results from different evaluations for a single dataset item."""
+
+    dataset_item_id: str
+    results: list[ResultResponse]
+
+
 class ComparisonResponse(BaseModel):
     """Response for comparing results across evaluations."""
 
     evaluations: list[EvaluationComparisonItem]
+    item_comparisons: list[CrossEvaluationItemComparison] = []
+    reference_evaluation_id: str | None = None
 
 
 class ArenaContestantSummary(BaseModel):
