@@ -16,10 +16,3 @@ export interface ApiError {
   detail: string;
   instance: string;
 }
-
-export type SortDirection = 'asc' | 'desc';
-
-export interface SortParams {
-  field: string;
-  direction: SortDirection;
-}
