@@ -4,6 +4,7 @@ This module prevents arbitrary command execution by validating binaries
 against a configurable allowlist before any subprocess is spawned.
 """
 
+import os
 import shutil
 
 import structlog
@@ -38,6 +39,11 @@ def validate_command(command: str, allowed_commands: set[str], context: str = "c
     if not resolved:
         raise ValueError(f"{context} '{command}' not found on PATH")
 
+    # Resolve symlinks so that a symlink to an allowed binary (or vice versa)
+    # cannot bypass the allowlist.  Both the candidate and the allowlist entries
+    # are compared after realpath resolution.
+    resolved = os.path.realpath(resolved)
+
     if resolved not in allowed_commands:
         raise ValueError(
             f"{context} '{resolved}' is not in the allowed binaries list. "
@@ -71,7 +77,7 @@ def load_allowed_commands(env_value: str) -> set[str]:
 
         resolved = shutil.which(entry)
         if resolved:
-            allowed.add(resolved)
+            allowed.add(os.path.realpath(resolved))
         else:
             logger.warning(
                 "subprocess_validation.unresolvable_entry",

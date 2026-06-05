@@ -25,6 +25,7 @@ class SubprocessHarness(AgentHarness):
     def __init__(self, profile: HarnessProfile) -> None:
         self._profile = profile
         self._config: dict[str, Any] = {}
+        self._resolved_binary: str | None = None
         self._process: asyncio.subprocess.Process | None = None
 
     @property
@@ -44,6 +45,7 @@ class SubprocessHarness(AgentHarness):
         allowed = load_allowed_commands(settings.harness_allowed_binaries)
         resolved = validate_command(binary, allowed, context="harness binary")
 
+        self._resolved_binary = resolved
         self._config = config
         logger.info(
             "subprocess_harness.session_started",
@@ -53,9 +55,12 @@ class SubprocessHarness(AgentHarness):
 
     async def send_message(self, content: str, history: list[dict[str, Any]]) -> AsyncGenerator[HarnessEvent, None]:
         """Spawn the subprocess, write prompt to stdin, parse stdout."""
-        binary = self._profile.binary_path
+        binary = self._resolved_binary
         if not binary:
-            yield HarnessEvent(type="error", data={"message": "No binary_path configured"})
+            yield HarnessEvent(
+                type="error",
+                data={"message": "No validated binary available. Call start_session() first."},
+            )
             return
 
         cmd = [binary, *self._profile.args]
@@ -166,6 +171,7 @@ class SubprocessHarness(AgentHarness):
                 with contextlib.suppress(ProcessLookupError):
                     self._process.kill()
             self._process = None
+        self._resolved_binary = None
         self._config = {}
 
     def _build_prompt(self, content: str, history: list[dict[str, Any]]) -> str:

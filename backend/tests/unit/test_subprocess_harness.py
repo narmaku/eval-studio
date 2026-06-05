@@ -1,5 +1,6 @@
 """Unit tests for SubprocessHarness."""
 
+import os
 import shutil
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -26,8 +27,9 @@ def subprocess_profile():
 def _allow_echo():
     """Temporarily allow echo binary in settings."""
     echo_path = shutil.which("echo")
+    echo_real = os.path.realpath(echo_path) if echo_path else ""
     with patch("app.harnesses.subprocess_harness.settings") as mock_settings:
-        mock_settings.harness_allowed_binaries = echo_path or ""
+        mock_settings.harness_allowed_binaries = echo_real
         yield mock_settings
 
 
@@ -130,7 +132,8 @@ async def test_send_message_binary_not_found_at_runtime():
         binary_path="__truly_nonexistent_cmd__",
     )
     harness = SubprocessHarness(profile)
-    harness._config = {}  # Skip start_session validation
+    harness._resolved_binary = "__truly_nonexistent_cmd__"  # Simulate binary disappearing after validation
+    harness._config = {}
 
     events = []
     async for event in harness.send_message("test", []):

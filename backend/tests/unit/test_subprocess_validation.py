@@ -1,5 +1,6 @@
 """Tests for the subprocess binary validation module."""
 
+import os
 import shutil
 
 import pytest
@@ -44,18 +45,20 @@ class TestValidateCommand:
         """A command in the allowlist returns its resolved absolute path."""
         echo_path = shutil.which("echo")
         assert echo_path is not None, "echo must be available for this test"
+        echo_real = os.path.realpath(echo_path)
 
-        result = validate_command("echo", allowed_commands={echo_path})
-        assert result == echo_path
+        result = validate_command("echo", allowed_commands={echo_real})
+        assert result == echo_real
         assert result.startswith("/")
 
     def test_absolute_path_in_allowlist_accepted(self) -> None:
         """Passing an absolute path that matches the allowlist works."""
         echo_path = shutil.which("echo")
         assert echo_path is not None
+        echo_real = os.path.realpath(echo_path)
 
-        result = validate_command(echo_path, allowed_commands={echo_path})
-        assert result == echo_path
+        result = validate_command(echo_path, allowed_commands={echo_real})
+        assert result == echo_real
 
     def test_unresolvable_command_raises(self) -> None:
         """A command that cannot be found on PATH is rejected."""
@@ -83,9 +86,10 @@ class TestLoadAllowedCommands:
         """A single binary name is resolved to its absolute path."""
         echo_path = shutil.which("echo")
         assert echo_path is not None
+        echo_real = os.path.realpath(echo_path)
 
         result = load_allowed_commands("echo")
-        assert echo_path in result
+        assert echo_real in result
 
     def test_multiple_binaries_comma_separated(self) -> None:
         """Comma-separated binaries are all resolved."""
@@ -95,8 +99,8 @@ class TestLoadAllowedCommands:
         assert cat_path is not None
 
         result = load_allowed_commands("echo,cat")
-        assert echo_path in result
-        assert cat_path in result
+        assert os.path.realpath(echo_path) in result
+        assert os.path.realpath(cat_path) in result
 
     def test_whitespace_around_entries_trimmed(self) -> None:
         """Leading and trailing whitespace around entries is stripped."""
@@ -104,7 +108,7 @@ class TestLoadAllowedCommands:
         assert echo_path is not None
 
         result = load_allowed_commands("  echo  ")
-        assert echo_path in result
+        assert os.path.realpath(echo_path) in result
 
     def test_nonexistent_entries_skipped(self) -> None:
         """Entries that cannot be resolved are silently skipped."""
@@ -112,12 +116,12 @@ class TestLoadAllowedCommands:
         assert result == set()
 
     def test_absolute_paths_accepted(self) -> None:
-        """Absolute paths are kept as-is (no which() resolution needed)."""
+        """Absolute paths are resolved through realpath."""
         echo_path = shutil.which("echo")
         assert echo_path is not None
 
         result = load_allowed_commands(echo_path)
-        assert echo_path in result
+        assert os.path.realpath(echo_path) in result
 
     def test_mixed_valid_and_invalid(self) -> None:
         """Valid entries are resolved; invalid entries are skipped."""
@@ -125,5 +129,5 @@ class TestLoadAllowedCommands:
         assert echo_path is not None
 
         result = load_allowed_commands("echo,__nonexistent__,  ")
-        assert echo_path in result
+        assert os.path.realpath(echo_path) in result
         assert len(result) == 1

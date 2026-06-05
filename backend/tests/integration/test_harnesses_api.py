@@ -71,11 +71,13 @@ async def test_get_not_found(client):
 
 @pytest.mark.asyncio
 async def test_create_harness(client):
+    import os
     import shutil
 
     ls_path = shutil.which("ls") or ""
+    ls_real = os.path.realpath(ls_path) if ls_path else ""
     with patch("app.api.v1.harnesses.settings") as mock_settings:
-        mock_settings.harness_allowed_binaries = ls_path
+        mock_settings.harness_allowed_binaries = ls_real
         payload = {"name": "New Harness", "type": "subprocess", "binary_path": "ls"}
         response = await client.post("/api/v1/harnesses", json=payload)
         assert response.status_code == 201
