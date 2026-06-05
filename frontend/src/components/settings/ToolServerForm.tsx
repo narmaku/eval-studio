@@ -140,8 +140,12 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
 
       onSaved?.();
       onClose();
-    } catch {
-      setErrors(['Failed to save tool server. Please try again.']);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to save tool server. Please try again.';
+      setErrors([message]);
     } finally {
       setIsSaving(false);
     }
