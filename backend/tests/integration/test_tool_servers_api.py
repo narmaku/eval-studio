@@ -1,8 +1,20 @@
 """Integration tests for the tool servers API endpoints."""
 
+from unittest.mock import patch
+
 import pytest
 
 from app.core.tool_servers import StandaloneToolDef, ToolServerProfile, tool_server_registry
+
+
+@pytest.fixture(autouse=True)
+def _bypass_command_validation():
+    """Bypass command validation for integration tests focused on CRUD behavior."""
+    with patch(
+        "app.api.v1.tool_servers.validate_command",
+        side_effect=lambda cmd, allowed, **kw: cmd,
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)

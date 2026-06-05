@@ -160,20 +160,29 @@ class McpStdioClient:
         Raises:
             TimeoutError: If initialization takes longer than timeout_ms.
             RuntimeError: If the server process fails to start or handshake fails.
+            CommandNotAllowedError: If the command is not in the allowlist.
+            FileNotFoundError: If the command cannot be found on PATH.
         """
         import os
 
+        from app.core.config import settings
+        from app.core.subprocess_validation import load_allowed_commands, validate_command
+
         env = {**os.environ, **self.env}
+
+        # Validate the command against the configured allowlist before spawning
+        allowed = load_allowed_commands(settings.tool_server_allowed_commands)
+        resolved_command = validate_command(self.command, allowed, context="tool server command")
 
         logger.info(
             "mcp.starting",
             server_id=self.server_id,
-            command=self.command,
+            command=resolved_command,
             args=self.args,
         )
 
         self._process = await asyncio.create_subprocess_exec(
-            self.command,
+            resolved_command,
             *self.args,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,

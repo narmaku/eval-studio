@@ -22,6 +22,9 @@ class Settings(BaseSettings):
 
     evaluator_config_dir: str = "config/evaluators"
 
+    # Security — subprocess allowlists
+    tool_server_allowed_commands: str = ""
+
     # Dataset import settings
     max_import_file_size: int = 10_485_760  # 10 MB
     max_import_total_size: int = 104_857_600  # 100 MB aggregate across all files

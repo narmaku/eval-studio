@@ -1,18 +1,37 @@
 """API endpoints for tool server profiles (YAML-backed CRUD)."""
 
-import shutil
 import uuid
 
 import structlog
 from fastapi import APIRouter, Query, Response
 
-from app.core.exceptions import NotFoundException
+from app.core.config import settings
+from app.core.exceptions import NotFoundException, ValidationException
+from app.core.subprocess_validation import CommandNotAllowedError, load_allowed_commands, validate_command
 from app.core.tool_servers import StandaloneToolDef, ToolServerProfile, tool_server_registry
 from app.schemas.tool_server import ToolServerCreate, ToolServerResponse, ToolServerUpdate
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/tool-servers", tags=["tool-servers"])
+
+
+def _validate_tool_server_command(command: str | None, server_type: str) -> None:
+    """Validate tool server command against allowlist at API time.
+
+    Only mcp_stdio servers have commands that spawn subprocesses.
+    Standalone servers define tools inline and never execute commands.
+    """
+    if server_type != "mcp_stdio" or not command:
+        return
+
+    allowed = load_allowed_commands(settings.tool_server_allowed_commands)
+    try:
+        validate_command(command, allowed, context="tool server command")
+    except CommandNotAllowedError as exc:
+        raise ValidationException(str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise ValidationException(str(exc)) from exc
 
 
 def _to_response(s: ToolServerProfile) -> ToolServerResponse:
@@ -54,6 +73,7 @@ async def get_tool_server(tool_server_id: str) -> ToolServerResponse:
 
 @router.post("", response_model=ToolServerResponse, status_code=201)
 async def create_tool_server(payload: ToolServerCreate) -> ToolServerResponse:
+    _validate_tool_server_command(payload.command, payload.type)
     tools = [StandaloneToolDef(name=t.name, description=t.description, parameters=t.parameters) for t in payload.tools]
     profile = ToolServerProfile(
         id=str(uuid.uuid4()),
@@ -74,6 +94,16 @@ async def create_tool_server(payload: ToolServerCreate) -> ToolServerResponse:
 
 @router.put("/{tool_server_id}", response_model=ToolServerResponse)
 async def update_tool_server(tool_server_id: str, payload: ToolServerUpdate) -> ToolServerResponse:
+    # If command is being updated, validate it. Determine the effective type:
+    # use the incoming type if provided, otherwise look up the existing profile.
+    if payload.command is not None:
+        effective_type = payload.type
+        if effective_type is None:
+            existing = tool_server_registry.get_tool_server(tool_server_id)
+            if not existing:
+                raise NotFoundException("Tool Server", tool_server_id)
+            effective_type = existing.type
+        _validate_tool_server_command(payload.command, effective_type)
     update_data = payload.model_dump(exclude_unset=True)
     if "tools" in update_data and update_data["tools"] is not None:
         update_data["tools"] = [
@@ -101,8 +131,12 @@ async def validate_tool_server(tool_server_id: str) -> dict:
     if not server:
         raise NotFoundException("Tool Server", tool_server_id)
     if server.type == "mcp_stdio" and server.command:
-        resolved = shutil.which(server.command)
-        return {"available": resolved is not None, "path": resolved}
+        allowed = load_allowed_commands(settings.tool_server_allowed_commands)
+        try:
+            resolved = validate_command(server.command, allowed, context="tool server command")
+            return {"available": True, "path": resolved}
+        except (CommandNotAllowedError, FileNotFoundError) as exc:
+            return {"available": False, "path": None, "error": str(exc)}
     if server.type == "standalone":
         return {"available": True, "path": None, "tool_count": len(server.tools)}
     return {"available": False, "path": None}
