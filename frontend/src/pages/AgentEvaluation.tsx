@@ -182,7 +182,7 @@ export default function AgentEvaluation() {
         agent_config: {
           ...(modelEndpoint && {
             provider_id: modelEndpoint.provider_id,
-            litellm_model: modelEndpoint.litellm_model,
+            default_model: modelEndpoint.default_model,
             api_base: modelEndpoint.api_base,
           }),
           ...(systemPrompt.trim() && { system_prompt: systemPrompt.trim() }),

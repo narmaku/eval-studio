@@ -1,6 +1,6 @@
 export interface CreateProviderRequest {
   name: string;
-  litellm_model?: string;
+  default_model?: string;
   api_base?: string | null;
   api_key_env?: string | null;
   proxy?: string | null;

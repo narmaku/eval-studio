@@ -130,7 +130,7 @@ describe('evaluationStore', () => {
           environment_id: null,
           judge_config_id: 'j1',
           config: {
-            model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+            model_endpoint: { name: 'test', default_model: 'gpt-4' },
             judge_config: { preset: 'default' },
           },
           result_count: 5,
@@ -239,7 +239,7 @@ describe('evaluationStore', () => {
           environment_id: null,
           judge_config_id: null,
           config: {
-            model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+            model_endpoint: { name: 'test', default_model: 'gpt-4' },
             judge_config: { preset: 'default' },
           },
           result_count: null,
@@ -272,7 +272,7 @@ describe('evaluationStore', () => {
           environment_id: null,
           judge_config_id: null,
           config: {
-            model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+            model_endpoint: { name: 'test', default_model: 'gpt-4' },
             judge_config: { preset: 'default' },
           },
           result_count: null,
@@ -372,7 +372,7 @@ describe('evaluationStore', () => {
         environment_id: null,
         judge_config_id: null,
         config: {
-          model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+          model_endpoint: { name: 'test', default_model: 'gpt-4' },
           judge_config: { preset: 'default' },
         },
         result_count: null,
@@ -399,7 +399,7 @@ describe('evaluationStore', () => {
         mode: 'qa',
         dataset_id: 'd1',
         config: {
-          model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+          model_endpoint: { name: 'test', default_model: 'gpt-4' },
           judge_config: { preset: 'default' },
         },
       });
@@ -500,7 +500,7 @@ describe('evaluationStore', () => {
         environment_id: null,
         judge_config_id: null,
         config: {
-          model_endpoint: { name: 'test', litellm_model: 'gpt-4' },
+          model_endpoint: { name: 'test', default_model: 'gpt-4' },
           judge_config: { preset: 'default' },
         },
         result_count: 5,

@@ -9,7 +9,7 @@ const mockDeleteProvider = vi.fn();
 const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   id: 'p-1',
   name: 'Test Provider',
-  litellm_model: 'gpt-4',
+  default_model: 'gpt-4',
   api_base: 'https://api.openai.com/v1',
   has_api_key: true,
   proxy: null,
@@ -104,7 +104,7 @@ describe('ProviderList', () => {
   it('shows model name', () => {
     storeState = {
       ...defaultStore,
-      providers: [makeProvider({ litellm_model: 'gpt-4-turbo' })],
+      providers: [makeProvider({ default_model: 'gpt-4-turbo' })],
     };
 
     render(<ProviderList />);
@@ -166,5 +166,53 @@ describe('ProviderList', () => {
 
     expect(screen.getByTestId('provider-form')).toBeInTheDocument();
     expect(screen.getByText('editing My Provider')).toBeInTheDocument();
+  });
+
+  it('renders providers in a grid layout', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [
+        makeProvider({ id: 'p-1', name: 'Provider 1' }),
+        makeProvider({ id: 'p-2', name: 'Provider 2' }),
+        makeProvider({ id: 'p-3', name: 'Provider 3' }),
+      ],
+    };
+    render(<ProviderList />);
+    // All providers should be visible
+    expect(screen.getByText('Provider 1')).toBeInTheDocument();
+    expect(screen.getByText('Provider 2')).toBeInTheDocument();
+    expect(screen.getByText('Provider 3')).toBeInTheDocument();
+  });
+
+  it('shows provider type badge', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ provider_type: 'custom' })],
+    };
+    render(<ProviderList />);
+    expect(screen.getByText('Custom')).toBeInTheDocument();
+  });
+
+  it('shows LiteLLM badge for litellm provider type', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ provider_type: 'litellm' })],
+    };
+    render(<ProviderList />);
+    expect(screen.getByText('LiteLLM')).toBeInTheDocument();
+  });
+
+  it('shows endpoint URL for custom providers', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [
+        makeProvider({
+          provider_type: 'custom',
+          endpoint_url: 'https://api.example.com/v1/infer',
+        }),
+      ],
+    };
+    render(<ProviderList />);
+    expect(screen.getByText('https://api.example.com/v1/infer')).toBeInTheDocument();
   });
 });

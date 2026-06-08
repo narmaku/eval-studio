@@ -68,7 +68,7 @@ export default function ArenaComparison() {
   const { results, fetchResults } = useResultStore();
 
   // Need at least 2 contestants with valid model config
-  const validContestants = contestants.filter((c) => c.name && c.litellm_model);
+  const validContestants = contestants.filter((c) => c.name && c.default_model);
   const isConfigValid = Boolean(
     validContestants.length >= 2 && selectedDatasetId && judgeConfig && selectedEvaluatorId,
   );
@@ -163,7 +163,7 @@ export default function ArenaComparison() {
   };
 
   // Extract unique contestant model names for the results grid
-  const contestantModels = validContestants.map((c) => c.litellm_model);
+  const contestantModels = validContestants.map((c) => c.default_model);
 
   return (
     <div className="space-y-6">

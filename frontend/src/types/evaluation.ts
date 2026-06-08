@@ -62,7 +62,7 @@ export interface EvaluationConfig {
 export interface ModelEndpoint {
   provider_id?: string;
   name: string;
-  litellm_model: string;
+  default_model: string;
   api_base?: string;
   api_key_env?: string;
   tags?: string[];
@@ -71,7 +71,7 @@ export interface ModelEndpoint {
 export interface Provider {
   id: string;
   name: string;
-  litellm_model: string;
+  default_model: string;
   api_base: string | null;
   has_api_key: boolean;
   proxy: string | null;

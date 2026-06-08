@@ -91,27 +91,75 @@ export function ProviderList() {
         </div>
       )}
 
-      {filteredProviders.map((provider) => (
-        <Card key={provider.id}>
-          <CardContent className="flex items-start justify-between py-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium">{provider.name}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredProviders.map((provider) => (
+          <Card key={provider.id} className="flex flex-col">
+            <CardContent className="flex flex-col gap-2 py-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium truncate">{provider.name}</h3>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleEdit(provider)}
+                    aria-label="Edit"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setDeleteTarget(provider)}
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground font-mono">{provider.litellm_model}</p>
-              {provider.api_base && (
-                <p className="text-xs text-muted-foreground">API Base: {provider.api_base}</p>
-              )}
-              {provider.default_params && Object.keys(provider.default_params).length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Defaults:{' '}
-                  {Object.entries(provider.default_params)
-                    .map(([k, v]) => `${k}=${v}`)
-                    .join(', ')}
-                </p>
-              )}
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={provider.provider_type === 'custom' ? 'secondary' : 'outline'}
+                    className="text-xs"
+                  >
+                    {provider.provider_type === 'custom' ? 'Custom' : 'LiteLLM'}
+                  </Badge>
+                  {provider.has_api_key && (
+                    <Badge variant="outline" className="text-xs">
+                      API Key
+                    </Badge>
+                  )}
+                </div>
+                {provider.default_model && (
+                  <p
+                    className="text-xs text-muted-foreground font-mono truncate"
+                    title={provider.default_model}
+                  >
+                    {provider.default_model}
+                  </p>
+                )}
+                {provider.api_base && (
+                  <p className="text-xs text-muted-foreground truncate" title={provider.api_base}>
+                    {provider.api_base}
+                  </p>
+                )}
+                {provider.endpoint_url && (
+                  <p
+                    className="text-xs text-muted-foreground truncate"
+                    title={provider.endpoint_url}
+                  >
+                    {provider.endpoint_url}
+                  </p>
+                )}
+              </div>
+
               {provider.tags.length > 0 && (
-                <div className="flex gap-1 pt-1">
+                <div className="flex flex-wrap gap-1 mt-auto pt-1">
                   {provider.tags.map((tag) => (
                     <Badge key={tag} variant="outline" className="text-xs">
                       {tag}
@@ -119,33 +167,10 @@ export function ProviderList() {
                   ))}
                 </div>
               )}
-            </div>
-            <div className="flex items-center gap-1">
-              {provider.has_api_key && (
-                <Badge variant="outline" className="text-xs mr-2">
-                  API Key Set
-                </Badge>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleEdit(provider)}
-                aria-label="Edit"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDeleteTarget(provider)}
-                aria-label="Delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       <ProviderForm
         open={formOpen}

@@ -23,7 +23,7 @@ vi.mock('@/components/evaluation/ContestantSelector', () => ({
       Contestant Selector ({value.length} contestants)
       <button
         data-testid="mock-add-contestant"
-        onClick={() => onChange([...value, { name: 'Model X', litellm_model: 'openai/gpt-4o' }])}
+        onClick={() => onChange([...value, { name: 'Model X', default_model: 'openai/gpt-4o' }])}
       >
         Mock Add
       </button>
