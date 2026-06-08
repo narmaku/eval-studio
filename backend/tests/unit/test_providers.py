@@ -340,15 +340,19 @@ class TestProxyEnv:
         key = tmp_path / "key.pem"
         key.write_text("KEY")
 
-        with pytest.raises(FileNotFoundError, match="ssl_cert_path"):
-            with proxy_env(None, "/nonexistent/cert.pem", str(key)):
-                pass
+        with (
+            pytest.raises(FileNotFoundError, match="ssl_cert_path"),
+            proxy_env(None, "/nonexistent/cert.pem", str(key)),
+        ):
+            pass
 
     def test_proxy_env_mtls_missing_key_raises(self, tmp_path):
         """mTLS mode raises FileNotFoundError when key file is missing."""
         cert = tmp_path / "cert.pem"
         cert.write_text("CERT")
 
-        with pytest.raises(FileNotFoundError, match="ssl_client_key"):
-            with proxy_env(None, str(cert), "/nonexistent/key.pem"):
-                pass
+        with (
+            pytest.raises(FileNotFoundError, match="ssl_client_key"),
+            proxy_env(None, str(cert), "/nonexistent/key.pem"),
+        ):
+            pass
