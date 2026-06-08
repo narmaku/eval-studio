@@ -31,6 +31,7 @@ DANGEROUS_ENV_NAMES = frozenset({
     "BASH_ENV",
     "ENV",
     "ZDOTDIR",
+    "PROMPT_COMMAND",
     "PYTHONSTARTUP",
     "PYTHONPATH",
     "PERL5LIB",
@@ -38,6 +39,9 @@ DANGEROUS_ENV_NAMES = frozenset({
     "RUBYOPT",
     "RUBYLIB",
     "NODE_OPTIONS",
+    "JAVA_TOOL_OPTIONS",
+    "_JAVA_OPTIONS",
+    "GIT_SSH_COMMAND",
 })
 
 
