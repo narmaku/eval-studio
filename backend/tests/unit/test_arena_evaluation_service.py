@@ -20,7 +20,6 @@ def _register_test_providers():
         id="__test__",
         name="Test Judge",
         default_model="test-judge-model",
-        purpose="judge",
     )
     yield
     provider_registry._items.pop("__test__", None)

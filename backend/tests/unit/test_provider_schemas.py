@@ -15,7 +15,6 @@ class TestProviderCreate:
         assert provider.api_key_env is None
         assert provider.proxy is None
         assert provider.tags == []
-        assert provider.purpose == "test"
 
     def test_all_fields(self):
         provider = ProviderCreate(
@@ -25,13 +24,11 @@ class TestProviderCreate:
             api_key_env="MY_API_KEY",
             proxy="http://proxy:3128",
             tags=["fast", "judge"],
-            purpose="judge",
         )
         assert provider.api_base == "https://api.example.com"
         assert provider.api_key_env == "MY_API_KEY"
         assert provider.proxy == "http://proxy:3128"
         assert provider.tags == ["fast", "judge"]
-        assert provider.purpose == "judge"
 
     def test_empty_name_rejected(self):
         with pytest.raises(ValidationError):
@@ -66,12 +63,10 @@ class TestProviderUpdate:
         assert update.api_key_env is None
         assert update.proxy is None
         assert update.tags is None
-        assert update.purpose is None
 
     def test_partial_update(self):
-        update = ProviderUpdate(name="New Name", purpose="judge")
+        update = ProviderUpdate(name="New Name")
         assert update.name == "New Name"
-        assert update.purpose == "judge"
         assert update.default_model is None
 
     def test_empty_name_in_update_rejected(self):
@@ -92,7 +87,6 @@ class TestProviderUpdate:
             "ssl_cert_path",
             "ssl_client_key",
             "tags",
-            "purpose",
             "default_params",
             "provider_type",
             "endpoint_url",
@@ -120,4 +114,3 @@ class TestProviderResponse:
         resp = ProviderResponse(id="p-1", name="Test", default_model="m")
         assert resp.has_api_key is False
         assert resp.tags == []
-        assert resp.purpose == "test"

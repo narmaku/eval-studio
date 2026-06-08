@@ -34,7 +34,6 @@ const providerList = [
     has_api_key: true,
     proxy: null,
     tags: [],
-    purpose: 'judge',
   },
 ];
 

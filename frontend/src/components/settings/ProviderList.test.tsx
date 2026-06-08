@@ -15,7 +15,6 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   proxy: null,
   ssl_cert_path: null,
   tags: ['general'],
-  purpose: 'test',
   default_params: null,
   provider_type: 'litellm',
   endpoint_url: null,
@@ -110,16 +109,6 @@ describe('ProviderList', () => {
 
     render(<ProviderList />);
     expect(screen.getByText('gpt-4-turbo')).toBeInTheDocument();
-  });
-
-  it('shows purpose badge', () => {
-    storeState = {
-      ...defaultStore,
-      providers: [makeProvider({ purpose: 'judge' })],
-    };
-
-    render(<ProviderList />);
-    expect(screen.getByText('judge')).toBeInTheDocument();
   });
 
   it('shows edit/delete buttons for all providers', () => {

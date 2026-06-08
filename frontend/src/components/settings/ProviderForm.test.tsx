@@ -31,7 +31,6 @@ const mockSchemaResponse = {
     proxy: { description: 'HTTP proxy URL for routing requests.' },
     ssl_cert_path: { description: 'Path to the SSL client certificate file.' },
     tags: { description: 'Tags for organizing and filtering providers.' },
-    purpose: { description: "Provider purpose: 'test' or 'judge'." },
     provider_type: { description: "Provider type: 'litellm' or 'custom'." },
     endpoint_url: { description: 'Full URL for custom provider endpoints.' },
     request_body_template: { description: 'Request body format for custom providers.' },
@@ -48,7 +47,6 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   proxy: null,
   ssl_cert_path: null,
   tags: ['fast'],
-  purpose: 'test',
   default_params: null,
   provider_type: 'litellm',
   endpoint_url: null,
@@ -83,7 +81,6 @@ describe('ProviderForm', () => {
     expect(screen.getByLabelText(/api base/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/api key env/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/proxy/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/purpose/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/tags/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/provider type/i)).toBeInTheDocument();
   });
@@ -95,8 +92,8 @@ describe('ProviderForm', () => {
     await waitFor(() => {
       const infoButtons = screen.getAllByRole('button', { name: /field info/i });
       // Expect tooltips for the visible litellm fields:
-      // provider_type, name, default_model, api_base, api_key_env, proxy, ssl_cert_path, purpose, tags
-      expect(infoButtons.length).toBeGreaterThanOrEqual(9);
+      // provider_type, name, default_model, api_base, api_key_env, proxy, ssl_cert_path, tags
+      expect(infoButtons.length).toBeGreaterThanOrEqual(8);
     });
   });
 

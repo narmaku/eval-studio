@@ -20,7 +20,6 @@ def _seed_test_providers():
         default_model="openai/default-model",
         api_base="http://localhost:8080/v1",
         tags=["local"],
-        purpose="test",
     )
     provider_registry._items["no-api-base"] = ProviderProfile(
         id="no-api-base",
@@ -28,7 +27,6 @@ def _seed_test_providers():
         default_model="gpt-4",
         api_key_env="CLOUD_KEY",
         tags=["cloud"],
-        purpose="test",
     )
 
     yield

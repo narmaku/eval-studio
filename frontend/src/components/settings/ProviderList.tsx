@@ -97,7 +97,6 @@ export function ProviderList() {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <h3 className="font-medium">{provider.name}</h3>
-                <Badge variant="secondary">{provider.purpose}</Badge>
               </div>
               <p className="text-xs text-muted-foreground font-mono">{provider.litellm_model}</p>
               {provider.api_base && (

@@ -60,10 +60,6 @@ class ProviderCreate(BaseModel):
         default_factory=list,
         description="Tags for organizing and filtering providers (e.g., 'staging', 'production', 'local').",
     )
-    purpose: str = Field(
-        default="test",
-        description="Provider purpose: 'test' for the model under evaluation, 'judge' for LLM-as-judge scoring.",
-    )
     default_params: dict | None = Field(
         default=None,
         description=(
@@ -109,7 +105,6 @@ class ProviderUpdate(BaseModel):
     ssl_cert_path: str | None = None
     ssl_client_key: str | None = None
     tags: list[str] | None = None
-    purpose: str | None = None
     default_params: dict | None = None
     provider_type: Literal["litellm", "custom"] | None = None
     endpoint_url: str | None = None
@@ -129,7 +124,6 @@ class ProviderResponse(BaseModel):
     ssl_cert_path: str | None = None
     has_ssl_client_key: bool = False
     tags: list[str] = []
-    purpose: str = "test"
     default_params: dict | None = None
     provider_type: str = "litellm"
     endpoint_url: str | None = None
