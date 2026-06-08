@@ -58,12 +58,20 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
 describe('ProviderForm', () => {
   const originalFetch = globalThis.fetch;
 
+  let testConnectionResponse: { success: boolean; message: string; details?: string } | null = null;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    testConnectionResponse = null;
     globalThis.fetch = vi.fn((url: string | URL | Request) => {
       const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
       if (urlStr.includes('/api/v1/providers/schema')) {
         return Promise.resolve(new Response(JSON.stringify(mockSchemaResponse), { status: 200 }));
+      }
+      if (urlStr.includes('/api/v1/providers/test') && testConnectionResponse) {
+        return Promise.resolve(
+          new Response(JSON.stringify(testConnectionResponse), { status: 200 }),
+        );
       }
       return Promise.resolve(new Response('{}', { status: 404 }));
     }) as unknown as typeof fetch;
@@ -297,6 +305,83 @@ describe('ProviderForm', () => {
         'https://example.com/api/v1/infer',
       );
       expect(screen.getByLabelText(/response json path/i)).toHaveValue('data.text');
+    });
+  });
+
+  describe('test connection', () => {
+    it('renders test connection button', () => {
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+      expect(screen.getByRole('button', { name: /test connection/i })).toBeInTheDocument();
+    });
+
+    it('shows success message on successful test', async () => {
+      const user = userEvent.setup();
+      testConnectionResponse = { success: true, message: 'Connected successfully' };
+
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+
+      await user.click(screen.getByRole('button', { name: /test connection/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Connected successfully/)).toBeInTheDocument();
+      });
+
+      // Verify green styling (success container)
+      const resultDiv = screen.getByText(/Connected successfully/).closest('div');
+      expect(resultDiv?.className).toMatch(/bg-green/);
+    });
+
+    it('shows error message on failed test', async () => {
+      const user = userEvent.setup();
+      testConnectionResponse = { success: false, message: 'Connection failed: refused' };
+
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+
+      await user.click(screen.getByRole('button', { name: /test connection/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Connection failed: refused/)).toBeInTheDocument();
+      });
+
+      // Verify destructive styling (error container)
+      const resultDiv = screen.getByText(/Connection failed: refused/).closest('div');
+      expect(resultDiv?.className).toMatch(/destructive/);
+    });
+
+    it('shows loading state during test', async () => {
+      const user = userEvent.setup();
+      // Use a promise that we control to hold the fetch in progress
+      let resolveFetch: (value: Response) => void;
+      const pendingFetch = new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      });
+
+      globalThis.fetch = vi.fn((url: string | URL | Request) => {
+        const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
+        if (urlStr.includes('/api/v1/providers/schema')) {
+          return Promise.resolve(new Response(JSON.stringify(mockSchemaResponse), { status: 200 }));
+        }
+        if (urlStr.includes('/api/v1/providers/test')) {
+          return pendingFetch;
+        }
+        return Promise.resolve(new Response('{}', { status: 404 }));
+      }) as unknown as typeof fetch;
+
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+
+      await user.click(screen.getByRole('button', { name: /test connection/i }));
+
+      // Should show loading text
+      expect(screen.getByText('Testing...')).toBeInTheDocument();
+
+      // Resolve the fetch to clean up
+      resolveFetch!(
+        new Response(JSON.stringify({ success: true, message: 'Connected' }), { status: 200 }),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/Test Connection/)).toBeInTheDocument();
+      });
     });
   });
 });

@@ -14,6 +14,7 @@ import {
 import { FieldTooltip } from '@/components/ui/FieldTooltip';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
 import { useProviderStore } from '@/stores/providerStore';
+import { api } from '@/services/api';
 import type { Provider, CreateProviderRequest, LLMParams } from '@/types';
 
 interface ProviderFormProps {
@@ -123,6 +124,11 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
 
   const [errors, setErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   const isCustom = providerType === 'custom';
 
@@ -136,6 +142,32 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
     }
     setErrors(newErrors);
     return newErrors.length === 0;
+  };
+
+  const handleTest = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const data: CreateProviderRequest = {
+        name: name.trim() || 'test',
+        default_model: isCustom ? '' : defaultModel.trim(),
+        api_base: apiBase.trim() || null,
+        api_key_env: apiKeyEnv.trim() || null,
+        proxy: proxy.trim() || null,
+        ssl_cert_path: sslCertPath.trim() || null,
+        tags: [],
+        provider_type: providerType,
+        endpoint_url: isCustom ? endpointUrl.trim() || null : null,
+        request_body_template: isCustom ? requestBodyTemplate.trim() || undefined : undefined,
+        response_json_path: isCustom ? responseJsonPath.trim() : 'choices.0.message.content',
+      };
+      const result = await api.testProviderConnection(data);
+      setTestResult(result);
+    } catch {
+      setTestResult({ success: false, message: 'Failed to reach the server' });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -372,7 +404,26 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         />
       </div>
 
+      {testResult && (
+        <div
+          className={`rounded-md p-3 text-sm ${testResult.success ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300' : 'bg-destructive/10 text-destructive'}`}
+        >
+          <p>
+            {testResult.success ? '✓' : '✗'} {testResult.message}
+          </p>
+        </div>
+      )}
+
       <div className="flex gap-2 pt-2">
+        <Button
+          variant="outline"
+          onClick={handleTest}
+          disabled={isTesting || isSaving}
+          className="flex-1"
+          type="button"
+        >
+          {isTesting ? 'Testing...' : 'Test Connection'}
+        </Button>
         <Button onClick={handleSave} disabled={isSaving} className="flex-1">
           {isSaving ? 'Saving...' : 'Save'}
         </Button>

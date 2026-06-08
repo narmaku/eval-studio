@@ -132,6 +132,14 @@ class ProviderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TestConnectionResponse(BaseModel):
+    """Response schema for testing connectivity to a provider endpoint."""
+
+    success: bool
+    message: str
+    details: str | None = None
+
+
 class ProviderModelResponse(BaseModel):
     """A model available from a provider's OpenAI-compatible /v1/models endpoint."""
 

@@ -226,6 +226,11 @@ export const api = {
   deleteProvider: (id: string) => request<void>(`/api/v1/providers/${id}`, { method: 'DELETE' }),
   listProviderModels: (providerId: string) =>
     request<{ id: string; owned_by: string }[]>(`/api/v1/providers/${providerId}/models`),
+  testProviderConnection: (data: CreateProviderRequest) =>
+    request<{ success: boolean; message: string; details?: string }>('/api/v1/providers/test', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // --- Rubrics ---
   listRubrics: (params?: { name?: string; offset?: number; limit?: number }) => {
