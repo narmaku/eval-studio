@@ -84,15 +84,17 @@ async def test_resolve_falls_back_to_settings(registry):
 
 
 @pytest.mark.asyncio
-async def test_resolve_raises_on_no_model(registry):
-    """When no model can be resolved from any source, raise ValueError."""
+async def test_resolve_empty_model_when_none_configured(registry):
+    """When no model can be resolved, model is set to empty string (not an error)."""
     with patch("app.services.provider_utils.settings") as mock_settings:
         mock_settings.default_model = None
         mock_settings.litellm_api_key = None
+        mock_settings.ssl_cert_file = None
+        mock_settings.ssl_client_key = None
 
         config = {}
-        with pytest.raises(ValueError, match="No model configured"):
-            resolve_model_config(config, registry=registry)
+        result = resolve_model_config(config, registry=registry)
+        assert result.model == ""
 
 
 @pytest.mark.asyncio
@@ -159,7 +161,7 @@ async def test_resolve_ssl_cert_path_only_backward_compat():
 
 @pytest.mark.asyncio
 async def test_resolve_custom_provider_fields():
-    """Custom provider resolves provider_type, endpoint_url, request_format, response_json_path."""
+    """Custom provider resolves provider_type, endpoint_url, request_body_template, response_json_path."""
     reg = ProviderRegistry()
     reg._items["rls-staging"] = ProviderProfile(
         id="rls-staging",
@@ -167,7 +169,7 @@ async def test_resolve_custom_provider_fields():
         default_model="",
         provider_type="custom",
         endpoint_url="https://staging.example.com/api/lightspeed/v1/infer",
-        request_format="rls_infer",
+        request_body_template='{"question": "{{message}}"}',
         response_json_path="data.text",
         proxy="http://squid:3128",
         ssl_cert_path="/path/to/cert.pem",
@@ -178,7 +180,7 @@ async def test_resolve_custom_provider_fields():
 
     assert result.provider_type == "custom"
     assert result.endpoint_url == "https://staging.example.com/api/lightspeed/v1/infer"
-    assert result.request_format == "rls_infer"
+    assert result.request_body_template == '{"question": "{{message}}"}'
     assert result.response_json_path == "data.text"
     assert result.model == ""  # custom providers don't need litellm model
 
@@ -217,7 +219,7 @@ class TestCallModel:
             model="",
             provider_type="custom",
             endpoint_url="https://example.com/api/lightspeed/v1/infer",
-            request_format="rls_infer",
+            request_body_template='{"question": "{{message}}"}',
             response_json_path="data.text",
         )
 

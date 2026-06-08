@@ -17,8 +17,8 @@ class ProviderCreate(BaseModel):
         default="",
         max_length=255,
         description=(
-            "The default LLM model identifier. For LiteLLM providers, use the format"
-            " 'provider/model' (e.g., 'openai/gpt-4'). Optional for custom providers."
+            "The default LLM model identifier (e.g., 'openai/gpt-4')."
+            " Optional — leave empty to select a model at runtime."
         ),
     )
     api_base: str | None = Field(
@@ -75,28 +75,25 @@ class ProviderCreate(BaseModel):
         default="litellm",
         description=(
             "Provider type: 'litellm' for OpenAI-compatible APIs via LiteLLM,"
-            " or 'custom' for non-standard APIs like RHEL Lightspeed."
+            " or 'custom' for any HTTP API with a custom request/response format."
         ),
     )
     endpoint_url: str | None = Field(
         default=None,
-        description=(
-            "Full URL for custom provider endpoints"
-            " (e.g., 'https://host/api/lightspeed/v1/infer'). Only used when provider_type is 'custom'."
-        ),
+        description=("Full URL for custom provider endpoints. Only used when provider_type is 'custom'."),
     )
-    request_format: str = Field(
-        default="openai",
+    request_body_template: str | None = Field(
+        default=None,
         description=(
-            "Request body format for custom providers:"
-            " 'rls_infer' sends {\"question\": \"...\"}, 'openai' sends the standard messages array."
+            "JSON template for the request body. Use {{message}} as a placeholder"
+            ' for the user\'s message. Example: {"question": "{{message}}"}'
         ),
     )
     response_json_path: str = Field(
         default="choices.0.message.content",
         description=(
-            "Dot-path to extract the response text from the API response JSON"
-            " (e.g., 'data.text' for RLS, 'choices.0.message.content' for OpenAI)."
+            "Dot-path to extract the response text from the API JSON response"
+            " (e.g., 'data.text', 'output.content', 'choices.0.message.content')."
         ),
     )
 
@@ -116,7 +113,7 @@ class ProviderUpdate(BaseModel):
     default_params: dict | None = None
     provider_type: Literal["litellm", "custom"] | None = None
     endpoint_url: str | None = None
-    request_format: str | None = None
+    request_body_template: str | None = None
     response_json_path: str | None = None
 
 
@@ -136,7 +133,7 @@ class ProviderResponse(BaseModel):
     default_params: dict | None = None
     provider_type: str = "litellm"
     endpoint_url: str | None = None
-    request_format: str = "openai"
+    request_body_template: str | None = None
     response_json_path: str = "choices.0.message.content"
     model_config = ConfigDict(from_attributes=True)
 

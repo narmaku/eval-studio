@@ -24,8 +24,8 @@ class ProviderProfile:
     default_params: dict | None = None  # e.g. {"max_tokens": 2048, "temperature": 0.7}
     provider_type: str = "litellm"  # "litellm" (default) or "custom"
     endpoint_url: str | None = None  # Full URL for custom providers (e.g. "https://host/api/v1/infer")
-    request_format: str = "openai"  # "openai" (default) or "rls_infer"
-    response_json_path: str = "choices.0.message.content"  # Dot-path to extract text from response
+    request_body_template: str | None = None
+    response_json_path: str = "choices.0.message.content"
 
     @property
     def api_key(self) -> str | None:
@@ -56,7 +56,7 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
             default_params=raw.get("default_params"),
             provider_type=raw.get("provider_type", "litellm"),
             endpoint_url=raw.get("endpoint_url"),
-            request_format=raw.get("request_format", "openai"),
+            request_body_template=raw.get("request_body_template"),
             response_json_path=raw.get("response_json_path", "choices.0.message.content"),
         )
 
@@ -75,7 +75,7 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
             **({"default_params": item.default_params} if item.default_params else {}),
             **({"provider_type": item.provider_type} if item.provider_type != "litellm" else {}),
             **({"endpoint_url": item.endpoint_url} if item.endpoint_url else {}),
-            **({"request_format": item.request_format} if item.request_format != "openai" else {}),
+            **({"request_body_template": item.request_body_template} if item.request_body_template else {}),
             **(
                 {"response_json_path": item.response_json_path}
                 if item.response_json_path != "choices.0.message.content"

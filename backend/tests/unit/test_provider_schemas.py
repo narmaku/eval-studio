@@ -96,7 +96,7 @@ class TestProviderUpdate:
             "default_params",
             "provider_type",
             "endpoint_url",
-            "request_format",
+            "request_body_template",
             "response_json_path",
         ]
 

@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -114,7 +115,9 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
 
   // Custom provider fields
   const [endpointUrl, setEndpointUrl] = useState(provider?.endpoint_url ?? '');
-  const [requestFormat, setRequestFormat] = useState(provider?.request_format ?? 'openai');
+  const [requestBodyTemplate, setRequestBodyTemplate] = useState(
+    provider?.request_body_template ?? '',
+  );
   const [responseJsonPath, setResponseJsonPath] = useState(
     provider?.response_json_path ?? 'choices.0.message.content',
   );
@@ -128,9 +131,6 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
     const newErrors: string[] = [];
     if (!name.trim()) {
       newErrors.push('Name is required');
-    }
-    if (!isCustom && !litellmModel.trim()) {
-      newErrors.push('LiteLLM model is required');
     }
     if (isCustom && !endpointUrl.trim()) {
       newErrors.push('Endpoint URL is required');
@@ -162,7 +162,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
           Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, unknown>) : null,
         provider_type: providerType,
         endpoint_url: isCustom ? endpointUrl.trim() || null : null,
-        request_format: isCustom ? requestFormat : 'openai',
+        request_body_template: isCustom ? requestBodyTemplate.trim() || null : null,
         response_json_path: isCustom ? responseJsonPath.trim() : 'choices.0.message.content',
       };
 
@@ -255,26 +255,25 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
               id="provider-endpoint-url"
               value={endpointUrl}
               onChange={(e) => setEndpointUrl(e.target.value)}
-              placeholder="e.g., https://host/api/lightspeed/v1/infer"
+              placeholder="e.g., https://host/api/v1/inference"
             />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="provider-request-format">Request Format</Label>
-              {fieldDescriptions.request_format && (
-                <FieldTooltip description={fieldDescriptions.request_format} />
+              <Label htmlFor="provider-request-template">Request Body Template</Label>
+              {fieldDescriptions.request_body_template && (
+                <FieldTooltip description={fieldDescriptions.request_body_template} />
               )}
             </div>
-            <Select value={requestFormat} onValueChange={setRequestFormat}>
-              <SelectTrigger className="w-full" id="provider-request-format">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai">OpenAI (messages array)</SelectItem>
-                <SelectItem value="rls_infer">RLS Infer (question field)</SelectItem>
-              </SelectContent>
-            </Select>
+            <Textarea
+              id="provider-request-template"
+              value={requestBodyTemplate}
+              onChange={(e) => setRequestBodyTemplate(e.target.value)}
+              placeholder={'{"question": "{{message}}"}'}
+              rows={3}
+              className="font-mono text-xs"
+            />
           </div>
 
           <div className="space-y-2">

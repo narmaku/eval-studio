@@ -64,7 +64,7 @@ def test_create_custom_backend():
         model="",
         provider_type="custom",
         endpoint_url="https://example.com/api/lightspeed/v1/infer",
-        request_format="rls_infer",
+        request_body_template='{"question": "{{message}}"}',
         response_json_path="data.text",
         proxy="http://squid:3128",
         ssl_cert_path="/path/to/cert.pem",
@@ -75,7 +75,7 @@ def test_create_custom_backend():
 
     assert isinstance(adapter, CustomHttpxAdapter)
     assert adapter.endpoint_url == "https://example.com/api/lightspeed/v1/infer"
-    assert adapter.request_format == "rls_infer"
+    assert adapter.request_body_template == '{"question": "{{message}}"}'
     assert adapter.response_json_path == "data.text"
     assert adapter.proxy == "http://squid:3128"
     assert adapter.ssl_cert_path == "/path/to/cert.pem"

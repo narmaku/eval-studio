@@ -1,9 +1,12 @@
 """Custom httpx-based agent backend adapter.
 
 Calls non-OpenAI APIs directly via httpx with mTLS and proxy support.
-Supports configurable request formats and response extraction paths.
+Users define the request shape via a JSON template with ``{{message}}``
+placeholder, and the response extraction path as a dot-separated JSON
+path.  No API-specific logic is hardcoded.
 """
 
+import json
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -14,22 +17,13 @@ from app.agent_backends.base import AgentBackendAdapter, AgentStreamChunk
 
 logger = structlog.get_logger()
 
+_DEFAULT_TEMPLATE = '{"messages": [{"role": "user", "content": "{{message}}"}]}'
+
 
 def extract_json_path(data: Any, path: str) -> Any:
     """Extract a value from a nested dict/list using a dot-separated path.
 
     Numeric path segments are treated as list indices.
-
-    Args:
-        data: The parsed JSON response (dict or list).
-        path: Dot-separated path, e.g. "data.text" or "choices.0.message.content".
-
-    Returns:
-        The value at the specified path.
-
-    Raises:
-        KeyError: If a dict key is not found.
-        IndexError: If a list index is out of bounds.
     """
     current = data
     for segment in path.split("."):
@@ -38,13 +32,10 @@ def extract_json_path(data: Any, path: str) -> Any:
 
 
 class CustomHttpxAdapter(AgentBackendAdapter):
-    """Agent backend that calls custom (non-OpenAI) APIs via httpx.
+    """Agent backend that calls arbitrary HTTP APIs via httpx.
 
-    Supports:
-    - mTLS client certificate authentication (ssl_cert_path + ssl_client_key)
-    - HTTP/HTTPS proxy routing
-    - Configurable request format (rls_infer, openai, etc.)
-    - Configurable response extraction via JSON dot-path
+    Supports mTLS client certificates, HTTP proxy routing, and
+    user-defined request/response mapping via templates.
     """
 
     def __init__(
@@ -53,14 +44,14 @@ class CustomHttpxAdapter(AgentBackendAdapter):
         proxy: str | None = None,
         ssl_cert_path: str | None = None,
         ssl_client_key: str | None = None,
-        request_format: str = "openai",
+        request_body_template: str | None = None,
         response_json_path: str = "choices.0.message.content",
     ):
         self.endpoint_url = endpoint_url
         self.proxy = proxy
         self.ssl_cert_path = ssl_cert_path
         self.ssl_client_key = ssl_client_key
-        self.request_format = request_format
+        self.request_body_template = request_body_template or _DEFAULT_TEMPLATE
         self.response_json_path = response_json_path
 
     def _build_client_kwargs(self) -> dict:
@@ -71,44 +62,27 @@ class CustomHttpxAdapter(AgentBackendAdapter):
             kwargs["proxy"] = self.proxy
 
         if self.ssl_cert_path and self.ssl_client_key:
-            # mTLS: client certificate authentication
             kwargs["cert"] = (self.ssl_cert_path, self.ssl_client_key)
         elif self.ssl_cert_path:
-            # CA-only: custom CA bundle for server verification
             kwargs["verify"] = self.ssl_cert_path
 
         return kwargs
 
     def _build_request_body(self, messages: list[dict[str, str]], system_prompt: str | None = None) -> dict:
-        """Build the request body based on the configured request format.
+        """Build the request body by substituting ``{{message}}`` in the template.
 
-        Args:
-            messages: Conversation history as a list of role/content dicts.
-            system_prompt: Optional system prompt (used for openai format).
-
-        Returns:
-            Dict to be sent as JSON request body.
-
-        Raises:
-            ValueError: If no user message found for formats that require one.
+        Extracts the last user message from the conversation history
+        and replaces the ``{{message}}`` placeholder in the configured
+        template string.
         """
-        if self.request_format == "rls_infer":
-            # RLS /v1/infer format: extract last user message as "question"
-            last_user_msg = None
-            for msg in reversed(messages):
-                if msg.get("role") == "user":
-                    last_user_msg = msg["content"]
-                    break
-            if last_user_msg is None:
-                raise ValueError("No user message found in conversation history for rls_infer format")
-            return {"question": last_user_msg}
-        else:
-            # Default openai-like format
-            all_messages = []
-            if system_prompt:
-                all_messages.append({"role": "system", "content": system_prompt})
-            all_messages.extend(messages)
-            return {"messages": all_messages}
+        last_user_msg = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                last_user_msg = msg["content"]
+                break
+
+        rendered = self.request_body_template.replace("{{message}}", last_user_msg)
+        return json.loads(rendered)
 
     async def send_message(
         self,
@@ -135,7 +109,7 @@ class CustomHttpxAdapter(AgentBackendAdapter):
         logger.debug(
             "custom_httpx.send_message",
             endpoint=self.endpoint_url,
-            request_format=self.request_format,
+            has_template=bool(self.request_body_template),
         )
 
         async with httpx.AsyncClient(**client_kwargs) as client:

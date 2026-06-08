@@ -31,7 +31,7 @@ class ResolvedModel:
     default_params: dict | None = None
     provider_type: str = "litellm"
     endpoint_url: str | None = None
-    request_format: str = "openai"
+    request_body_template: str | None = None
     response_json_path: str = "choices.0.message.content"
 
 
@@ -67,7 +67,7 @@ def resolve_model_config(
     default_params: dict | None = None
     provider_type: str = "litellm"
     endpoint_url: str | None = None
-    request_format: str = "openai"
+    request_body_template: str | None = None
     response_json_path: str = "choices.0.message.content"
 
     # 1. Try provider profile
@@ -87,7 +87,7 @@ def resolve_model_config(
         default_params = provider.default_params
         provider_type = provider.provider_type
         endpoint_url = provider.endpoint_url
-        request_format = provider.request_format
+        request_body_template = provider.request_body_template
         response_json_path = provider.response_json_path
     else:
         # 2. Direct config fields
@@ -102,9 +102,8 @@ def resolve_model_config(
         if not api_key:
             api_key = settings.litellm_api_key
 
-    # Custom providers don't need a litellm model name
-    if not model and provider_type != "custom":
-        raise ValueError("No model configured")
+    if not model:
+        model = ""
 
     # Dummy key for local servers that require one
     if not api_key and api_base:
@@ -125,7 +124,7 @@ def resolve_model_config(
         default_params=default_params,
         provider_type=provider_type,
         endpoint_url=endpoint_url,
-        request_format=request_format,
+        request_body_template=request_body_template,
         response_json_path=response_json_path,
     )
 
@@ -289,7 +288,7 @@ async def call_model(
             proxy=resolved.proxy,
             ssl_cert_path=resolved.ssl_cert_path,
             ssl_client_key=resolved.ssl_client_key,
-            request_format=resolved.request_format,
+            request_body_template=resolved.request_body_template,
             response_json_path=resolved.response_json_path,
         )
         messages = [{"role": "user", "content": question}]
@@ -361,7 +360,7 @@ async def resolve_provider(
             default_params=getattr(db_provider, "default_params", None),
             provider_type=getattr(db_provider, "provider_type", "litellm"),
             endpoint_url=getattr(db_provider, "endpoint_url", None),
-            request_format=getattr(db_provider, "request_format", "openai"),
+            request_body_template=getattr(db_provider, "request_body_template", None),
             response_json_path=getattr(db_provider, "response_json_path", "choices.0.message.content"),
         )
 

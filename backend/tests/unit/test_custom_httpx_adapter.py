@@ -45,11 +45,11 @@ class TestCustomHttpxAdapterInit:
     def test_basic_init(self):
         adapter = CustomHttpxAdapter(
             endpoint_url="https://example.com/api/v1/infer",
-            request_format="rls_infer",
+            request_body_template='{"question": "{{message}}"}',
             response_json_path="data.text",
         )
         assert adapter.endpoint_url == "https://example.com/api/v1/infer"
-        assert adapter.request_format == "rls_infer"
+        assert adapter.request_body_template == '{"question": "{{message}}"}'
         assert adapter.response_json_path == "data.text"
         assert adapter.proxy is None
         assert adapter.ssl_cert_path is None
@@ -67,15 +67,15 @@ class TestCustomHttpxAdapterInit:
         assert adapter.ssl_client_key == "/path/to/key.pem"
 
 
-class TestRlsInferRequestFormat:
-    """Tests for the rls_infer request format mapping."""
+class TestTemplateRequestFormat:
+    """Tests for template-based request body mapping."""
 
     @pytest.mark.asyncio
-    async def test_rls_infer_format_sends_question(self):
-        """rls_infer format extracts last user message as 'question'."""
+    async def test_template_substitution_sends_correct_body(self):
+        """Template substitution replaces {{message}} with user content."""
         adapter = CustomHttpxAdapter(
             endpoint_url="https://example.com/api/lightspeed/v1/infer",
-            request_format="rls_infer",
+            request_body_template='{"question": "{{message}}"}',
             response_json_path="data.text",
         )
 
@@ -107,11 +107,11 @@ class TestRlsInferRequestFormat:
             assert call_kwargs[1]["json"] == {"question": "What is the meaning of life?"}
 
     @pytest.mark.asyncio
-    async def test_rls_infer_format_extracts_last_user_message(self):
-        """rls_infer format uses the last user message from conversation history."""
+    async def test_template_uses_last_user_message(self):
+        """Template substitution uses the last user message from conversation."""
         adapter = CustomHttpxAdapter(
             endpoint_url="https://example.com/api/lightspeed/v1/infer",
-            request_format="rls_infer",
+            request_body_template='{"question": "{{message}}"}',
             response_json_path="data.text",
         )
 
@@ -151,7 +151,7 @@ class TestResponseExtraction:
         """Adapter extracts response text using configured json path."""
         adapter = CustomHttpxAdapter(
             endpoint_url="https://example.com/api/lightspeed/v1/infer",
-            request_format="rls_infer",
+            request_body_template='{"question": "{{message}}"}',
             response_json_path="data.text",
         )
 
@@ -185,7 +185,7 @@ class TestResponseExtraction:
         """Adapter raises on HTTP errors."""
         adapter = CustomHttpxAdapter(
             endpoint_url="https://example.com/api/lightspeed/v1/infer",
-            request_format="rls_infer",
+            request_body_template='{"question": "{{message}}"}',
             response_json_path="data.text",
         )
 
@@ -216,7 +216,7 @@ class TestMTLSConfiguration:
         """When ssl_cert_path and ssl_client_key are set, httpx gets cert tuple."""
         adapter = CustomHttpxAdapter(
             endpoint_url="https://example.com/api/lightspeed/v1/infer",
-            request_format="rls_infer",
+            request_body_template='{"question": "{{message}}"}',
             response_json_path="data.text",
             proxy="http://squid:3128",
             ssl_cert_path="/path/to/cert.pem",
@@ -250,7 +250,7 @@ class TestMTLSConfiguration:
         """When only ssl_cert_path is set (no key), httpx gets verify=path."""
         adapter = CustomHttpxAdapter(
             endpoint_url="https://example.com/api/v1/infer",
-            request_format="rls_infer",
+            request_body_template='{"question": "{{message}}"}',
             response_json_path="data.text",
             ssl_cert_path="/path/to/ca-bundle.pem",
         )
@@ -318,23 +318,38 @@ class TestHealthCheck:
             assert result is False
 
 
-class TestNoUserMessageError:
+class TestTemplateSubstitution:
     """Test error handling when no user message is found."""
 
     @pytest.mark.asyncio
-    async def test_rls_infer_no_user_message_raises(self):
-        """rls_infer format raises ValueError when no user message found."""
+    async def test_template_with_no_user_message_substitutes_empty(self):
+        """When no user message found, {{message}} is replaced with empty string."""
         adapter = CustomHttpxAdapter(
-            endpoint_url="https://example.com/api/lightspeed/v1/infer",
-            request_format="rls_infer",
+            endpoint_url="https://example.com/api/v1/infer",
+            request_body_template='{"question": "{{message}}"}',
             response_json_path="data.text",
         )
 
-        messages = [
-            {"role": "system", "content": "You are a helper"},
-            {"role": "assistant", "content": "Hi there"},
-        ]
+        mock_response = httpx.Response(
+            200,
+            json={"data": {"text": "empty response"}},
+            request=httpx.Request("POST", "https://example.com/api/v1/infer"),
+        )
 
-        with pytest.raises(ValueError, match="No user message found"):
-            async for _ in adapter.send_message(messages):
-                pass
+        with patch("app.agent_backends.custom_httpx_agent.httpx.AsyncClient") as mock_client_cls:
+            mock_client_instance = AsyncMock()
+            mock_client_instance.post = AsyncMock(return_value=mock_response)
+            mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client_instance
+
+            messages = [
+                {"role": "system", "content": "You are a helper"},
+                {"role": "assistant", "content": "Hi there"},
+            ]
+            chunks = []
+            async for chunk in adapter.send_message(messages):
+                chunks.append(chunk)
+
+            call_kwargs = mock_client_instance.post.call_args
+            assert call_kwargs[1]["json"] == {"question": ""}

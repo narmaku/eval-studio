@@ -81,7 +81,7 @@ export interface Provider {
   default_params: Record<string, unknown> | null;
   provider_type: string;
   endpoint_url: string | null;
-  request_format: string;
+  request_body_template: string;
   response_json_path: string;
 }
 

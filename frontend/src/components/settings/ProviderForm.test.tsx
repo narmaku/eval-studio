@@ -34,7 +34,7 @@ const mockSchemaResponse = {
     purpose: { description: "Provider purpose: 'test' or 'judge'." },
     provider_type: { description: "Provider type: 'litellm' or 'custom'." },
     endpoint_url: { description: 'Full URL for custom provider endpoints.' },
-    request_format: { description: 'Request body format for custom providers.' },
+    request_body_template: { description: 'Request body format for custom providers.' },
     response_json_path: { description: 'Dot-path to extract response text.' },
   },
 };
@@ -52,7 +52,7 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   default_params: null,
   provider_type: 'litellm',
   endpoint_url: null,
-  request_format: 'openai',
+  request_body_template: 'openai',
   response_json_path: 'choices.0.message.content',
   ...overrides,
 });
@@ -130,16 +130,16 @@ describe('ProviderForm', () => {
     expect(mockCreateProvider).not.toHaveBeenCalled();
   });
 
-  it('validates: rejects empty model for litellm type', async () => {
+  it('allows empty model for litellm type (optional field)', async () => {
     const user = userEvent.setup();
+    mockCreateProvider.mockResolvedValue(makeProvider({ default_model: '' }));
+
     render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
 
-    // Fill in name but not model
     await user.type(screen.getByLabelText(/name/i), 'My Provider');
     await user.click(screen.getByRole('button', { name: /save/i }));
 
-    expect(screen.getByText(/litellm model is required/i)).toBeInTheDocument();
-    expect(mockCreateProvider).not.toHaveBeenCalled();
+    expect(mockCreateProvider).toHaveBeenCalledTimes(1);
   });
 
   it('calls createProvider on save in create mode', async () => {
@@ -214,7 +214,7 @@ describe('ProviderForm', () => {
 
       // Custom fields should not be visible initially
       expect(screen.queryByLabelText(/endpoint url/i)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/request format/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/request body template/i)).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/response json path/i)).not.toBeInTheDocument();
 
       // Select "Custom API" type
@@ -223,7 +223,7 @@ describe('ProviderForm', () => {
 
       // Custom fields should be visible
       expect(screen.getByLabelText(/endpoint url/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/request format/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/request body template/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/response json path/i)).toBeInTheDocument();
     });
 
@@ -261,9 +261,10 @@ describe('ProviderForm', () => {
       await user.type(screen.getByLabelText(/name/i), 'RLS Staging');
       await user.type(screen.getByLabelText(/endpoint url/i), 'https://example.com/api/v1/infer');
 
-      // Select rls_infer format
-      await user.click(screen.getByLabelText(/request format/i));
-      await user.click(screen.getByText('RLS Infer (question field)'));
+      // Set request body template via paste (type() interprets braces as keyboard modifiers)
+      const templateInput = screen.getByLabelText(/request body template/i);
+      await user.click(templateInput);
+      await user.paste('{"question": "{{message}}"}');
 
       // Set response path
       const pathInput = screen.getByLabelText(/response json path/i);
@@ -278,9 +279,8 @@ describe('ProviderForm', () => {
           name: 'RLS Staging',
           provider_type: 'custom',
           endpoint_url: 'https://example.com/api/v1/infer',
-          request_format: 'rls_infer',
+          request_body_template: '{"question": "{{message}}"}',
           response_json_path: 'data.text',
-          litellm_model: '',
         }),
       );
     });
@@ -289,7 +289,7 @@ describe('ProviderForm', () => {
       const customProvider = makeProvider({
         provider_type: 'custom',
         endpoint_url: 'https://example.com/api/v1/infer',
-        request_format: 'rls_infer',
+        request_body_template: '{"question": "{{message}}"}',
         response_json_path: 'data.text',
       });
 

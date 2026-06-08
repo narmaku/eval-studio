@@ -39,7 +39,7 @@ def create_agent_backend(config: dict) -> AgentBackendAdapter:
                 proxy=resolved.proxy,
                 ssl_cert_path=resolved.ssl_cert_path,
                 ssl_client_key=resolved.ssl_client_key,
-                request_format=resolved.request_format,
+                request_body_template=resolved.request_body_template,
                 response_json_path=resolved.response_json_path,
             )
 

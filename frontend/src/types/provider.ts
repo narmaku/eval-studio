@@ -10,7 +10,7 @@ export interface CreateProviderRequest {
   default_params?: Record<string, unknown> | null;
   provider_type?: 'litellm' | 'custom';
   endpoint_url?: string | null;
-  request_format?: string;
+  request_body_template?: string;
   response_json_path?: string;
 }
 

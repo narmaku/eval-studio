@@ -28,7 +28,7 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   default_params: null,
   provider_type: 'litellm',
   endpoint_url: null,
-  request_format: 'openai',
+  request_body_template: null,
   response_json_path: 'choices.0.message.content',
   ...overrides,
 });
