@@ -8,9 +8,9 @@ from app.schemas.provider import ProviderCreate, ProviderResponse, ProviderUpdat
 
 class TestProviderCreate:
     def test_valid_create(self):
-        provider = ProviderCreate(name="My LLM", litellm_model="openai/gpt-4")
+        provider = ProviderCreate(name="My LLM", default_model="openai/gpt-4")
         assert provider.name == "My LLM"
-        assert provider.litellm_model == "openai/gpt-4"
+        assert provider.default_model == "openai/gpt-4"
         assert provider.api_base is None
         assert provider.api_key_env is None
         assert provider.proxy is None
@@ -20,7 +20,7 @@ class TestProviderCreate:
     def test_all_fields(self):
         provider = ProviderCreate(
             name="Full Provider",
-            litellm_model="anthropic/claude-3",
+            default_model="anthropic/claude-3",
             api_base="https://api.example.com",
             api_key_env="MY_API_KEY",
             proxy="http://proxy:3128",
@@ -35,26 +35,33 @@ class TestProviderCreate:
 
     def test_empty_name_rejected(self):
         with pytest.raises(ValidationError):
-            ProviderCreate(name="", litellm_model="openai/gpt-4")
+            ProviderCreate(name="", default_model="openai/gpt-4")
 
     def test_name_too_long_rejected(self):
         with pytest.raises(ValidationError):
-            ProviderCreate(name="a" * 256, litellm_model="openai/gpt-4")
+            ProviderCreate(name="a" * 256, default_model="openai/gpt-4")
 
-    def test_empty_litellm_model_rejected(self):
-        with pytest.raises(ValidationError):
-            ProviderCreate(name="My LLM", litellm_model="")
+    def test_empty_litellm_model_allowed_for_custom(self):
+        """Custom providers don't need a litellm_model."""
+        provider = ProviderCreate(name="My Custom", default_model="", provider_type="custom")
+        assert provider.default_model == ""
+        assert provider.provider_type == "custom"
+
+    def test_empty_litellm_model_defaults(self):
+        """Default litellm_model is empty string when not provided."""
+        provider = ProviderCreate(name="My LLM")
+        assert provider.default_model == ""
 
     def test_litellm_model_too_long_rejected(self):
         with pytest.raises(ValidationError):
-            ProviderCreate(name="My LLM", litellm_model="a" * 256)
+            ProviderCreate(name="My LLM", default_model="a" * 256)
 
 
 class TestProviderUpdate:
     def test_all_fields_optional(self):
         update = ProviderUpdate()
         assert update.name is None
-        assert update.litellm_model is None
+        assert update.default_model is None
         assert update.api_base is None
         assert update.api_key_env is None
         assert update.proxy is None
@@ -65,7 +72,7 @@ class TestProviderUpdate:
         update = ProviderUpdate(name="New Name", purpose="judge")
         assert update.name == "New Name"
         assert update.purpose == "judge"
-        assert update.litellm_model is None
+        assert update.default_model is None
 
     def test_empty_name_in_update_rejected(self):
         with pytest.raises(ValidationError):
@@ -77,7 +84,7 @@ class TestProviderResponse:
         assert ProviderResponse.model_config.get("from_attributes") is True
 
     def test_defaults(self):
-        resp = ProviderResponse(id="p-1", name="Test", litellm_model="m")
+        resp = ProviderResponse(id="p-1", name="Test", default_model="m")
         assert resp.has_api_key is False
         assert resp.tags == []
         assert resp.purpose == "test"

@@ -19,7 +19,7 @@ class TestProviderModel:
         """Verify column types match the spec."""
         cols = Provider.__table__.columns
         assert isinstance(cols["name"].type, String)
-        assert isinstance(cols["litellm_model"].type, String)
+        assert isinstance(cols["default_model"].type, String)
         assert isinstance(cols["api_base"].type, String)
         assert isinstance(cols["api_key_env"].type, String)
         assert isinstance(cols["proxy"].type, String)
@@ -33,7 +33,7 @@ class TestProviderModel:
     def test_nullable_fields(self):
         cols = Provider.__table__.columns
         assert cols["name"].nullable is False
-        assert cols["litellm_model"].nullable is False
+        assert cols["default_model"].nullable is False
         assert cols["api_base"].nullable is True
         assert cols["api_key_env"].nullable is True
         assert cols["proxy"].nullable is True

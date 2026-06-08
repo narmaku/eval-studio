@@ -25,7 +25,7 @@ class TestProviderDefaultParams:
                 {
                     "id": "with-defaults",
                     "name": "With Defaults",
-                    "litellm_model": "gpt-4",
+                    "default_model": "gpt-4",
                     "default_params": {"max_tokens": 2048, "temperature": 0.7},
                 }
             ]
@@ -42,7 +42,7 @@ class TestProviderDefaultParams:
 
     def test_default_params_none_when_not_set(self, tmp_path):
         """default_params is None when not specified in YAML."""
-        config = {"providers": [{"id": "no-defaults", "name": "No Defaults", "litellm_model": "gpt-4"}]}
+        config = {"providers": [{"id": "no-defaults", "name": "No Defaults", "default_model": "gpt-4"}]}
         config_file = tmp_path / "providers.yaml"
         config_file.write_text(yaml.dump(config))
 
@@ -64,7 +64,7 @@ class TestProviderDefaultParams:
         profile = ProviderProfile(
             id="persist-test",
             name="Persist Test",
-            litellm_model="gpt-4",
+            default_model="gpt-4",
             default_params={"temperature": 0.5, "top_p": 0.9},
         )
         registry.add_provider(profile)
@@ -88,7 +88,7 @@ class TestProviderDefaultParams:
         profile = ProviderProfile(
             id="no-params",
             name="No Params",
-            litellm_model="gpt-4",
+            default_model="gpt-4",
         )
         registry.add_provider(profile)
 
@@ -176,14 +176,14 @@ class TestResolveModelWithDefaultParams:
         reg._items["llama-with-params"] = ProviderProfile(
             id="llama-with-params",
             name="Llama With Params",
-            litellm_model="openai/llama3",
+            default_model="openai/llama3",
             api_base="http://localhost:8080/v1",
             default_params={"max_tokens": 4096, "temperature": 0.3},
         )
         reg._items["llama-no-params"] = ProviderProfile(
             id="llama-no-params",
             name="Llama No Params",
-            litellm_model="openai/llama3",
+            default_model="openai/llama3",
             api_base="http://localhost:8080/v1",
         )
         return reg
@@ -210,7 +210,7 @@ class TestResolveModelWithDefaultParams:
             mock_settings.litellm_api_key = None
             mock_settings.ssl_cert_file = None
 
-            config = {"litellm_model": "direct-model"}
+            config = {"default_model": "direct-model"}
             result = resolve_model_config(config, registry=registry_with_params)
 
         assert result.default_params is None

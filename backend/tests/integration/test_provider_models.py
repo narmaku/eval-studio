@@ -17,7 +17,7 @@ def _seed_test_providers():
     provider_registry._items["with-api-base"] = ProviderProfile(
         id="with-api-base",
         name="Local LLM",
-        litellm_model="openai/default-model",
+        default_model="openai/default-model",
         api_base="http://localhost:8080/v1",
         tags=["local"],
         purpose="test",
@@ -25,7 +25,7 @@ def _seed_test_providers():
     provider_registry._items["no-api-base"] = ProviderProfile(
         id="no-api-base",
         name="Cloud Provider",
-        litellm_model="gpt-4",
+        default_model="gpt-4",
         api_key_env="CLOUD_KEY",
         tags=["cloud"],
         purpose="test",

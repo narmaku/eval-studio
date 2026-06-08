@@ -16,7 +16,7 @@ class Provider(Base):
     __tablename__ = "providers"
 
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    litellm_model: Mapped[str] = mapped_column(String(255), nullable=False)
+    default_model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     api_base: Mapped[str | None] = mapped_column(String(512), nullable=True)
     api_key_env: Mapped[str | None] = mapped_column(String(255), nullable=True)
     proxy: Mapped[str | None] = mapped_column(String(512), nullable=True)
@@ -26,3 +26,7 @@ class Provider(Base):
     purpose: Mapped[str] = mapped_column(String(50), nullable=False, default="test")
     source: Mapped[str] = mapped_column(String(50), nullable=False, default="user")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+    provider_type: Mapped[str] = mapped_column(String(50), nullable=False, default="litellm")
+    endpoint_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    request_format: Mapped[str] = mapped_column(String(50), nullable=False, default="openai")
+    response_json_path: Mapped[str] = mapped_column(String(255), nullable=False, default="choices.0.message.content")

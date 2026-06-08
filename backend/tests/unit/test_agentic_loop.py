@@ -76,7 +76,7 @@ async def session_with_tools(db_session: AsyncSession):
         status="active",
         mode="live",
         agent_config={
-            "litellm_model": "openai/test-model",
+            "default_model": "openai/test-model",
             "api_base": "http://localhost:8080/v1",
             "tool_server_ids": ["test-mcp-server"],
         },

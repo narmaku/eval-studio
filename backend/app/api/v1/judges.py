@@ -87,7 +87,7 @@ async def get_judge_presets() -> list[JudgeConfigResponse]:
             id=f"provider-{p.id}",
             name=p.name,
             preset=None,
-            model=p.litellm_model,
+            model=p.default_model,
             temperature=0.0,
             prompt_template=None,
             pass_threshold=0.7,

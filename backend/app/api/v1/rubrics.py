@@ -72,7 +72,7 @@ async def generate_rubric_endpoint(
             generate_rubric,
             description=payload.description,
             sample_data=payload.sample_data,
-            model=provider.litellm_model,
+            model=provider.default_model,
             api_base=provider.api_base,
         )
     except Exception as exc:
@@ -216,7 +216,7 @@ async def refine_rubric_endpoint(
             refine_rubric,
             existing_rubric=existing_data,
             feedback=payload.feedback,
-            model=provider.litellm_model,
+            model=provider.default_model,
             api_base=provider.api_base,
         )
     except Exception as exc:

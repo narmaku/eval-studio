@@ -103,7 +103,7 @@ async def session_with_auto_eval(db_session: AsyncSession):
         name="Test Chat",
         status="active",
         mode="live",
-        agent_config={"litellm_model": "openai/test-model"},
+        agent_config={"default_model": "openai/test-model"},
         transcript=[
             {"role": "user", "content": "Hello", "timestamp": datetime.now(UTC).isoformat()},
             {"role": "assistant", "content": "Hi!", "timestamp": datetime.now(UTC).isoformat()},
@@ -205,7 +205,7 @@ async def test_end_session_without_evaluation_no_result(db_session: AsyncSession
         evaluation_id=None,
         status="active",
         mode="live",
-        agent_config={"litellm_model": "openai/test-model"},
+        agent_config={"default_model": "openai/test-model"},
         transcript=[],
     )
     db_session.add(session)
