@@ -33,6 +33,7 @@ nav:
   - Adapters: adapters.md
   - Environments: environments.md
   - API Reference: api-reference.md
+  - CI/CD Integration: ci-cd-integration.md
 
 markdown_extensions:
   - admonition
