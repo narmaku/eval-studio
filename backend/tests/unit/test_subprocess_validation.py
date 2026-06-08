@@ -5,7 +5,12 @@ import shutil
 
 import pytest
 
-from app.core.subprocess_validation import load_allowed_commands, validate_command
+from app.core.subprocess_validation import (
+    DANGEROUS_ENV_NAMES,
+    load_allowed_commands,
+    sanitize_env,
+    validate_command,
+)
 
 
 class TestValidateCommand:
@@ -131,3 +136,69 @@ class TestLoadAllowedCommands:
         result = load_allowed_commands("echo,__nonexistent__,  ")
         assert os.path.realpath(echo_path) in result
         assert len(result) == 1
+
+
+class TestSanitizeEnv:
+    """Tests for sanitize_env()."""
+
+    def test_none_returns_none(self) -> None:
+        assert sanitize_env(None) is None
+
+    def test_empty_dict_returns_empty(self) -> None:
+        assert sanitize_env({}) == {}
+
+    def test_safe_vars_pass_through(self) -> None:
+        env = {"HOME": "/home/user", "LANG": "en_US.UTF-8", "MY_VAR": "1"}
+        result = sanitize_env(env)
+        assert result == env
+
+    def test_ld_preload_removed(self) -> None:
+        env = {"HOME": "/home/user", "LD_PRELOAD": "/tmp/evil.so"}
+        result = sanitize_env(env)
+        assert "LD_PRELOAD" not in result
+        assert result == {"HOME": "/home/user"}
+
+    def test_ld_library_path_removed(self) -> None:
+        env = {"LD_LIBRARY_PATH": "/tmp/evil", "TERM": "xterm"}
+        result = sanitize_env(env)
+        assert "LD_LIBRARY_PATH" not in result
+        assert result == {"TERM": "xterm"}
+
+    def test_dyld_insert_libraries_removed(self) -> None:
+        env = {"DYLD_INSERT_LIBRARIES": "/tmp/evil.dylib"}
+        result = sanitize_env(env)
+        assert result == {}
+
+    def test_ld_prefix_catches_unknown_ld_vars(self) -> None:
+        env = {"LD_SOMETHING_NEW": "val", "SAFE": "ok"}
+        result = sanitize_env(env)
+        assert "LD_SOMETHING_NEW" not in result
+        assert result == {"SAFE": "ok"}
+
+    def test_case_insensitive_matching(self) -> None:
+        env = {"ld_preload": "/tmp/evil.so", "Ld_Library_Path": "/tmp"}
+        result = sanitize_env(env)
+        assert result == {}
+
+    def test_node_options_removed(self) -> None:
+        env = {"NODE_OPTIONS": "--require /tmp/evil.js", "PATH": "/usr/bin"}
+        result = sanitize_env(env)
+        assert "NODE_OPTIONS" not in result
+        assert result == {"PATH": "/usr/bin"}
+
+    def test_pythonpath_removed(self) -> None:
+        env = {"PYTHONPATH": "/tmp/evil", "PYTHONSTARTUP": "/tmp/evil.py"}
+        result = sanitize_env(env)
+        assert result == {}
+
+    def test_all_dangerous_names_blocked(self) -> None:
+        env = {name: "val" for name in DANGEROUS_ENV_NAMES}
+        env["SAFE_VAR"] = "ok"
+        result = sanitize_env(env)
+        assert result == {"SAFE_VAR": "ok"}
+
+    def test_returns_new_dict(self) -> None:
+        env = {"HOME": "/home/user"}
+        result = sanitize_env(env)
+        assert result is not env
+        assert result == env

@@ -166,9 +166,10 @@ class McpStdioClient:
         import os
 
         from app.core.config import settings
-        from app.core.subprocess_validation import load_allowed_commands, validate_command
+        from app.core.subprocess_validation import load_allowed_commands, sanitize_env, validate_command
 
         env = {**os.environ, **self.env}
+        env = sanitize_env(env, context="tool server env") or env
 
         # Validate the command against the configured allowlist before spawning
         allowed = load_allowed_commands(settings.tool_server_allowed_commands)

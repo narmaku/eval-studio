@@ -3,12 +3,12 @@ import hmac
 import secrets
 from datetime import UTC, datetime
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, WebSocket
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import async_session_factory, get_db
 from app.core.exceptions import UnauthorizedException
 from app.models.api_key import ApiKey
 
@@ -102,3 +102,29 @@ async def require_auth(
     api_key.last_used_at = datetime.now(UTC)
     await db.commit()
     return api_key
+
+
+async def verify_ws_auth(websocket: WebSocket) -> bool:
+    """Verify WebSocket authentication via query parameter token.
+
+    When auth is disabled globally, returns True immediately.
+    Otherwise, the client must provide a valid API key as the ``token``
+    query parameter (e.g. ``/ws/session/abc?token=esk_...``).
+
+    Returns:
+        True if the connection is authorized.  False otherwise — the
+        caller is responsible for closing the WebSocket.
+    """
+    if settings.auth_disabled:
+        return True
+
+    token = websocket.query_params.get("token")
+    if not token:
+        return False
+
+    try:
+        async with async_session_factory() as db:
+            await verify_api_key(token, db)
+        return True
+    except UnauthorizedException:
+        return False

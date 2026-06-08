@@ -1,7 +1,9 @@
-"""Subprocess binary validation — allowlist enforcement for harness and tool server execution.
+"""Subprocess security — allowlist enforcement and environment sanitization.
 
 This module prevents arbitrary command execution by validating binaries
-against a configurable allowlist before any subprocess is spawned.
+against a configurable allowlist before any subprocess is spawned, and
+strips dangerous environment variables (e.g. LD_PRELOAD) that could
+hijack an otherwise-allowed binary.
 """
 
 import os
@@ -10,6 +12,33 @@ import shutil
 import structlog
 
 logger = structlog.get_logger()
+
+# Environment variable prefixes/names that can hijack subprocess execution
+# even when the binary itself is on the allowlist.
+DANGEROUS_ENV_PREFIXES = ("LD_", "DYLD_")
+DANGEROUS_ENV_NAMES = frozenset({
+    "LD_PRELOAD",
+    "LD_LIBRARY_PATH",
+    "LD_AUDIT",
+    "LD_DEBUG",
+    "LD_PROFILE",
+    "DYLD_INSERT_LIBRARIES",
+    "DYLD_LIBRARY_PATH",
+    "DYLD_FRAMEWORK_PATH",
+    "_RLD_LIST",
+    "LIBPATH",
+    "SHLIB_PATH",
+    "BASH_ENV",
+    "ENV",
+    "ZDOTDIR",
+    "PYTHONSTARTUP",
+    "PYTHONPATH",
+    "PERL5LIB",
+    "PERL5OPT",
+    "RUBYOPT",
+    "RUBYLIB",
+    "NODE_OPTIONS",
+})
 
 
 class CommandNotAllowedError(ValueError):
@@ -90,3 +119,31 @@ def load_allowed_commands(env_value: str) -> set[str]:
             )
 
     return allowed
+
+
+def sanitize_env(env: dict[str, str] | None, context: str = "subprocess") -> dict[str, str] | None:
+    """Remove dangerous environment variables that could hijack subprocess execution.
+
+    Args:
+        env: The environment dictionary to sanitize (may be None).
+        context: Human-readable label for log messages.
+
+    Returns:
+        A new dict with dangerous keys removed, or None if the input was None.
+    """
+    if env is None:
+        return None
+
+    cleaned: dict[str, str] = {}
+    for key, value in env.items():
+        upper = key.upper()
+        if upper in DANGEROUS_ENV_NAMES or any(upper.startswith(p) for p in DANGEROUS_ENV_PREFIXES):
+            logger.warning(
+                "subprocess_validation.dangerous_env_removed",
+                context=context,
+                variable=key,
+            )
+            continue
+        cleaned[key] = value
+
+    return cleaned

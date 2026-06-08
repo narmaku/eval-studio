@@ -5,6 +5,8 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.core.security import verify_ws_auth
+
 logger = structlog.get_logger()
 router = APIRouter()
 
@@ -133,6 +135,10 @@ async def progress_websocket(
     evaluation_id: str,
 ) -> None:
     """WebSocket for evaluation progress updates."""
+    if not await verify_ws_auth(websocket):
+        await websocket.close(code=4001, reason="Authentication required")
+        return
+
     await websocket.accept()
     await _add_connection(evaluation_id, websocket)
     try:
