@@ -8,20 +8,97 @@ from pydantic import BaseModel, ConfigDict, Field
 class ProviderCreate(BaseModel):
     """Schema for creating a new user-managed provider."""
 
-    name: str = Field(min_length=1, max_length=255)
-    default_model: str = Field(default="", max_length=255)
-    api_base: str | None = None
-    api_key_env: str | None = None
-    proxy: str | None = None
-    ssl_cert_path: str | None = None
-    ssl_client_key: str | None = None
-    tags: list[str] = Field(default_factory=list)
-    purpose: str = "test"
-    default_params: dict | None = None
-    provider_type: Literal["litellm", "custom"] = "litellm"
-    endpoint_url: str | None = None
-    request_format: str = "openai"
-    response_json_path: str = "choices.0.message.content"
+    name: str = Field(
+        min_length=1,
+        max_length=255,
+        description="A descriptive name for this provider (e.g., 'RLS Staging', 'Local Llama').",
+    )
+    default_model: str = Field(
+        default="",
+        max_length=255,
+        description=(
+            "The default LLM model identifier. For LiteLLM providers, use the format"
+            " 'provider/model' (e.g., 'openai/gpt-4'). Optional for custom providers."
+        ),
+    )
+    api_base: str | None = Field(
+        default=None,
+        description=(
+            "Base URL for the LLM API endpoint (e.g., 'https://api.example.com/v1')."
+            " Required for self-hosted or custom endpoints."
+        ),
+    )
+    api_key_env: str | None = Field(
+        default=None,
+        description=(
+            "Name of the environment variable containing the API key (e.g., 'OPENAI_API_KEY')."
+            " The key value is read from the server environment at runtime."
+        ),
+    )
+    proxy: str | None = Field(
+        default=None,
+        description=(
+            "HTTP proxy URL for routing requests (e.g., 'http://squid.corp.example.com:3128')."
+            " Used in corporate environments with network restrictions."
+        ),
+    )
+    ssl_cert_path: str | None = Field(
+        default=None,
+        description=(
+            "Path to the SSL client certificate file for mTLS authentication,"
+            " or a CA certificate bundle for server verification."
+        ),
+    )
+    ssl_client_key: str | None = Field(
+        default=None,
+        description=(
+            "Path to the SSL client private key file."
+            " When set alongside ssl_cert_path, enables mutual TLS (mTLS) authentication."
+        ),
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Tags for organizing and filtering providers (e.g., 'staging', 'production', 'local').",
+    )
+    purpose: str = Field(
+        default="test",
+        description="Provider purpose: 'test' for the model under evaluation, 'judge' for LLM-as-judge scoring.",
+    )
+    default_params: dict | None = Field(
+        default=None,
+        description=(
+            "Default LLM parameters applied to all calls"
+            ' (e.g., {"max_tokens": 2048, "temperature": 0.7}). Can be overridden per evaluation.'
+        ),
+    )
+    provider_type: Literal["litellm", "custom"] = Field(
+        default="litellm",
+        description=(
+            "Provider type: 'litellm' for OpenAI-compatible APIs via LiteLLM,"
+            " or 'custom' for non-standard APIs like RHEL Lightspeed."
+        ),
+    )
+    endpoint_url: str | None = Field(
+        default=None,
+        description=(
+            "Full URL for custom provider endpoints"
+            " (e.g., 'https://host/api/lightspeed/v1/infer'). Only used when provider_type is 'custom'."
+        ),
+    )
+    request_format: str = Field(
+        default="openai",
+        description=(
+            "Request body format for custom providers:"
+            " 'rls_infer' sends {\"question\": \"...\"}, 'openai' sends the standard messages array."
+        ),
+    )
+    response_json_path: str = Field(
+        default="choices.0.message.content",
+        description=(
+            "Dot-path to extract the response text from the API response JSON"
+            " (e.g., 'data.text' for RLS, 'choices.0.message.content' for OpenAI)."
+        ),
+    )
 
 
 class ProviderUpdate(BaseModel):

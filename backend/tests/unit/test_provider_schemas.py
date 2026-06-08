@@ -78,6 +78,39 @@ class TestProviderUpdate:
         with pytest.raises(ValidationError):
             ProviderUpdate(name="")
 
+    def test_json_schema_includes_descriptions(self):
+        """All ProviderCreate fields must have descriptions for frontend tooltips."""
+        schema = ProviderCreate.model_json_schema()
+        props = schema["properties"]
+
+        expected_fields = [
+            "name",
+            "default_model",
+            "api_base",
+            "api_key_env",
+            "proxy",
+            "ssl_cert_path",
+            "ssl_client_key",
+            "tags",
+            "purpose",
+            "default_params",
+            "provider_type",
+            "endpoint_url",
+            "request_format",
+            "response_json_path",
+        ]
+
+        for field_name in expected_fields:
+            assert field_name in props, f"Field {field_name} missing from schema"
+            field_schema = props[field_name]
+            # Some optional fields use anyOf; description may be on the top level
+            desc = field_schema.get("description")
+            if desc is None and "anyOf" in field_schema:
+                # For Optional[str] fields, Pydantic puts description at the top level
+                desc = field_schema.get("description")
+            assert desc, f"Field {field_name} is missing a description in the JSON schema"
+            assert len(desc) > 10, f"Field {field_name} description is too short: {desc!r}"
+
 
 class TestProviderResponse:
     def test_from_attributes(self):
