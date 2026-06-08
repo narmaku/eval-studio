@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EvaluationMode(StrEnum):
@@ -23,28 +23,28 @@ class EvaluationStatus(StrEnum):
 class EvaluationCreate(BaseModel):
     """Schema for creating an evaluation."""
 
-    name: str
-    mode: EvaluationMode
-    dataset_id: str | None = None
-    environment_id: str | None = None
-    judge_config_id: str | None = None
-    config: dict[str, Any] = {}
+    name: str = Field(description="Human-readable evaluation name.")
+    mode: EvaluationMode = Field(description="Evaluation mode: qa, rag, agent, or arena.")
+    dataset_id: str | None = Field(default=None, description="ID of the dataset to evaluate against.")
+    environment_id: str | None = Field(default=None, description="ID of the environment to use.")
+    judge_config_id: str | None = Field(default=None, description="ID of the judge configuration for scoring.")
+    config: dict[str, Any] = Field(default={}, description="Mode-specific configuration.")
 
 
 class EvaluationResponse(BaseModel):
     """Schema for an evaluation in API responses."""
 
-    id: str
-    name: str
-    mode: EvaluationMode
-    status: EvaluationStatus
-    error: str | None = None
-    dataset_id: str | None
-    environment_id: str | None
-    judge_config_id: str | None
-    config: dict[str, Any]
-    result_count: int | None = None
-    created_at: datetime
-    updated_at: datetime
+    id: str = Field(description="Unique identifier for the evaluation.")
+    name: str = Field(description="Human-readable evaluation name.")
+    mode: EvaluationMode = Field(description="Evaluation mode: qa, rag, agent, or arena.")
+    status: EvaluationStatus = Field(description="Current evaluation status.")
+    error: str | None = Field(default=None, description="Error message if the evaluation failed.")
+    dataset_id: str | None = Field(description="ID of the dataset being evaluated.")
+    environment_id: str | None = Field(description="ID of the environment used.")
+    judge_config_id: str | None = Field(description="ID of the judge configuration used for scoring.")
+    config: dict[str, Any] = Field(description="Mode-specific configuration.")
+    result_count: int | None = Field(default=None, description="Number of results (populated on detail endpoint).")
+    created_at: datetime = Field(description="Timestamp when the evaluation was created.")
+    updated_at: datetime = Field(description="Timestamp when the evaluation was last updated.")
 
     model_config = ConfigDict(from_attributes=True)
