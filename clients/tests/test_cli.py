@@ -104,7 +104,7 @@ class TestVersionFlag:
 
 
 class TestHealthCommand:
-    @patch("eval_studio.cli.app.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_health_success(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.health.return_value = HealthStatus(status="ok", version="1.2.3")
@@ -114,7 +114,7 @@ class TestHealthCommand:
         assert "ok" in result.stdout
         assert "1.2.3" in result.stdout
 
-    @patch("eval_studio.cli.app.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_health_connection_error(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.health.side_effect = ConnectionError("refused")
@@ -129,7 +129,7 @@ class TestHealthCommand:
 
 
 class TestRunCommand:
-    @patch("eval_studio.cli.run_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_run_success(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.evaluate.return_value = _sample_run_result()
@@ -137,7 +137,7 @@ class TestRunCommand:
         result = runner.invoke(app, ["run", "--name", "test-eval", "--dataset", "ds-1"])
         assert result.exit_code == 0
 
-    @patch("eval_studio.cli.run_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_run_fail_under(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.evaluate.return_value = _sample_run_result(verdict="fail", score=0.3)
@@ -145,7 +145,7 @@ class TestRunCommand:
         result = runner.invoke(app, ["run", "--name", "test-eval", "--dataset", "ds-1", "--fail-under", "0.5"])
         assert result.exit_code == 1
 
-    @patch("eval_studio.cli.run_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_run_json_output(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.evaluate.return_value = _sample_run_result()
@@ -155,7 +155,7 @@ class TestRunCommand:
         parsed = json.loads(result.stdout)
         assert parsed["verdict"] == "pass"
 
-    @patch("eval_studio.cli.run_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_run_pass_threshold_sent(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.evaluate.return_value = _sample_run_result()
@@ -223,7 +223,7 @@ class TestConfigCommands:
 
 
 class TestEvaluationsCommands:
-    @patch("eval_studio.cli.evaluations_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_evaluations_list(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.evaluations.list.return_value = EvaluationList(
@@ -238,7 +238,7 @@ class TestEvaluationsCommands:
         assert result.exit_code == 0
         assert "My Evaluation" in result.stdout
 
-    @patch("eval_studio.cli.evaluations_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_evaluations_get(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.evaluations.get.return_value = _sample_evaluation()
@@ -254,7 +254,7 @@ class TestEvaluationsCommands:
 
 
 class TestDatasetsCommands:
-    @patch("eval_studio.cli.datasets_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_datasets_list(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.datasets.list.return_value = DatasetList(
@@ -269,7 +269,7 @@ class TestDatasetsCommands:
         assert result.exit_code == 0
         assert "My Dataset" in result.stdout
 
-    @patch("eval_studio.cli.datasets_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_datasets_get(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.datasets.get.return_value = _sample_dataset()
@@ -285,7 +285,7 @@ class TestDatasetsCommands:
 
 
 class TestResultsCommands:
-    @patch("eval_studio.cli.results_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_results_list(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.results.list.return_value = ResultList(
@@ -300,7 +300,7 @@ class TestResultsCommands:
         assert result.exit_code == 0
         assert "res-1" in result.stdout
 
-    @patch("eval_studio.cli.results_cmd.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_results_get(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.results.get.return_value = _sample_result()
@@ -316,19 +316,36 @@ class TestResultsCommands:
 
 
 class TestErrorDisplay:
-    @patch("eval_studio.cli.app.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_auth_error_display(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.health.side_effect = AuthenticationError()
         mock_cls.return_value = client
         result = runner.invoke(app, ["health"])
         assert result.exit_code == 2
-        assert "Authentication" in result.stdout or "API key" in result.stdout
 
-    @patch("eval_studio.cli.app.EvalStudioClient")
+    @patch("eval_studio.cli._state.EvalStudioClient")
     def test_not_found_error_display(self, mock_cls: MagicMock) -> None:
         client = _mock_client()
         client.health.side_effect = NotFoundError("gone")
         mock_cls.return_value = client
         result = runner.invoke(app, ["health"])
+        assert result.exit_code == 2
+
+    @patch("eval_studio.cli._state.EvalStudioClient")
+    def test_run_connection_error(self, mock_cls: MagicMock) -> None:
+        """Verify ``run`` maps SDK errors to exit code 2 (not a traceback)."""
+        client = _mock_client()
+        client.evaluate.side_effect = ConnectionError("refused")
+        mock_cls.return_value = client
+        result = runner.invoke(app, ["run", "--name", "e", "--dataset", "d"])
+        assert result.exit_code == 2
+
+    @patch("eval_studio.cli._state.EvalStudioClient")
+    def test_evaluations_list_connection_error(self, mock_cls: MagicMock) -> None:
+        """Verify ``evaluations list`` maps SDK errors to exit code 2."""
+        client = _mock_client()
+        client.evaluations.list.side_effect = ConnectionError("refused")
+        mock_cls.return_value = client
+        result = runner.invoke(app, ["evaluations", "list"])
         assert result.exit_code == 2

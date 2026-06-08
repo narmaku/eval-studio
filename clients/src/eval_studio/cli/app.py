@@ -3,26 +3,21 @@
 from __future__ import annotations
 
 import typer
-from rich.console import Console
 
 import eval_studio
-from eval_studio.cli._state import state
+from eval_studio.cli._state import sdk_error_handler, state
 from eval_studio.cli.config_cmd import config_app
 from eval_studio.cli.datasets_cmd import datasets_app
 from eval_studio.cli.evaluations_cmd import evaluations_app
 from eval_studio.cli.output import OutputFormat, detect_format
 from eval_studio.cli.results_cmd import results_app
 from eval_studio.cli.run_cmd import run_command
-from eval_studio.client import EvalStudioClient
-from eval_studio.exceptions import EvalStudioError
 
 app = typer.Typer(
     name="eval-studio",
     help="eval-studio CLI -- run evaluations from the terminal.",
     no_args_is_help=True,
 )
-
-console = Console(stderr=True)
 
 
 def _version_callback(value: bool) -> None:
@@ -59,21 +54,11 @@ app.command("run")(run_command)
 
 
 @app.command("health")
+@sdk_error_handler
 def health() -> None:
     """Check server health."""
-    client_kwargs: dict = {}
-    if state.url:
-        client_kwargs["url"] = state.url
-    if state.api_key:
-        client_kwargs["api_key"] = state.api_key
-
-    try:
-        client = EvalStudioClient(**client_kwargs)
+    with state.make_client() as client:
         status = client.health()
-        client.close()
-    except EvalStudioError as exc:
-        typer.echo(f"Error: {exc.detail}")
-        raise typer.Exit(code=2) from None
 
     typer.echo(f"Status:  {status.status}")
     typer.echo(f"Version: {status.version}")

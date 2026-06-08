@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import typer
-from rich.console import Console
 
-from eval_studio.cli._state import state
+from eval_studio.cli._state import sdk_error_handler, state
 from eval_studio.cli.output import print_run_result
-from eval_studio.client import EvalStudioClient
-
-console = Console(stderr=True)
 
 
+@sdk_error_handler
 def run_command(
     name: str = typer.Option(..., "--name", help="Evaluation name."),
     dataset: str = typer.Option(..., "--dataset", help="Dataset ID."),
@@ -31,17 +28,12 @@ def run_command(
     if judge is not None:
         kwargs["judge_config_id"] = judge
 
-    client_kwargs: dict = {}
-    if state.url:
-        client_kwargs["url"] = state.url
-    if state.api_key:
-        client_kwargs["api_key"] = state.api_key
+    extra: dict = {}
     if timeout is not None:
-        client_kwargs["timeout"] = timeout
+        extra["timeout"] = timeout
 
-    client = EvalStudioClient(**client_kwargs)
-    result = client.evaluate(**kwargs)
-    client.close()
+    with state.make_client(**extra) as client:
+        result = client.evaluate(**kwargs)
 
     print_run_result(result, state.output_format)
 
