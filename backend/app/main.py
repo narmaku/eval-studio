@@ -23,6 +23,8 @@ async def lifespan(app: FastAPI):
         version=settings.app_version,
         debug=settings.debug,
     )
+    if settings.auth_disabled:
+        logger.warning("Authentication is DISABLED (AUTH_DISABLED=true). All endpoints are publicly accessible.")
     yield
     logger = get_logger("app.main")
     logger.info("Shutting down eval-studio backend")
@@ -87,6 +89,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 # Import and include routers
+from app.api.v1.api_keys import router as api_keys_router  # noqa: E402
 from app.api.v1.artifacts import router as artifacts_router  # noqa: E402
 from app.api.v1.dataset_import import router as dataset_import_router  # noqa: E402
 from app.api.v1.datasets import router as datasets_router  # noqa: E402
@@ -105,6 +108,7 @@ from app.websocket.chat import router as ws_chat_router  # noqa: E402
 from app.websocket.progress import router as ws_progress_router  # noqa: E402
 
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(api_keys_router, prefix="/api/v1")
 app.include_router(artifacts_router, prefix="/api/v1")
 app.include_router(dataset_import_router, prefix="/api/v1")
 app.include_router(datasets_router, prefix="/api/v1")

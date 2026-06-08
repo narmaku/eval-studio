@@ -6,17 +6,18 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Query, UploadFile
+from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from app.adapters.registry import _ALLOWED_ADAPTER_PREFIXES, evaluator_registry
 from app.core.config import settings
 from app.core.exceptions import AppException, NotFoundException
+from app.core.security import require_auth
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/evaluators", tags=["evaluators"])
+router = APIRouter(prefix="/evaluators", tags=["evaluators"], dependencies=[Depends(require_auth)])
 
 
 class EvaluatorResponse(BaseModel):

@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.core.exceptions import NotImplementedException
+from app.core.security import require_auth
 
-router = APIRouter(prefix="/environments", tags=["environments"])
+router = APIRouter(prefix="/environments", tags=["environments"], dependencies=[Depends(require_auth)])
 
 
 @router.get("")

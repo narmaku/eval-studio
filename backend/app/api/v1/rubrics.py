@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.exceptions import AppException, NotFoundException, sanitize_error_for_client
 from app.core.providers import provider_registry
+from app.core.security import require_auth
 from app.models.rubric import Rubric
 from app.schemas.common import PaginatedResponse
 from app.schemas.rubric import (
@@ -25,7 +26,7 @@ from app.services.rubric_service import generate_rubric, parse_rubric_yaml, refi
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/rubrics", tags=["rubrics"])
+router = APIRouter(prefix="/rubrics", tags=["rubrics"], dependencies=[Depends(require_auth)])
 
 
 # --- Fixed-path routes MUST come before /{rubric_id} routes ---

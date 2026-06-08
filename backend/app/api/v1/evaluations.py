@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory, get_db
 from app.core.exceptions import ConflictException, NotFoundException, NotImplementedException, ValidationException
+from app.core.security import require_auth
 from app.models.dataset import Dataset
 from app.models.evaluation import Evaluation
 from app.models.result import Result
@@ -24,7 +25,7 @@ from app.services.rag_evaluation_service import run_rag_evaluation
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/evaluations", tags=["evaluations"])
+router = APIRouter(prefix="/evaluations", tags=["evaluations"], dependencies=[Depends(require_auth)])
 
 # Keep strong references to background evaluation tasks so they are
 # not garbage-collected while still running.

@@ -3,17 +3,18 @@
 import uuid
 
 import structlog
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from app.core.config import settings
 from app.core.exceptions import AppException, NotFoundException, ValidationException, sanitize_error_for_client
+from app.core.security import require_auth
 from app.core.subprocess_validation import CommandNotAllowedError, load_allowed_commands, validate_command
 from app.core.tool_servers import StandaloneToolDef, ToolServerProfile, tool_server_registry
 from app.schemas.tool_server import ToolServerCreate, ToolServerResponse, ToolServerUpdate
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/tool-servers", tags=["tool-servers"])
+router = APIRouter(prefix="/tool-servers", tags=["tool-servers"], dependencies=[Depends(require_auth)])
 
 
 def _validate_tool_server_command(command: str | None, server_type: str) -> None:
