@@ -106,7 +106,7 @@ async def run_and_wait(
     payload: RunRequest,
     request: Request,
     async_mode: bool = Query(False, alias="async"),
-    timeout: int | None = Query(None),
+    timeout: int | None = Query(None, ge=1),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Create an evaluation and run it, returning results in a single request.
@@ -129,6 +129,12 @@ async def run_and_wait(
     ds_result = await db.execute(select(Dataset).where(Dataset.id == payload.dataset_id))
     if not ds_result.scalar_one_or_none():
         raise NotFoundException("Dataset", payload.dataset_id)
+
+    # Arena-specific validation: must have at least 2 contestants
+    if payload.mode == EvaluationMode.ARENA:
+        contestants = payload.config.get("contestants", [])
+        if not contestants or len(contestants) < 2:
+            raise ValidationException("Arena evaluations require at least 2 contestants in config.contestants.")
 
     # Create the evaluation
     evaluation = Evaluation(

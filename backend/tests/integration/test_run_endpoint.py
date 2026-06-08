@@ -212,3 +212,102 @@ async def test_run_missing_required_fields(client):
         json={},
     )
     assert resp.status_code == 422
+
+
+# ── pass_threshold validation ───────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_run_pass_threshold_out_of_range(client, dataset_id):
+    """pass_threshold > 1 returns 422 validation error."""
+    resp = await client.post(
+        "/api/v1/evaluations/run",
+        json={
+            "name": "Bad Threshold Run",
+            "mode": "qa",
+            "dataset_id": dataset_id,
+            "pass_threshold": 1.5,
+        },
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_run_pass_threshold_negative(client, dataset_id):
+    """pass_threshold < 0 returns 422 validation error."""
+    resp = await client.post(
+        "/api/v1/evaluations/run",
+        json={
+            "name": "Negative Threshold Run",
+            "mode": "qa",
+            "dataset_id": dataset_id,
+            "pass_threshold": -0.1,
+        },
+    )
+    assert resp.status_code == 422
+
+
+# ── timeout lower bound ────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_run_timeout_zero_rejected(client, dataset_id):
+    """timeout=0 returns 422 validation error."""
+    resp = await client.post(
+        "/api/v1/evaluations/run",
+        params={"timeout": 0},
+        json={
+            "name": "Zero Timeout Run",
+            "mode": "qa",
+            "dataset_id": dataset_id,
+        },
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_run_timeout_negative_rejected(client, dataset_id):
+    """timeout=-1 returns 422 validation error."""
+    resp = await client.post(
+        "/api/v1/evaluations/run",
+        params={"timeout": -1},
+        json={
+            "name": "Negative Timeout Run",
+            "mode": "qa",
+            "dataset_id": dataset_id,
+        },
+    )
+    assert resp.status_code == 422
+
+
+# ── Arena validation ────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_run_arena_missing_contestants(client, dataset_id):
+    """Arena mode without enough contestants returns 422 validation error."""
+    resp = await client.post(
+        "/api/v1/evaluations/run",
+        json={
+            "name": "Arena No Contestants",
+            "mode": "arena",
+            "dataset_id": dataset_id,
+            "config": {},
+        },
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_run_arena_one_contestant(client, dataset_id):
+    """Arena mode with only 1 contestant returns 422 validation error."""
+    resp = await client.post(
+        "/api/v1/evaluations/run",
+        json={
+            "name": "Arena One Contestant",
+            "mode": "arena",
+            "dataset_id": dataset_id,
+            "config": {"contestants": [{"model": "model-a"}]},
+        },
+    )
+    assert resp.status_code == 422

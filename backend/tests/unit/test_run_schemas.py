@@ -1,5 +1,8 @@
 """Unit tests for run schemas (RunRequest, RunResponse, RunAsyncResponse)."""
 
+import pytest
+from pydantic import ValidationError
+
 from app.schemas.evaluation import EvaluationMode, EvaluationStatus
 from app.schemas.run import RunAsyncResponse, RunRequest, RunResponse
 
@@ -30,6 +33,24 @@ class TestRunRequest:
         assert req.mode == EvaluationMode.RAG
         assert req.pass_threshold == 0.8
         assert req.judge_config_id == "jc-1"
+
+    def test_pass_threshold_above_one_rejected(self):
+        """pass_threshold > 1 is rejected by Pydantic validation."""
+        with pytest.raises(ValidationError):
+            RunRequest(name="test", mode=EvaluationMode.QA, dataset_id="ds-1", pass_threshold=1.5)
+
+    def test_pass_threshold_negative_rejected(self):
+        """pass_threshold < 0 is rejected by Pydantic validation."""
+        with pytest.raises(ValidationError):
+            RunRequest(name="test", mode=EvaluationMode.QA, dataset_id="ds-1", pass_threshold=-0.1)
+
+    def test_pass_threshold_boundaries_accepted(self):
+        """pass_threshold at boundaries (0 and 1) is accepted."""
+        req_zero = RunRequest(name="test", mode=EvaluationMode.QA, dataset_id="ds-1", pass_threshold=0.0)
+        assert req_zero.pass_threshold == 0.0
+
+        req_one = RunRequest(name="test", mode=EvaluationMode.QA, dataset_id="ds-1", pass_threshold=1.0)
+        assert req_one.pass_threshold == 1.0
 
 
 class TestRunResponse:

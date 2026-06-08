@@ -37,7 +37,7 @@ async def execute_evaluation_sync(
         timeout: Maximum seconds to wait for completion.
 
     Raises:
-        asyncio.TimeoutError: If the evaluation exceeds the timeout.
+        TimeoutError: If the evaluation exceeds the timeout.
     """
     async with async_session_factory() as session:
         # Fetch evaluation to determine mode

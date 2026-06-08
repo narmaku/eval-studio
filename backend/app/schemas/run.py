@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.evaluation import EvaluationMode, EvaluationStatus
 from app.schemas.result import ResultResponse
@@ -17,7 +17,7 @@ class RunRequest(BaseModel):
     judge_config_id: str | None = None
     config: dict[str, Any] = {}
     environment_id: str | None = None
-    pass_threshold: float = 0.7
+    pass_threshold: float = Field(default=0.7, ge=0, le=1)
 
 
 class RunResponse(BaseModel):
