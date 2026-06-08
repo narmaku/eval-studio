@@ -67,6 +67,9 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
 
   const isEditMode = !!provider;
 
+  const [providerType, setProviderType] = useState<'litellm' | 'custom'>(
+    (provider?.provider_type as 'litellm' | 'custom') ?? 'litellm',
+  );
   const [name, setName] = useState(provider?.name ?? '');
   const [litellmModel, setLitellmModel] = useState(provider?.litellm_model ?? '');
   const [apiBase, setApiBase] = useState(provider?.api_base ?? '');
@@ -78,16 +81,29 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
   const [defaultParams, setDefaultParams] = useState<LLMParams>(
     (provider?.default_params as LLMParams) ?? {},
   );
+
+  // Custom provider fields
+  const [endpointUrl, setEndpointUrl] = useState(provider?.endpoint_url ?? '');
+  const [requestFormat, setRequestFormat] = useState(provider?.request_format ?? 'openai');
+  const [responseJsonPath, setResponseJsonPath] = useState(
+    provider?.response_json_path ?? 'choices.0.message.content',
+  );
+
   const [errors, setErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  const isCustom = providerType === 'custom';
 
   const validate = (): boolean => {
     const newErrors: string[] = [];
     if (!name.trim()) {
       newErrors.push('Name is required');
     }
-    if (!litellmModel.trim()) {
+    if (!isCustom && !litellmModel.trim()) {
       newErrors.push('LiteLLM model is required');
+    }
+    if (isCustom && !endpointUrl.trim()) {
+      newErrors.push('Endpoint URL is required');
     }
     setErrors(newErrors);
     return newErrors.length === 0;
@@ -105,7 +121,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
 
       const data: CreateProviderRequest = {
         name: name.trim(),
-        litellm_model: litellmModel.trim(),
+        litellm_model: isCustom ? '' : litellmModel.trim(),
         api_base: apiBase.trim() || null,
         api_key_env: apiKeyEnv.trim() || null,
         proxy: proxy.trim() || null,
@@ -113,6 +129,10 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         tags,
         purpose,
         default_params: Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, unknown>) : null,
+        provider_type: providerType,
+        endpoint_url: isCustom ? endpointUrl.trim() || null : null,
+        request_format: isCustom ? requestFormat : 'openai',
+        response_json_path: isCustom ? responseJsonPath.trim() : 'choices.0.message.content',
       };
 
       if (isEditMode && provider) {
@@ -141,6 +161,22 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
       )}
 
       <div className="space-y-2">
+        <Label htmlFor="provider-type">Provider Type</Label>
+        <Select
+          value={providerType}
+          onValueChange={(v) => setProviderType(v as 'litellm' | 'custom')}
+        >
+          <SelectTrigger className="w-full" id="provider-type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="litellm">LiteLLM (OpenAI-compatible)</SelectItem>
+            <SelectItem value="custom">Custom API</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="provider-name">Name</Label>
         <Input
           id="provider-name"
@@ -150,25 +186,72 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="provider-model">LiteLLM Model</Label>
-        <Input
-          id="provider-model"
-          value={litellmModel}
-          onChange={(e) => setLitellmModel(e.target.value)}
-          placeholder="e.g., openai/gpt-4 or ollama/llama3"
-        />
-      </div>
+      {!isCustom && (
+        <div className="space-y-2">
+          <Label htmlFor="provider-model">LiteLLM Model</Label>
+          <Input
+            id="provider-model"
+            value={litellmModel}
+            onChange={(e) => setLitellmModel(e.target.value)}
+            placeholder="e.g., openai/gpt-4 or ollama/llama3"
+          />
+        </div>
+      )}
 
-      <div className="space-y-2">
-        <Label htmlFor="provider-api-base">API Base (optional)</Label>
-        <Input
-          id="provider-api-base"
-          value={apiBase}
-          onChange={(e) => setApiBase(e.target.value)}
-          placeholder="e.g., http://localhost:11434/v1"
-        />
-      </div>
+      {isCustom && (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="provider-endpoint-url">Endpoint URL</Label>
+            <Input
+              id="provider-endpoint-url"
+              value={endpointUrl}
+              onChange={(e) => setEndpointUrl(e.target.value)}
+              placeholder="e.g., https://host/api/lightspeed/v1/infer"
+            />
+            <p className="text-xs text-muted-foreground">
+              Full URL for the API endpoint to call directly via HTTP.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="provider-request-format">Request Format</Label>
+            <Select value={requestFormat} onValueChange={setRequestFormat}>
+              <SelectTrigger className="w-full" id="provider-request-format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openai">OpenAI (messages array)</SelectItem>
+                <SelectItem value="rls_infer">RLS Infer (question field)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="provider-response-path">Response JSON Path</Label>
+            <Input
+              id="provider-response-path"
+              value={responseJsonPath}
+              onChange={(e) => setResponseJsonPath(e.target.value)}
+              placeholder="e.g., data.text"
+            />
+            <p className="text-xs text-muted-foreground">
+              Dot-path to extract the response text from the JSON response body.
+            </p>
+          </div>
+        </>
+      )}
+
+      {!isCustom && (
+        <div className="space-y-2">
+          <Label htmlFor="provider-api-base">API Base (optional)</Label>
+          <Input
+            id="provider-api-base"
+            value={apiBase}
+            onChange={(e) => setApiBase(e.target.value)}
+            placeholder="e.g., http://localhost:11434/v1"
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="provider-api-key-env">API Key Env Var (optional)</Label>
@@ -219,7 +302,9 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         </Select>
       </div>
 
-      <LLMParamsPanel label="Default LLM Parameters" value={defaultParams} onChange={setDefaultParams} />
+      {!isCustom && (
+        <LLMParamsPanel label="Default LLM Parameters" value={defaultParams} onChange={setDefaultParams} />
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="provider-tags">Tags (optional, comma-separated)</Label>

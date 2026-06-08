@@ -1,6 +1,6 @@
 export interface CreateProviderRequest {
   name: string;
-  litellm_model: string;
+  litellm_model?: string;
   api_base?: string | null;
   api_key_env?: string | null;
   proxy?: string | null;
@@ -8,6 +8,10 @@ export interface CreateProviderRequest {
   tags?: string[];
   purpose?: string;
   default_params?: Record<string, unknown> | null;
+  provider_type?: 'litellm' | 'custom';
+  endpoint_url?: string | null;
+  request_format?: string;
+  response_json_path?: string;
 }
 
 export type UpdateProviderRequest = Partial<CreateProviderRequest>;

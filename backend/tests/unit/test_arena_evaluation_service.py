@@ -1,6 +1,6 @@
 """Unit tests for the arena evaluation service."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -69,14 +69,6 @@ async def arena_evaluation_with_dataset(db_session: AsyncSession):
     return evaluation, dataset, items
 
 
-def _mock_acompletion_response(content: str = "This is the model's answer."):
-    """Create a mock acompletion response."""
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = content
-    return mock_response
-
-
 @pytest.mark.asyncio
 async def test_arena_result_has_contestant_model(db_session: AsyncSession, arena_evaluation_with_dataset):
     """Arena evaluation creates results tagged with contestant_model."""
@@ -84,11 +76,11 @@ async def test_arena_result_has_contestant_model(db_session: AsyncSession, arena
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_call_model = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good answer"))
 
     with (
-        patch("app.services.arena_evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.arena_evaluation_service.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
@@ -123,20 +115,16 @@ async def test_arena_error_isolation(db_session: AsyncSession, arena_evaluation_
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
-    call_count = 0
-
-    async def mock_acompletion(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        model = kwargs.get("model", "")
-        if model == "model-a":
+    async def mock_call(resolved_model, question, **kwargs):
+        # call_model receives (ResolvedModel, question_str)
+        if resolved_model.model == "model-a":
             raise RuntimeError("model-a API down")
-        return _mock_acompletion_response()
+        return "This is the model's answer."
 
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.9, passed=True, reasoning="Great"))
 
     with (
-        patch("app.services.arena_evaluation_service.litellm.acompletion", side_effect=mock_acompletion),
+        patch("app.services.arena_evaluation_service.call_model", side_effect=mock_call),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
@@ -171,11 +159,11 @@ async def test_arena_all_contestants_fail(db_session: AsyncSession, arena_evalua
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
-    async def mock_acompletion_fail(*args, **kwargs):
+    async def mock_call_fail(*args, **kwargs):
         raise RuntimeError("All APIs down")
 
     with (
-        patch("app.services.arena_evaluation_service.litellm.acompletion", side_effect=mock_acompletion_fail),
+        patch("app.services.arena_evaluation_service.call_model", side_effect=mock_call_fail),
         patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
         await run_arena_evaluation(evaluation.id, db_session)
@@ -270,12 +258,12 @@ async def test_arena_websocket_progress_includes_contestant_model(
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_call_model = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
     mock_progress = AsyncMock()
 
     with (
-        patch("app.services.arena_evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.arena_evaluation_service.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.arena_evaluation_service.broadcast_progress", mock_progress),
     ):
@@ -464,22 +452,16 @@ async def test_arena_partial_contestant_item_failures(db_session: AsyncSession, 
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
-    call_index = 0
-
-    async def mock_acompletion(*args, **kwargs):
-        nonlocal call_index
-        call_index += 1
-        model = kwargs.get("model", "")
-        question = kwargs.get("messages", [{}])[0].get("content", "")
-        # model-a fails only on the second item
-        if model == "model-a" and "Fedora" in question:
+    async def mock_call(resolved_model, question, **kwargs):
+        # model-a fails only on the second item (Fedora)
+        if resolved_model.model == "model-a" and "Fedora" in question:
             raise RuntimeError("model-a partial failure")
-        return _mock_acompletion_response()
+        return "This is the model's answer."
 
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.8, passed=True, reasoning="OK"))
 
     with (
-        patch("app.services.arena_evaluation_service.litellm.acompletion", side_effect=mock_acompletion),
+        patch("app.services.arena_evaluation_service.call_model", side_effect=mock_call),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
@@ -528,11 +510,11 @@ async def test_arena_duplicate_contestant_models(db_session: AsyncSession):
     db_session.add(evaluation)
     await db_session.commit()
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_call_model = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
 
     with (
-        patch("app.services.arena_evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.arena_evaluation_service.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):

@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -64,24 +64,16 @@ async def evaluation_with_dataset(db_session: AsyncSession):
     return evaluation, dataset, items
 
 
-def _mock_acompletion_response(content: str = "This is the model's answer."):
-    """Create a mock acompletion response."""
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = content
-    return mock_response
-
-
 @pytest.mark.asyncio
 async def test_run_qa_evaluation_happy_path(db_session: AsyncSession, evaluation_with_dataset):
     """Run a full evaluation with mocked LLM calls, verify results created."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_call_model = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good answer"))
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.evaluation_service.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
@@ -152,11 +144,11 @@ async def test_run_qa_evaluation_default_judge_config(db_session: AsyncSession, 
     evaluation.judge_config_id = None
     await db_session.commit()
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_call_model = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good answer"))
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.evaluation_service.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
@@ -174,17 +166,17 @@ async def test_run_qa_evaluation_item_error_partial_results(db_session: AsyncSes
 
     call_count = 0
 
-    async def mock_acompletion(*args, **kwargs):
+    async def mock_call(*args, **kwargs):
         nonlocal call_count
         call_count += 1
         if call_count == 1:
             raise RuntimeError("API Error")
-        return _mock_acompletion_response()
+        return "This is the model's answer."
 
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good answer"))
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", side_effect=mock_acompletion),
+        patch("app.services.evaluation_service.call_model", side_effect=mock_call),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
@@ -205,11 +197,11 @@ async def test_run_qa_evaluation_all_items_fail(db_session: AsyncSession, evalua
     """All items fail -- status should be failed with error message."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
-    async def mock_acompletion_fail(*args, **kwargs):
+    async def mock_call_fail(*args, **kwargs):
         raise RuntimeError("API Error for all")
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", side_effect=mock_acompletion_fail),
+        patch("app.services.evaluation_service.call_model", side_effect=mock_call_fail),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
         await run_qa_evaluation(evaluation.id, db_session)

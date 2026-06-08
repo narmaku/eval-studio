@@ -8,6 +8,7 @@ import os
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+import litellm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +29,10 @@ class ResolvedModel:
     ssl_cert_path: str | None = None
     ssl_client_key: str | None = None
     default_params: dict | None = None
+    provider_type: str = "litellm"
+    endpoint_url: str | None = None
+    request_format: str = "openai"
+    response_json_path: str = "choices.0.message.content"
 
 
 def resolve_model_config(
@@ -60,6 +65,10 @@ def resolve_model_config(
     api_base: str | None = None
     proxy: str | None = None
     default_params: dict | None = None
+    provider_type: str = "litellm"
+    endpoint_url: str | None = None
+    request_format: str = "openai"
+    response_json_path: str = "choices.0.message.content"
 
     # 1. Try provider profile
     provider_id = config.get("provider_id")
@@ -76,6 +85,10 @@ def resolve_model_config(
         ssl_cert_path = provider.ssl_cert_path
         ssl_client_key = provider.ssl_client_key
         default_params = provider.default_params
+        provider_type = provider.provider_type
+        endpoint_url = provider.endpoint_url
+        request_format = provider.request_format
+        response_json_path = provider.response_json_path
     else:
         # 2. Direct config fields
         model = config.get("litellm_model") or config.get("model")
@@ -89,7 +102,8 @@ def resolve_model_config(
         if not api_key:
             api_key = settings.litellm_api_key
 
-    if not model:
+    # Custom providers don't need a litellm model name
+    if not model and provider_type != "custom":
         raise ValueError("No model configured")
 
     # Dummy key for local servers that require one
@@ -102,13 +116,17 @@ def resolve_model_config(
         ssl_client_key = getattr(settings, "ssl_client_key", None)
 
     return ResolvedModel(
-        model=model,
+        model=model or "",
         api_key=api_key,
         api_base=api_base,
         proxy=proxy,
         ssl_cert_path=ssl_cert_path,
         ssl_client_key=ssl_client_key,
         default_params=default_params,
+        provider_type=provider_type,
+        endpoint_url=endpoint_url,
+        request_format=request_format,
+        response_json_path=response_json_path,
     )
 
 
@@ -245,6 +263,59 @@ def proxy_env(proxy: str | None, ssl_cert_path: str | None = None, ssl_client_ke
             _litellm.ssl_certificate = saved_ssl_certificate
 
 
+async def call_model(
+    resolved: "ResolvedModel",
+    question: str,
+    *,
+    extra_params: dict | None = None,
+) -> str:
+    """Call an LLM model and return the response text.
+
+    Handles both litellm and custom provider types transparently.
+
+    Args:
+        resolved: A ResolvedModel with all connection details.
+        question: The user message to send.
+        extra_params: Optional dict of extra LLM params (max_tokens, temperature, etc.)
+
+    Returns:
+        The model's text response.
+    """
+    if resolved.provider_type == "custom":
+        from app.agent_backends.custom_httpx_agent import CustomHttpxAdapter
+
+        adapter = CustomHttpxAdapter(
+            endpoint_url=resolved.endpoint_url or "",
+            proxy=resolved.proxy,
+            ssl_cert_path=resolved.ssl_cert_path,
+            ssl_client_key=resolved.ssl_client_key,
+            request_format=resolved.request_format,
+            response_json_path=resolved.response_json_path,
+        )
+        messages = [{"role": "user", "content": question}]
+        text_parts: list[str] = []
+        async for chunk in adapter.send_message(messages):
+            if chunk.content:
+                text_parts.append(chunk.content)
+        return "".join(text_parts)
+
+    # Default: litellm provider
+    litellm_kwargs: dict = {
+        "model": resolved.model,
+        "messages": [{"role": "user", "content": question}],
+    }
+    if resolved.api_key:
+        litellm_kwargs["api_key"] = resolved.api_key
+    if resolved.api_base:
+        litellm_kwargs["api_base"] = resolved.api_base
+    if extra_params:
+        apply_llm_params(litellm_kwargs, extra_params)
+
+    with proxy_env(resolved.proxy, resolved.ssl_cert_path, resolved.ssl_client_key):
+        response = await litellm.acompletion(**litellm_kwargs)
+    return response.choices[0].message.content or ""
+
+
 async def resolve_provider(
     provider_id: str,
     db: AsyncSession,
@@ -288,6 +359,10 @@ async def resolve_provider(
             tags=db_provider.tags or [],
             purpose=db_provider.purpose,
             default_params=getattr(db_provider, "default_params", None),
+            provider_type=getattr(db_provider, "provider_type", "litellm"),
+            endpoint_url=getattr(db_provider, "endpoint_url", None),
+            request_format=getattr(db_provider, "request_format", "openai"),
+            response_json_path=getattr(db_provider, "response_json_path", "choices.0.message.content"),
         )
 
     return None

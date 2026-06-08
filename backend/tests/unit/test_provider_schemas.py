@@ -41,9 +41,16 @@ class TestProviderCreate:
         with pytest.raises(ValidationError):
             ProviderCreate(name="a" * 256, litellm_model="openai/gpt-4")
 
-    def test_empty_litellm_model_rejected(self):
-        with pytest.raises(ValidationError):
-            ProviderCreate(name="My LLM", litellm_model="")
+    def test_empty_litellm_model_allowed_for_custom(self):
+        """Custom providers don't need a litellm_model."""
+        provider = ProviderCreate(name="My Custom", litellm_model="", provider_type="custom")
+        assert provider.litellm_model == ""
+        assert provider.provider_type == "custom"
+
+    def test_empty_litellm_model_defaults(self):
+        """Default litellm_model is empty string when not provided."""
+        provider = ProviderCreate(name="My LLM")
+        assert provider.litellm_model == ""
 
     def test_litellm_model_too_long_rejected(self):
         with pytest.raises(ValidationError):

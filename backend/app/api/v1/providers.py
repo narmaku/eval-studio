@@ -29,6 +29,10 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
         tags=p.tags,
         purpose=p.purpose,
         default_params=p.default_params,
+        provider_type=p.provider_type,
+        endpoint_url=p.endpoint_url,
+        request_format=p.request_format,
+        response_json_path=p.response_json_path,
     )
 
 
@@ -65,6 +69,10 @@ async def create_provider(payload: ProviderCreate) -> ProviderResponse:
         tags=payload.tags,
         purpose=payload.purpose,
         default_params=payload.default_params,
+        provider_type=payload.provider_type,
+        endpoint_url=payload.endpoint_url,
+        request_format=payload.request_format,
+        response_json_path=payload.response_json_path,
     )
     provider_registry.add_provider(profile)
     logger.info("provider.created", id=profile.id, name=profile.name)

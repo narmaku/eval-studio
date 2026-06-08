@@ -1,11 +1,12 @@
 """Tests for provider_utils — shared provider resolution logic."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from app.core.providers import ProviderProfile, ProviderRegistry
-from app.services.provider_utils import ResolvedModel, resolve_model_config
+from app.services.provider_utils import ResolvedModel, call_model, resolve_model_config
 
 
 @pytest.fixture
@@ -154,3 +155,132 @@ async def test_resolve_ssl_cert_path_only_backward_compat():
 
     assert result.ssl_cert_path == "/path/to/ca-bundle.pem"
     assert result.ssl_client_key is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_custom_provider_fields():
+    """Custom provider resolves provider_type, endpoint_url, request_format, response_json_path."""
+    reg = ProviderRegistry()
+    reg._items["rls-staging"] = ProviderProfile(
+        id="rls-staging",
+        name="RLS Staging",
+        litellm_model="",
+        provider_type="custom",
+        endpoint_url="https://staging.example.com/api/lightspeed/v1/infer",
+        request_format="rls_infer",
+        response_json_path="data.text",
+        proxy="http://squid:3128",
+        ssl_cert_path="/path/to/cert.pem",
+        ssl_client_key="/path/to/key.pem",
+    )
+    config = {"provider_id": "rls-staging"}
+    result = resolve_model_config(config, registry=reg)
+
+    assert result.provider_type == "custom"
+    assert result.endpoint_url == "https://staging.example.com/api/lightspeed/v1/infer"
+    assert result.request_format == "rls_infer"
+    assert result.response_json_path == "data.text"
+    assert result.model == ""  # custom providers don't need litellm model
+
+
+@pytest.mark.asyncio
+async def test_resolve_custom_provider_no_model_required():
+    """Custom provider doesn't raise ValueError even when no model is configured."""
+    reg = ProviderRegistry()
+    reg._items["custom-no-model"] = ProviderProfile(
+        id="custom-no-model",
+        name="Custom No Model",
+        litellm_model="",
+        provider_type="custom",
+        endpoint_url="https://example.com/api/v1/infer",
+    )
+    with patch("app.services.provider_utils.settings") as mock_settings:
+        mock_settings.litellm_model = None
+        mock_settings.litellm_api_key = None
+        mock_settings.ssl_cert_file = None
+        mock_settings.ssl_client_key = None
+
+        config = {"provider_id": "custom-no-model"}
+        result = resolve_model_config(config, registry=reg)
+
+    assert result.provider_type == "custom"
+    assert result.model == ""
+
+
+class TestCallModel:
+    """Tests for the call_model helper function."""
+
+    @pytest.mark.asyncio
+    async def test_call_model_custom_provider(self):
+        """call_model uses CustomHttpxAdapter for custom providers."""
+        resolved = ResolvedModel(
+            model="",
+            provider_type="custom",
+            endpoint_url="https://example.com/api/lightspeed/v1/infer",
+            request_format="rls_infer",
+            response_json_path="data.text",
+        )
+
+        mock_response = httpx.Response(
+            200,
+            json={"data": {"text": "The answer", "request_id": "r1"}},
+            request=httpx.Request("POST", "https://example.com/api/lightspeed/v1/infer"),
+        )
+
+        with patch("app.agent_backends.custom_httpx_agent.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            result = await call_model(resolved, "What is 2+2?")
+
+        assert result == "The answer"
+
+    @pytest.mark.asyncio
+    async def test_call_model_litellm_provider(self):
+        """call_model uses litellm.acompletion for litellm providers."""
+        resolved = ResolvedModel(
+            model="openai/gpt-4",
+            api_key="sk-test",
+            provider_type="litellm",
+        )
+
+        mock_completion = AsyncMock()
+        mock_completion.choices = [AsyncMock()]
+        mock_completion.choices[0].message.content = "LiteLLM answer"
+
+        with (
+            patch("app.services.provider_utils.litellm") as mock_litellm,
+            patch("app.services.provider_utils.proxy_env"),
+        ):
+            mock_litellm.acompletion = AsyncMock(return_value=mock_completion)
+            result = await call_model(resolved, "What is 2+2?")
+
+        assert result == "LiteLLM answer"
+
+    @pytest.mark.asyncio
+    async def test_call_model_litellm_with_params(self):
+        """call_model passes extra params to litellm.acompletion."""
+        resolved = ResolvedModel(
+            model="openai/gpt-4",
+            api_key="sk-test",
+            api_base="http://localhost:8080/v1",
+            provider_type="litellm",
+        )
+
+        mock_completion = AsyncMock()
+        mock_completion.choices = [AsyncMock()]
+        mock_completion.choices[0].message.content = "Answer"
+
+        with (
+            patch("app.services.provider_utils.litellm") as mock_litellm,
+            patch("app.services.provider_utils.proxy_env"),
+        ):
+            mock_litellm.acompletion = AsyncMock(return_value=mock_completion)
+            result = await call_model(resolved, "test", extra_params={"max_tokens": 100})
+
+        assert result == "Answer"
+        call_kwargs = mock_litellm.acompletion.call_args[1]
+        assert call_kwargs["max_tokens"] == 100

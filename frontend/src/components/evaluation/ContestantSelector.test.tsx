@@ -16,6 +16,10 @@ const mockProviders: Provider[] = [
     tags: ['fast'],
     purpose: 'test',
     default_params: null,
+    provider_type: 'litellm',
+    endpoint_url: null,
+    request_format: 'openai',
+    response_json_path: 'choices.0.message.content',
   },
   {
     id: 'provider-2',
@@ -28,6 +32,10 @@ const mockProviders: Provider[] = [
     tags: [],
     purpose: 'test',
     default_params: null,
+    provider_type: 'litellm',
+    endpoint_url: null,
+    request_format: 'openai',
+    response_json_path: 'choices.0.message.content',
   },
 ];
 

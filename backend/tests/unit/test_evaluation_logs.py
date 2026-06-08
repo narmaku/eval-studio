@@ -82,12 +82,12 @@ async def test_qa_evaluation_emits_start_log(db_session: AsyncSession, evaluatio
     """run_qa_evaluation emits a 'Starting evaluation' log at the beginning."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_acompletion = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.evaluation_service.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
         patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
@@ -105,12 +105,12 @@ async def test_qa_evaluation_emits_model_resolved_log(db_session: AsyncSession, 
     """run_qa_evaluation emits a 'Model resolved' log after model config resolution."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_acompletion = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.evaluation_service.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
         patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
@@ -127,12 +127,12 @@ async def test_qa_evaluation_emits_judge_resolved_log(db_session: AsyncSession, 
     """run_qa_evaluation emits a 'Judge model' log after judge resolution."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_acompletion = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.evaluation_service.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
         patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
@@ -149,12 +149,12 @@ async def test_qa_evaluation_emits_per_item_logs(db_session: AsyncSession, evalu
     """run_qa_evaluation emits per-item logs: processing, response, score."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_acompletion = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good answer"))
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.evaluation_service.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
         patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
@@ -181,12 +181,12 @@ async def test_qa_evaluation_emits_completion_log(db_session: AsyncSession, eval
     """run_qa_evaluation emits a completion summary log at the end."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_acompletion = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.evaluation_service.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
         patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
@@ -210,13 +210,13 @@ async def test_qa_evaluation_emits_error_log_on_item_failure(db_session: AsyncSe
         call_count += 1
         if call_count == 1:
             raise RuntimeError("API timeout")
-        return _mock_acompletion_response()
+        return "This is the model's answer."
 
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", side_effect=mock_acompletion_fail),
+        patch("app.services.evaluation_service.call_model", side_effect=mock_acompletion_fail),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
         patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
@@ -237,12 +237,12 @@ async def test_qa_evaluation_log_uses_correct_evaluation_id(db_session: AsyncSes
     """All broadcast_log calls use the correct evaluation_id."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
-    mock_acompletion = AsyncMock(return_value=_mock_acompletion_response())
+    mock_acompletion = AsyncMock(return_value="This is the model's answer.")
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.evaluation_service.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
         patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),

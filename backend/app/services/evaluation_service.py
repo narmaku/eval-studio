@@ -1,6 +1,5 @@
 import asyncio
 
-import litellm
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +12,8 @@ from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.services.judge_utils import to_judge_params
 from app.services.provider_utils import (
-    apply_llm_params,
+    call_model,
     merge_llm_params,
-    proxy_env,
     resolve_judge_config,
     resolve_model_config,
 )
@@ -100,12 +98,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             await broadcast_status(evaluation_id, "failed", error=evaluation.error)
             return
 
-        model_under_test = resolved.model
-        model_api_base = resolved.api_base
-        model_api_key = resolved.api_key
-        model_proxy = resolved.proxy
-        model_ssl_cert = resolved.ssl_cert_path
-        model_ssl_key = resolved.ssl_client_key
+        model_under_test = resolved.model or resolved.endpoint_url or "custom"
 
         # Merge LLM params: provider defaults < eval-level overrides
         model_params = merge_llm_params(resolved.default_params, config.get("model_params"))
@@ -113,15 +106,16 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         logger.info(
             "evaluation.model_resolved",
             model=model_under_test,
-            api_base=model_api_base,
-            has_key=bool(model_api_key),
+            api_base=resolved.api_base,
+            has_key=bool(resolved.api_key),
             provider=model_endpoint.get("provider_id") or "none",
+            provider_type=resolved.provider_type,
         )
         await broadcast_log(
             evaluation_id=evaluation_id,
             level="info",
             message=f"Model resolved: {model_under_test}",
-            details={"model": model_under_test, "api_base": model_api_base},
+            details={"model": model_under_test, "api_base": resolved.api_base},
         )
 
         # 6. Resolve judge: provider profile > DB judge config > LITELLM_MODEL env
@@ -180,19 +174,8 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 message=f"Processing item {idx + 1}/{total}: {item.question[:80]}",
             )
 
-            # Step A: Call the model under test (with proxy support)
-            litellm_kwargs: dict = {
-                "model": model_under_test,
-                "messages": [{"role": "user", "content": item.question}],
-            }
-            if model_api_key:
-                litellm_kwargs["api_key"] = model_api_key
-            if model_api_base:
-                litellm_kwargs["api_base"] = model_api_base
-            apply_llm_params(litellm_kwargs, model_params)
-            with proxy_env(model_proxy, model_ssl_cert, model_ssl_key):
-                response = await litellm.acompletion(**litellm_kwargs)
-            actual_answer = response.choices[0].message.content or ""
+            # Step A: Call the model under test (supports both litellm and custom providers)
+            actual_answer = await call_model(resolved, item.question, extra_params=model_params)
 
             await broadcast_log(
                 evaluation_id=evaluation_id,

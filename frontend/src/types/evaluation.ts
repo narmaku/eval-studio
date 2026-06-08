@@ -79,6 +79,10 @@ export interface Provider {
   tags: string[];
   purpose: string;
   default_params: Record<string, unknown> | null;
+  provider_type: string;
+  endpoint_url: string | null;
+  request_format: string;
+  response_json_path: string;
 }
 
 export interface ProviderModel {

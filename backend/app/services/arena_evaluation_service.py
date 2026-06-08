@@ -2,7 +2,6 @@
 
 import asyncio
 
-import litellm
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,9 +15,8 @@ from app.models.result import Result
 from app.services.judge_utils import to_judge_params
 from app.services.provider_utils import (
     ResolvedModel,
-    apply_llm_params,
+    call_model,
     merge_llm_params,
-    proxy_env,
     resolve_judge_config,
     resolve_model_config,
 )
@@ -142,9 +140,8 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             try:
                 resolved = resolve_model_config(contestant)
                 contestant_params = merge_llm_params(resolved.default_params, eval_model_params)
-                resolved_contestants.append(
-                    (contestant.get("litellm_model") or resolved.model, resolved, contestant_params)
-                )
+                contestant_name = contestant.get("litellm_model") or resolved.model or resolved.endpoint_url or "custom"
+                resolved_contestants.append((contestant_name, resolved, contestant_params))
             except ValueError as e:
                 logger.error(
                     "arena.contestant_resolve_failed",
@@ -209,20 +206,8 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 details={"contestant_model": contestant_name},
             )
 
-            # Call the contestant model
-            litellm_kwargs: dict = {
-                "model": resolved_model.model,
-                "messages": [{"role": "user", "content": item.question}],
-            }
-            if resolved_model.api_key:
-                litellm_kwargs["api_key"] = resolved_model.api_key
-            if resolved_model.api_base:
-                litellm_kwargs["api_base"] = resolved_model.api_base
-            apply_llm_params(litellm_kwargs, contestant_params)
-
-            with proxy_env(resolved_model.proxy, resolved_model.ssl_cert_path, resolved_model.ssl_client_key):
-                response = await litellm.acompletion(**litellm_kwargs)
-            actual_answer = response.choices[0].message.content or ""
+            # Call the contestant model (supports both litellm and custom providers)
+            actual_answer = await call_model(resolved_model, item.question, extra_params=contestant_params)
 
             await broadcast_log(
                 evaluation_id=evaluation_id,
