@@ -96,7 +96,7 @@ export default function RAGEvaluation() {
       config: {
         model_endpoint: {
           name: 'RAG Endpoint',
-          litellm_model: 'rag',
+          default_model: 'rag',
           api_base: modelApiBase,
         },
         judge_config: judgeConfig,

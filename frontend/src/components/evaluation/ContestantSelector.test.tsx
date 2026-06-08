@@ -8,7 +8,7 @@ const mockProviders: Provider[] = [
   {
     id: 'provider-1',
     name: 'Model Alpha',
-    litellm_model: 'openai/gpt-4o',
+    default_model: 'openai/gpt-4o',
     api_base: 'https://alpha.example.com',
     has_api_key: true,
     proxy: null,
@@ -23,7 +23,7 @@ const mockProviders: Provider[] = [
   {
     id: 'provider-2',
     name: 'Model Beta',
-    litellm_model: 'openai/gpt-3.5',
+    default_model: 'openai/gpt-3.5',
     api_base: null,
     has_api_key: true,
     proxy: null,
@@ -86,7 +86,7 @@ describe('ContestantSelector', () => {
   it('disables add button at max 8 contestants', () => {
     const contestants: ModelEndpoint[] = Array.from({ length: 8 }, (_, i) => ({
       name: `Model ${i + 1}`,
-      litellm_model: `openai/model-${i + 1}`,
+      default_model: `openai/model-${i + 1}`,
     }));
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);
@@ -97,9 +97,9 @@ describe('ContestantSelector', () => {
 
   it('has remove buttons for each contestant', () => {
     const contestants: ModelEndpoint[] = [
-      { name: 'Model A', litellm_model: 'openai/a' },
-      { name: 'Model B', litellm_model: 'openai/b' },
-      { name: 'Model C', litellm_model: 'openai/c' },
+      { name: 'Model A', default_model: 'openai/a' },
+      { name: 'Model B', default_model: 'openai/b' },
+      { name: 'Model C', default_model: 'openai/c' },
     ];
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);
@@ -110,8 +110,8 @@ describe('ContestantSelector', () => {
 
   it('disables remove buttons when only 2 contestants remain', () => {
     const contestants: ModelEndpoint[] = [
-      { name: 'Model A', litellm_model: 'openai/a' },
-      { name: 'Model B', litellm_model: 'openai/b' },
+      { name: 'Model A', default_model: 'openai/a' },
+      { name: 'Model B', default_model: 'openai/b' },
     ];
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);
@@ -125,9 +125,9 @@ describe('ContestantSelector', () => {
   it('calls onChange when removing a contestant with 3+', async () => {
     const user = userEvent.setup();
     const contestants: ModelEndpoint[] = [
-      { name: 'Model A', litellm_model: 'openai/a' },
-      { name: 'Model B', litellm_model: 'openai/b' },
-      { name: 'Model C', litellm_model: 'openai/c' },
+      { name: 'Model A', default_model: 'openai/a' },
+      { name: 'Model B', default_model: 'openai/b' },
+      { name: 'Model C', default_model: 'openai/c' },
     ];
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);
@@ -137,16 +137,16 @@ describe('ContestantSelector', () => {
     await user.click(removeButtons[1]!);
 
     expect(onChange).toHaveBeenCalledWith([
-      { name: 'Model A', litellm_model: 'openai/a' },
-      { name: 'Model C', litellm_model: 'openai/c' },
+      { name: 'Model A', default_model: 'openai/a' },
+      { name: 'Model C', default_model: 'openai/c' },
     ]);
   });
 
   it('shows contestant number badges', () => {
     const contestants: ModelEndpoint[] = [
-      { name: 'Model A', litellm_model: 'openai/a' },
-      { name: 'Model B', litellm_model: 'openai/b' },
-      { name: 'Model C', litellm_model: 'openai/c' },
+      { name: 'Model A', default_model: 'openai/a' },
+      { name: 'Model B', default_model: 'openai/b' },
+      { name: 'Model C', default_model: 'openai/c' },
     ];
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);
@@ -158,8 +158,8 @@ describe('ContestantSelector', () => {
 
   it('renders a ProviderSelector for each contestant', () => {
     const contestants: ModelEndpoint[] = [
-      { name: 'Model A', litellm_model: 'openai/a', provider_id: 'provider-1' },
-      { name: 'Model B', litellm_model: 'openai/b', provider_id: 'provider-2' },
+      { name: 'Model A', default_model: 'openai/a', provider_id: 'provider-1' },
+      { name: 'Model B', default_model: 'openai/b', provider_id: 'provider-2' },
     ];
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);
@@ -171,9 +171,9 @@ describe('ContestantSelector', () => {
 
   it('disables all controls when disabled prop is true', () => {
     const contestants: ModelEndpoint[] = [
-      { name: 'Model A', litellm_model: 'openai/a' },
-      { name: 'Model B', litellm_model: 'openai/b' },
-      { name: 'Model C', litellm_model: 'openai/c' },
+      { name: 'Model A', default_model: 'openai/a' },
+      { name: 'Model B', default_model: 'openai/b' },
+      { name: 'Model C', default_model: 'openai/c' },
     ];
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} disabled />);
@@ -190,8 +190,8 @@ describe('ContestantSelector', () => {
   it('does not call onChange when removing an empty slot beyond value length', async () => {
     const user = userEvent.setup();
     const contestants: ModelEndpoint[] = [
-      { name: 'Model A', litellm_model: 'openai/a' },
-      { name: 'Model B', litellm_model: 'openai/b' },
+      { name: 'Model A', default_model: 'openai/a' },
+      { name: 'Model B', default_model: 'openai/b' },
     ];
     const onChange = vi.fn();
     render(
@@ -214,7 +214,7 @@ describe('ContestantSelector', () => {
     const user = userEvent.setup();
     const contestants: ModelEndpoint[] = Array.from({ length: 7 }, (_, i) => ({
       name: `Model ${i + 1}`,
-      litellm_model: `openai/model-${i + 1}`,
+      default_model: `openai/model-${i + 1}`,
     }));
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);
@@ -232,8 +232,8 @@ describe('ContestantSelector', () => {
   it('does not remove below MIN_CONTESTANTS (2) when only 2 remain', async () => {
     const user = userEvent.setup();
     const contestants: ModelEndpoint[] = [
-      { name: 'Model A', litellm_model: 'openai/a' },
-      { name: 'Model B', litellm_model: 'openai/b' },
+      { name: 'Model A', default_model: 'openai/a' },
+      { name: 'Model B', default_model: 'openai/b' },
     ];
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);
@@ -252,9 +252,9 @@ describe('ContestantSelector', () => {
 
   it('has correct aria-labels on remove buttons', () => {
     const contestants: ModelEndpoint[] = [
-      { name: 'Model A', litellm_model: 'openai/a' },
-      { name: 'Model B', litellm_model: 'openai/b' },
-      { name: 'Model C', litellm_model: 'openai/c' },
+      { name: 'Model A', default_model: 'openai/a' },
+      { name: 'Model B', default_model: 'openai/b' },
+      { name: 'Model C', default_model: 'openai/c' },
     ];
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);

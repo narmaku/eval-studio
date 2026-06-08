@@ -36,7 +36,7 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
 
   // Custom fields -- local state, emitted onBlur to avoid infinite re-render
   const [customName, setCustomName] = useState(value?.name ?? '');
-  const [customModel, setCustomModel] = useState(value?.litellm_model ?? '');
+  const [customModel, setCustomModel] = useState(value?.default_model ?? '');
   const [customApiBase, setCustomApiBase] = useState(value?.api_base ?? '');
 
   useEffect(() => {
@@ -93,7 +93,7 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
       onChange({
         provider_id: provider.id,
         name: provider.name,
-        litellm_model: provider.litellm_model,
+        default_model: provider.default_model,
         api_base: provider.api_base ?? undefined,
       });
 
@@ -108,13 +108,13 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
     const provider = providers.find((p) => p.id === selection);
     if (!provider) return;
 
-    // Build the litellm_model value: use openai/<model_id> format for OpenAI-compatible endpoints
-    const litellmModel = provider.api_base ? `openai/${modelId}` : modelId;
+    // Build the default_model value: use openai/<model_id> format for OpenAI-compatible endpoints
+    const modelValue = provider.api_base ? `openai/${modelId}` : modelId;
 
     onChange({
       provider_id: provider.id,
       name: provider.name,
-      litellm_model: litellmModel,
+      default_model: modelValue,
       api_base: provider.api_base ?? undefined,
     });
   };
@@ -123,7 +123,7 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
     if (customName && customModel) {
       onChange({
         name: customName,
-        litellm_model: customModel,
+        default_model: customModel,
         api_base: customApiBase || undefined,
       });
     }
@@ -160,7 +160,7 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
                     <span className="flex items-center gap-2">
                       <span className="font-medium">{provider.name}</span>
                       <span className="text-muted-foreground text-xs">
-                        {provider.litellm_model}
+                        {provider.default_model}
                       </span>
                       {provider.tags.map((tag) => (
                         <Badge key={tag} variant="secondary" className="text-[10px] px-1 py-0">
@@ -202,7 +202,7 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
               disabled={disabled}
             >
               <SelectTrigger id="model-select" className="w-full">
-                <SelectValue placeholder={`Default: ${selectedProvider.litellm_model}`} />
+                <SelectValue placeholder={`Default: ${selectedProvider.default_model}`} />
               </SelectTrigger>
               <SelectContent>
                 {availableModels.map((model) => (
@@ -236,7 +236,7 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="custom-model">LiteLLM Model</Label>
+              <Label htmlFor="custom-model">Default Model</Label>
               <Input
                 id="custom-model"
                 placeholder="e.g. openai/gpt-4o"

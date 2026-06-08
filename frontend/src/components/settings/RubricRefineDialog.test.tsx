@@ -49,7 +49,7 @@ describe('RubricRefineDialog', () => {
       {
         id: 'openai-gpt4',
         name: 'OpenAI GPT-4',
-        litellm_model: 'gpt-4',
+        default_model: 'gpt-4',
         api_base: null,
         has_api_key: true,
         proxy: null,

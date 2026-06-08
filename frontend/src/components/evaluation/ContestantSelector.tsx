@@ -44,7 +44,7 @@ export function ContestantSelector({ value, onChange, disabled }: ContestantSele
     const newContestants = [...value];
     // Pad array with empty slots if needed
     while (newContestants.length <= index) {
-      newContestants.push({ name: '', litellm_model: '' });
+      newContestants.push({ name: '', default_model: '' });
     }
     newContestants[index] = endpoint;
     onChange(newContestants);

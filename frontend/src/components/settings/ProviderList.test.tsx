@@ -9,7 +9,7 @@ const mockDeleteProvider = vi.fn();
 const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   id: 'p-1',
   name: 'Test Provider',
-  litellm_model: 'gpt-4',
+  default_model: 'gpt-4',
   api_base: 'https://api.openai.com/v1',
   has_api_key: true,
   proxy: null,
@@ -104,7 +104,7 @@ describe('ProviderList', () => {
   it('shows model name', () => {
     storeState = {
       ...defaultStore,
-      providers: [makeProvider({ litellm_model: 'gpt-4-turbo' })],
+      providers: [makeProvider({ default_model: 'gpt-4-turbo' })],
     };
 
     render(<ProviderList />);

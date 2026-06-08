@@ -98,7 +98,7 @@ export function ProviderList() {
               <div className="flex items-center gap-2">
                 <h3 className="font-medium">{provider.name}</h3>
               </div>
-              <p className="text-xs text-muted-foreground font-mono">{provider.litellm_model}</p>
+              <p className="text-xs text-muted-foreground font-mono">{provider.default_model}</p>
               {provider.api_base && (
                 <p className="text-xs text-muted-foreground">API Base: {provider.api_base}</p>
               )}

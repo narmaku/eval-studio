@@ -8,7 +8,7 @@ const mockProviders: Provider[] = [
   {
     id: 'rls-staging',
     name: 'RLS Staging',
-    litellm_model: 'openai/gpt-4o',
+    default_model: 'openai/gpt-4o',
     api_base: 'https://staging.example.com',
     has_api_key: true,
     proxy: null,
@@ -23,7 +23,7 @@ const mockProviders: Provider[] = [
   {
     id: 'rls-prod',
     name: 'RLS Production',
-    litellm_model: 'openai/gpt-4o',
+    default_model: 'openai/gpt-4o',
     api_base: null,
     has_api_key: false,
     proxy: 'http://proxy.example.com',
@@ -98,7 +98,7 @@ describe('ProviderSelector', () => {
       expect(screen.getByLabelText('Name')).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText('LiteLLM Model')).toBeInTheDocument();
+    expect(screen.getByLabelText('Default Model')).toBeInTheDocument();
     expect(screen.getByLabelText('API Base URL (optional)')).toBeInTheDocument();
 
     // The select dropdown should not be shown when API failed
@@ -118,7 +118,7 @@ describe('ProviderSelector', () => {
     const user = userEvent.setup();
 
     const nameInput = screen.getByLabelText('Name');
-    const modelInput = screen.getByLabelText('LiteLLM Model');
+    const modelInput = screen.getByLabelText('Default Model');
 
     await user.type(nameInput, 'My Model');
     await user.type(modelInput, 'openai/gpt-4o');
@@ -128,7 +128,7 @@ describe('ProviderSelector', () => {
 
     expect(onChange).toHaveBeenCalledWith({
       name: 'My Model',
-      litellm_model: 'openai/gpt-4o',
+      default_model: 'openai/gpt-4o',
       api_base: undefined,
     });
   });
@@ -175,7 +175,7 @@ describe('ProviderSelector', () => {
         value={{
           provider_id: 'rls-staging',
           name: 'RLS Staging',
-          litellm_model: 'openai/gpt-4o',
+          default_model: 'openai/gpt-4o',
           api_base: 'https://staging.example.com',
         }}
         onChange={onChange}
@@ -198,7 +198,7 @@ describe('ProviderSelector', () => {
       expect(screen.getByLabelText('Name')).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText('LiteLLM Model')).toBeInTheDocument();
+    expect(screen.getByLabelText('Default Model')).toBeInTheDocument();
   });
 
   it('fetches models when a provider is selected via onChange prop', async () => {
@@ -227,7 +227,7 @@ describe('ProviderSelector', () => {
           value={{
             provider_id: 'rls-staging',
             name: 'RLS Staging',
-            litellm_model: 'openai/gpt-4o',
+            default_model: 'openai/gpt-4o',
             api_base: 'https://staging.example.com',
           }}
           onChange={onChange}

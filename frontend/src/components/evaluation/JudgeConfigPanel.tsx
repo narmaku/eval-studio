@@ -129,7 +129,7 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
                     )}
                   >
                     <p className="text-sm font-medium">{provider.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{provider.litellm_model}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{provider.default_model}</p>
                     <div className="mt-2 flex flex-wrap gap-1">
                       {provider.tags.map((tag) => (
                         <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
