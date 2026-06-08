@@ -44,11 +44,11 @@ def resolve_model_config(
 
     Resolution order:
     1. Provider profile (if provider_id is present and found in registry)
-    2. Direct config fields (litellm_model, api_base)
+    2. Direct config fields (default_model, api_base)
     3. Settings fallback (LITELLM_MODEL, LITELLM_API_KEY env vars)
 
     Args:
-        config: Dictionary with optional keys: provider_id, litellm_model, api_base.
+        config: Dictionary with optional keys: provider_id, default_model, api_base.
         registry: Provider registry to look up provider_id. Defaults to the global singleton.
 
     Returns:
@@ -78,7 +78,7 @@ def resolve_model_config(
     ssl_client_key: str | None = None
 
     if provider:
-        model = provider.litellm_model
+        model = provider.default_model
         api_base = provider.api_base
         api_key = provider.api_key
         proxy = provider.proxy
@@ -91,14 +91,14 @@ def resolve_model_config(
         response_json_path = provider.response_json_path
     else:
         # 2. Direct config fields
-        model = config.get("litellm_model") or config.get("model")
+        model = config.get("default_model") or config.get("model")
         api_base = config.get("api_base")
         api_key = settings.litellm_api_key
         proxy = None
 
     # 3. Fallback to settings
     if not model:
-        model = settings.litellm_model
+        model = settings.default_model
         if not api_key:
             api_key = settings.litellm_api_key
 
@@ -160,9 +160,9 @@ def resolve_judge_config(
             api_key=settings.litellm_api_key if settings.litellm_api_key else None,
         )
 
-    if settings.litellm_model:
+    if settings.default_model:
         return ResolvedModel(
-            model=settings.litellm_model,
+            model=settings.default_model,
             api_key=settings.litellm_api_key if settings.litellm_api_key else None,
         )
 
@@ -350,7 +350,7 @@ async def resolve_provider(
         return ProviderProfile(
             id=db_provider.id,
             name=db_provider.name,
-            litellm_model=db_provider.litellm_model,
+            default_model=db_provider.default_model,
             api_base=db_provider.api_base,
             api_key_env=db_provider.api_key_env,
             proxy=db_provider.proxy,

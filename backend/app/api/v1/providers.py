@@ -20,7 +20,7 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
     return ProviderResponse(
         id=p.id,
         name=p.name,
-        litellm_model=p.litellm_model,
+        default_model=p.default_model,
         api_base=p.api_base,
         has_api_key=p.api_key is not None,
         proxy=p.proxy,
@@ -60,7 +60,7 @@ async def create_provider(payload: ProviderCreate) -> ProviderResponse:
     profile = ProviderProfile(
         id=str(uuid.uuid4()),
         name=payload.name,
-        litellm_model=payload.litellm_model,
+        default_model=payload.default_model,
         api_base=payload.api_base,
         api_key_env=payload.api_key_env,
         proxy=payload.proxy,
@@ -106,12 +106,12 @@ async def list_provider_models(provider_id: str) -> list[ProviderModelResponse]:
     if not provider:
         raise NotFoundException("Provider", provider_id)
 
-    litellm_model = provider.litellm_model
+    default_model_name = provider.default_model
     api_base = provider.api_base
     api_key = provider.api_key
 
     if not api_base:
-        return [ProviderModelResponse(id=litellm_model, owned_by="configured")]
+        return [ProviderModelResponse(id=default_model_name, owned_by="configured")]
 
     base = api_base.rstrip("/")
     if base.endswith("/v1"):
@@ -141,4 +141,4 @@ async def list_provider_models(provider_id: str) -> list[ProviderModelResponse]:
             return [ProviderModelResponse(id=m.get("id", ""), owned_by=m.get("owned_by", "")) for m in models]
     except Exception as exc:
         logger.warning("failed to fetch models from provider", provider_id=provider_id, error=str(exc))
-        return [ProviderModelResponse(id=litellm_model, owned_by="configured")]
+        return [ProviderModelResponse(id=default_model_name, owned_by="configured")]

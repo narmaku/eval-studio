@@ -16,7 +16,7 @@ class Provider(Base):
     __tablename__ = "providers"
 
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    litellm_model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    default_model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     api_base: Mapped[str | None] = mapped_column(String(512), nullable=True)
     api_key_env: Mapped[str | None] = mapped_column(String(255), nullable=True)
     proxy: Mapped[str | None] = mapped_column(String(512), nullable=True)

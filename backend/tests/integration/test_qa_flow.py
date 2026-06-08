@@ -7,22 +7,13 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 
-def _make_mock_acompletion():
-    """Return a mock that simulates LLM responses based on the prompt."""
+def _make_mock_call_model():
+    """Return a mock that simulates call_model() returning plain text."""
 
-    async def mock_acompletion(*args, **kwargs):
-        messages = kwargs.get("messages", args[1] if len(args) > 1 else [])
-        content = messages[0]["content"] if messages else ""
-        if "Score the response" in content or "evaluating" in content.lower():
-            # Judge response
-            return MagicMock(
-                choices=[MagicMock(message=MagicMock(content='{"score": 0.85, "reasoning": "Good answer"}'))]
-            )
-        else:
-            # Model under test response
-            return MagicMock(choices=[MagicMock(message=MagicMock(content="This is the model's answer."))])
+    async def mock_call_model(resolved, question, **kwargs):
+        return "This is the model's answer."
 
-    return mock_acompletion
+    return mock_call_model
 
 
 async def _wait_for_completion(client, evaluation_id: str, timeout: float = 10.0) -> dict:
@@ -90,7 +81,7 @@ async def test_full_qa_evaluation_flow(client, mock_bg_session_factory):
 
     # 4. Run the evaluation (with mocked LLM and session factory)
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", side_effect=_make_mock_acompletion()),
+        patch("app.services.evaluation_service.call_model", side_effect=_make_mock_call_model()),
         patch("app.adapters.litellm_judge.litellm.acompletion", new_callable=AsyncMock) as mock_judge,
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
         patch("app.api.v1.evaluations.async_session_factory", mock_bg_session_factory),
@@ -137,20 +128,20 @@ async def test_rerun_evaluation(client, mock_bg_session_factory):
             "mode": "qa",
             "dataset_id": dataset_id,
             "config": {
-                "model_endpoint": {"litellm_model": "test-model"},
+                "model_endpoint": {"default_model": "test-model"},
                 "judge_config": {"provider_id": "__test__"},
             },
         },
     )
     eval_id = eval_resp.json()["id"]
 
-    mock_acompletion = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=MagicMock(content="answer"))]))
+    mock_call = AsyncMock(return_value="answer")
     mock_judge = AsyncMock(
         return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"score": 0.9, "reasoning": "OK"}'))]),
     )
 
     with (
-        patch("app.services.evaluation_service.litellm.acompletion", mock_acompletion),
+        patch("app.services.evaluation_service.call_model", mock_call),
         patch("app.adapters.litellm_judge.litellm.acompletion", mock_judge),
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
         patch("app.api.v1.evaluations.async_session_factory", mock_bg_session_factory),

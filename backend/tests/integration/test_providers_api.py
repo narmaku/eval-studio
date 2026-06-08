@@ -17,7 +17,7 @@ def _seed_test_providers(tmp_path):
     provider_registry._items["test-model"] = ProviderProfile(
         id="test-model",
         name="Test Model",
-        litellm_model="gpt-4",
+        default_model="gpt-4",
         api_base="http://localhost:8000",
         api_key_env="TEST_API_KEY_FOR_PROVIDERS",
         tags=["test"],
@@ -26,7 +26,7 @@ def _seed_test_providers(tmp_path):
     provider_registry._items["test-judge"] = ProviderProfile(
         id="test-judge",
         name="Test Judge",
-        litellm_model="gpt-4.1",
+        default_model="gpt-4.1",
         api_key_env="TEST_JUDGE_KEY_FOR_PROVIDERS",
         proxy="http://proxy:3128",
         tags=["judge"],
@@ -35,7 +35,7 @@ def _seed_test_providers(tmp_path):
     provider_registry._items["no-key-provider"] = ProviderProfile(
         id="no-key-provider",
         name="No Key Provider",
-        litellm_model="ollama/llama3",
+        default_model="ollama/llama3",
         api_base="http://localhost:11434",
         tags=["local"],
         purpose="test",
@@ -82,7 +82,7 @@ async def test_get_provider_by_id(client):
     data = response.json()
     assert data["id"] == "test-model"
     assert data["name"] == "Test Model"
-    assert data["litellm_model"] == "gpt-4"
+    assert data["default_model"] == "gpt-4"
 
 
 @pytest.mark.asyncio
@@ -123,7 +123,7 @@ async def test_never_exposes_actual_key(client, monkeypatch):
 
 PROVIDER_PAYLOAD = {
     "name": "New Provider",
-    "litellm_model": "openai/gpt-4",
+    "default_model": "openai/gpt-4",
     "api_base": "https://api.example.com/v1",
     "api_key_env": "NEW_PROVIDER_KEY",
     "tags": ["custom"],
@@ -137,7 +137,7 @@ async def test_create_provider(client):
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "New Provider"
-    assert data["litellm_model"] == "openai/gpt-4"
+    assert data["default_model"] == "openai/gpt-4"
     assert data["id"] is not None
 
     list_resp = await client.get("/api/v1/providers")
@@ -146,7 +146,7 @@ async def test_create_provider(client):
 
 @pytest.mark.asyncio
 async def test_create_provider_minimal(client):
-    payload = {"name": "Minimal", "litellm_model": "ollama/llama3"}
+    payload = {"name": "Minimal", "default_model": "ollama/llama3"}
     response = await client.post("/api/v1/providers", json=payload)
     assert response.status_code == 201
     data = response.json()
@@ -157,7 +157,7 @@ async def test_create_provider_minimal(client):
 
 @pytest.mark.asyncio
 async def test_create_provider_validation(client):
-    response = await client.post("/api/v1/providers", json={"name": "", "litellm_model": "m"})
+    response = await client.post("/api/v1/providers", json={"name": "", "default_model": "m"})
     assert response.status_code == 422
 
 
@@ -166,7 +166,7 @@ async def test_update_provider(client):
     response = await client.put("/api/v1/providers/test-model", json={"name": "Updated Model"})
     assert response.status_code == 200
     assert response.json()["name"] == "Updated Model"
-    assert response.json()["litellm_model"] == "gpt-4"
+    assert response.json()["default_model"] == "gpt-4"
 
 
 @pytest.mark.asyncio

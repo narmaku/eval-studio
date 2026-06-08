@@ -22,7 +22,7 @@ def _register_test_judge_provider():
     provider_registry._items["__test__"] = ProviderProfile(
         id="__test__",
         name="Test Judge",
-        litellm_model="test-judge-model",
+        default_model="test-judge-model",
         purpose="judge",
     )
     yield
@@ -59,7 +59,7 @@ async def evaluation_with_dataset(db_session: AsyncSession):
         status="pending",
         dataset_id=dataset.id,
         config={
-            "model_endpoint": {"litellm_model": "test-model"},
+            "model_endpoint": {"default_model": "test-model"},
             "judge_config": {"provider_id": "__test__"},
         },
     )

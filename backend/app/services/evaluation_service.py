@@ -83,7 +83,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         # Merge top-level "model" key as fallback for backward compatibility
         resolution_config = dict(model_endpoint)
-        if "litellm_model" not in resolution_config and "model" not in resolution_config:
+        if "default_model" not in resolution_config and "model" not in resolution_config:
             top_level_model = config.get("model")
             if top_level_model:
                 resolution_config["model"] = top_level_model

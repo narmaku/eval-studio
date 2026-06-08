@@ -22,7 +22,7 @@ class TestProviderRegistryReload:
         config_file = tmp_path / "providers.yaml"
         self._write_providers_yaml(
             config_file,
-            [{"id": "p1", "name": "Provider 1", "litellm_model": "m1"}],
+            [{"id": "p1", "name": "Provider 1", "default_model": "m1"}],
         )
 
         registry = ProviderRegistry()
@@ -34,8 +34,8 @@ class TestProviderRegistryReload:
         self._write_providers_yaml(
             config_file,
             [
-                {"id": "p1", "name": "Provider 1", "litellm_model": "m1"},
-                {"id": "p2", "name": "Provider 2", "litellm_model": "m2"},
+                {"id": "p1", "name": "Provider 1", "default_model": "m1"},
+                {"id": "p2", "name": "Provider 2", "default_model": "m2"},
             ],
         )
 
@@ -50,7 +50,7 @@ class TestProviderRegistryReload:
         config_file = tmp_path / "providers.yaml"
         self._write_providers_yaml(
             config_file,
-            [{"id": "p1", "name": "Provider 1", "litellm_model": "m1"}],
+            [{"id": "p1", "name": "Provider 1", "default_model": "m1"}],
         )
 
         registry = ProviderRegistry()
@@ -66,7 +66,7 @@ class TestProviderRegistryReload:
         config_file = tmp_path / "providers.yaml"
         self._write_providers_yaml(
             config_file,
-            [{"id": "p1", "name": "Provider 1", "litellm_model": "m1"}],
+            [{"id": "p1", "name": "Provider 1", "default_model": "m1"}],
         )
 
         registry = ProviderRegistry()
@@ -85,7 +85,7 @@ class TestProviderRegistryReload:
         config_file = tmp_path / "providers.yaml"
         self._write_providers_yaml(
             config_file,
-            [{"id": "p1", "name": "Original", "litellm_model": "m1"}],
+            [{"id": "p1", "name": "Original", "default_model": "m1"}],
         )
 
         registry = ProviderRegistry()
@@ -96,7 +96,7 @@ class TestProviderRegistryReload:
         time.sleep(0.05)
         self._write_providers_yaml(
             config_file,
-            [{"id": "p1", "name": "Updated", "litellm_model": "m1"}],
+            [{"id": "p1", "name": "Updated", "default_model": "m1"}],
         )
 
         provider = registry.get_provider("p1")
@@ -107,14 +107,14 @@ class TestProviderRegistryReload:
         config_file = tmp_path / "providers.yaml"
         self._write_providers_yaml(
             config_file,
-            [{"id": "p1", "name": "Provider 1", "litellm_model": "m1"}],
+            [{"id": "p1", "name": "Provider 1", "default_model": "m1"}],
         )
 
         registry = ProviderRegistry()
         registry.load_from_yaml(config_file)
 
         # Add a new provider via CRUD
-        new_profile = ProviderProfile(id="p2", name="Provider 2", litellm_model="m2")
+        new_profile = ProviderProfile(id="p2", name="Provider 2", default_model="m2")
         registry.add_provider(new_profile)
 
         # The mtime should be updated, so no spurious reload on next access
@@ -130,7 +130,7 @@ class TestProviderRegistryReload:
         config_file = tmp_path / "providers.yaml"
         self._write_providers_yaml(
             config_file,
-            [{"id": "p1", "name": "Original", "litellm_model": "m1"}],
+            [{"id": "p1", "name": "Original", "default_model": "m1"}],
         )
 
         registry = ProviderRegistry()
@@ -150,8 +150,8 @@ class TestProviderRegistryReload:
         self._write_providers_yaml(
             config_file,
             [
-                {"id": "p1", "name": "Provider 1", "litellm_model": "m1"},
-                {"id": "p2", "name": "Provider 2", "litellm_model": "m2"},
+                {"id": "p1", "name": "Provider 1", "default_model": "m1"},
+                {"id": "p2", "name": "Provider 2", "default_model": "m2"},
             ],
         )
 

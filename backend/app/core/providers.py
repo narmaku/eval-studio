@@ -13,7 +13,7 @@ class ProviderProfile:
 
     id: str
     name: str
-    litellm_model: str
+    default_model: str
     api_base: str | None = None
     api_key_env: str | None = None
     proxy: str | None = None
@@ -45,7 +45,7 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
         return ProviderProfile(
             id=raw["id"],
             name=raw["name"],
-            litellm_model=raw.get("litellm_model", ""),
+            default_model=raw.get("default_model", ""),
             api_base=raw.get("api_base"),
             api_key_env=raw.get("api_key_env"),
             proxy=raw.get("proxy"),
@@ -64,7 +64,7 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
         return {
             "id": item.id,
             "name": item.name,
-            **({"litellm_model": item.litellm_model} if item.litellm_model else {}),
+            **({"default_model": item.default_model} if item.default_model else {}),
             **({"api_base": item.api_base} if item.api_base else {}),
             **({"api_key_env": item.api_key_env} if item.api_key_env else {}),
             **({"proxy": item.proxy} if item.proxy else {}),

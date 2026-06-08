@@ -45,7 +45,7 @@ async def ws_setup():
             evaluation_id=evaluation.id,
             status="active",
             mode="live",
-            agent_config={"litellm_model": "test-model"},
+            agent_config={"default_model": "test-model"},
             transcript=[],
         )
         db.add(session)

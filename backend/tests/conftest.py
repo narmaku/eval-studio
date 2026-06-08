@@ -71,7 +71,7 @@ def _isolate_yaml_registries(tmp_path):
     provider_registry._items["__test__"] = ProviderProfile(
         id="__test__",
         name="Test Judge",
-        litellm_model="test-judge-model",
+        default_model="test-judge-model",
         purpose="judge",
     )
     provider_registry._persist_yaml()

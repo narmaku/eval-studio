@@ -13,29 +13,29 @@ class TestProviderProfile:
     def test_api_key_from_env(self, monkeypatch):
         """api_key property reads from the env var named by api_key_env."""
         monkeypatch.setenv("TEST_PROVIDER_KEY", "secret-123")
-        profile = ProviderProfile(id="test", name="Test", litellm_model="gpt-4", api_key_env="TEST_PROVIDER_KEY")
+        profile = ProviderProfile(id="test", name="Test", default_model="gpt-4", api_key_env="TEST_PROVIDER_KEY")
         assert profile.api_key == "secret-123"
 
     def test_api_key_none_when_env_unset(self):
         """api_key returns None when the env var does not exist."""
         profile = ProviderProfile(
-            id="test", name="Test", litellm_model="gpt-4", api_key_env="NONEXISTENT_PROVIDER_KEY_12345"
+            id="test", name="Test", default_model="gpt-4", api_key_env="NONEXISTENT_PROVIDER_KEY_12345"
         )
         assert profile.api_key is None
 
     def test_api_key_none_when_no_env_configured(self):
         """api_key returns None when api_key_env is not set."""
-        profile = ProviderProfile(id="test", name="Test", litellm_model="gpt-4")
+        profile = ProviderProfile(id="test", name="Test", default_model="gpt-4")
         assert profile.api_key is None
 
     def test_default_purpose_is_test(self):
         """Default purpose should be 'test'."""
-        profile = ProviderProfile(id="test", name="Test", litellm_model="gpt-4")
+        profile = ProviderProfile(id="test", name="Test", default_model="gpt-4")
         assert profile.purpose == "test"
 
     def test_default_tags_empty(self):
         """Default tags should be an empty list."""
-        profile = ProviderProfile(id="test", name="Test", litellm_model="gpt-4")
+        profile = ProviderProfile(id="test", name="Test", default_model="gpt-4")
         assert profile.tags == []
 
 
@@ -47,7 +47,7 @@ class TestProviderRegistry:
                 {
                     "id": "test-provider",
                     "name": "Test Provider",
-                    "litellm_model": "gpt-4",
+                    "default_model": "gpt-4",
                     "api_base": "http://localhost:8000",
                     "api_key_env": "TEST_KEY",
                     "proxy": "http://proxy:3128",
@@ -57,7 +57,7 @@ class TestProviderRegistry:
                 {
                     "id": "judge-provider",
                     "name": "Judge",
-                    "litellm_model": "gpt-4.1",
+                    "default_model": "gpt-4.1",
                     "purpose": "judge",
                 },
             ]
@@ -90,9 +90,9 @@ class TestProviderRegistry:
         """list_providers(purpose=...) filters correctly."""
         config = {
             "providers": [
-                {"id": "a", "name": "A", "litellm_model": "m1", "purpose": "test"},
-                {"id": "b", "name": "B", "litellm_model": "m2", "purpose": "judge"},
-                {"id": "c", "name": "C", "litellm_model": "m3", "purpose": "test"},
+                {"id": "a", "name": "A", "default_model": "m1", "purpose": "test"},
+                {"id": "b", "name": "B", "default_model": "m2", "purpose": "judge"},
+                {"id": "c", "name": "C", "default_model": "m3", "purpose": "test"},
             ]
         }
         config_file = tmp_path / "providers.yaml"
@@ -113,7 +113,7 @@ class TestProviderRegistry:
         """get_provider returns the correct profile by ID."""
         config = {
             "providers": [
-                {"id": "my-provider", "name": "My Provider", "litellm_model": "gpt-4"},
+                {"id": "my-provider", "name": "My Provider", "default_model": "gpt-4"},
             ]
         }
         config_file = tmp_path / "providers.yaml"
@@ -125,7 +125,7 @@ class TestProviderRegistry:
         provider = registry.get_provider("my-provider")
         assert provider is not None
         assert provider.name == "My Provider"
-        assert provider.litellm_model == "gpt-4"
+        assert provider.default_model == "gpt-4"
 
     def test_get_provider_not_found(self):
         """get_provider returns None for unknown ID."""
@@ -139,7 +139,7 @@ class TestProviderRegistry:
                 {
                     "id": "full",
                     "name": "Full Provider",
-                    "litellm_model": "openai/granite",
+                    "default_model": "openai/granite",
                     "api_base": "https://api.example.com/v1",
                     "api_key_env": "MY_KEY",
                     "proxy": "http://squid:3128",
@@ -166,7 +166,7 @@ class TestProviderRegistry:
         """Omitted optional fields get correct defaults."""
         config = {
             "providers": [
-                {"id": "minimal", "name": "Minimal", "litellm_model": "gpt-4"},
+                {"id": "minimal", "name": "Minimal", "default_model": "gpt-4"},
             ]
         }
         config_file = tmp_path / "providers.yaml"
@@ -192,7 +192,7 @@ class TestProviderRegistry:
                 {
                     "id": "mtls-provider",
                     "name": "mTLS Provider",
-                    "litellm_model": "openai/granite",
+                    "default_model": "openai/granite",
                     "proxy": "http://squid:3128",
                     "ssl_cert_path": "/path/to/cert.pem",
                     "ssl_client_key": "/path/to/key.pem",

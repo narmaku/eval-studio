@@ -16,7 +16,7 @@ def registry():
     reg._items["local-llama"] = ProviderProfile(
         id="local-llama",
         name="Local Llama",
-        litellm_model="openai/llama3",
+        default_model="openai/llama3",
         api_base="http://localhost:8080/v1",
         api_key_env=None,
         proxy="http://proxy:8888",
@@ -24,7 +24,7 @@ def registry():
     reg._items["cloud-gpt"] = ProviderProfile(
         id="cloud-gpt",
         name="Cloud GPT",
-        litellm_model="gpt-4",
+        default_model="gpt-4",
         api_key_env="OPENAI_API_KEY",
     )
     return reg
@@ -60,7 +60,7 @@ async def test_resolve_from_provider_id_with_env_key(registry):
 @pytest.mark.asyncio
 async def test_resolve_from_direct_config(registry):
     """When no provider_id, resolve from direct config fields."""
-    config = {"litellm_model": "openai/custom-model", "api_base": "http://localhost:9090/v1"}
+    config = {"default_model": "openai/custom-model", "api_base": "http://localhost:9090/v1"}
     result = resolve_model_config(config, registry=registry)
 
     assert result.model == "openai/custom-model"
@@ -73,7 +73,7 @@ async def test_resolve_falls_back_to_settings(registry):
     with (
         patch("app.services.provider_utils.settings") as mock_settings,
     ):
-        mock_settings.litellm_model = "fallback-model"
+        mock_settings.default_model = "fallback-model"
         mock_settings.litellm_api_key = "fallback-key"
 
         config = {}
@@ -87,7 +87,7 @@ async def test_resolve_falls_back_to_settings(registry):
 async def test_resolve_raises_on_no_model(registry):
     """When no model can be resolved from any source, raise ValueError."""
     with patch("app.services.provider_utils.settings") as mock_settings:
-        mock_settings.litellm_model = None
+        mock_settings.default_model = None
         mock_settings.litellm_api_key = None
 
         config = {}
@@ -99,10 +99,10 @@ async def test_resolve_raises_on_no_model(registry):
 async def test_resolve_dummy_key_for_local_server(registry):
     """When api_base is set but api_key is missing, use dummy key."""
     with patch("app.services.provider_utils.settings") as mock_settings:
-        mock_settings.litellm_model = None
+        mock_settings.default_model = None
         mock_settings.litellm_api_key = None
 
-        config = {"litellm_model": "openai/local-model", "api_base": "http://localhost:1234/v1"}
+        config = {"default_model": "openai/local-model", "api_base": "http://localhost:1234/v1"}
         result = resolve_model_config(config, registry=registry)
 
     assert result.model == "openai/local-model"
@@ -113,7 +113,7 @@ async def test_resolve_dummy_key_for_local_server(registry):
 @pytest.mark.asyncio
 async def test_resolve_provider_id_not_found(registry):
     """When provider_id is given but not found in registry, fall through to direct config."""
-    config = {"provider_id": "nonexistent", "litellm_model": "direct-model"}
+    config = {"provider_id": "nonexistent", "default_model": "direct-model"}
     result = resolve_model_config(config, registry=registry)
 
     assert result.model == "direct-model"
@@ -126,7 +126,7 @@ async def test_resolve_from_provider_with_mtls():
     reg._items["mtls-provider"] = ProviderProfile(
         id="mtls-provider",
         name="mTLS Provider",
-        litellm_model="openai/granite",
+        default_model="openai/granite",
         api_base="https://staging.example.com/v1",
         proxy="http://squid:3128",
         ssl_cert_path="/path/to/cert.pem",
@@ -147,7 +147,7 @@ async def test_resolve_ssl_cert_path_only_backward_compat():
     reg._items["ca-only"] = ProviderProfile(
         id="ca-only",
         name="CA Only",
-        litellm_model="openai/model",
+        default_model="openai/model",
         ssl_cert_path="/path/to/ca-bundle.pem",
     )
     config = {"provider_id": "ca-only"}
@@ -164,7 +164,7 @@ async def test_resolve_custom_provider_fields():
     reg._items["rls-staging"] = ProviderProfile(
         id="rls-staging",
         name="RLS Staging",
-        litellm_model="",
+        default_model="",
         provider_type="custom",
         endpoint_url="https://staging.example.com/api/lightspeed/v1/infer",
         request_format="rls_infer",
@@ -190,12 +190,12 @@ async def test_resolve_custom_provider_no_model_required():
     reg._items["custom-no-model"] = ProviderProfile(
         id="custom-no-model",
         name="Custom No Model",
-        litellm_model="",
+        default_model="",
         provider_type="custom",
         endpoint_url="https://example.com/api/v1/infer",
     )
     with patch("app.services.provider_utils.settings") as mock_settings:
-        mock_settings.litellm_model = None
+        mock_settings.default_model = None
         mock_settings.litellm_api_key = None
         mock_settings.ssl_cert_file = None
         mock_settings.ssl_client_key = None

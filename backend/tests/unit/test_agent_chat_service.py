@@ -76,7 +76,7 @@ async def session_with_config(db_session: AsyncSession):
         evaluation_id=evaluation.id,
         status="active",
         mode="live",
-        agent_config={"litellm_model": "openai/test-model", "api_base": "http://localhost:8080/v1"},
+        agent_config={"default_model": "openai/test-model", "api_base": "http://localhost:8080/v1"},
         transcript=[],
     )
     db_session.add(session)

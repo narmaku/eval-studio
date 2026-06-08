@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
 
     litellm_api_key: str | None = None
-    litellm_model: str | None = None
+    default_model: str | None = None
 
     auth_enabled: bool = False
 

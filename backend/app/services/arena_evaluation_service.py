@@ -140,7 +140,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             try:
                 resolved = resolve_model_config(contestant)
                 contestant_params = merge_llm_params(resolved.default_params, eval_model_params)
-                contestant_name = contestant.get("litellm_model") or resolved.model or resolved.endpoint_url or "custom"
+                contestant_name = contestant.get("default_model") or resolved.model or resolved.endpoint_url or "custom"
                 resolved_contestants.append((contestant_name, resolved, contestant_params))
             except ValueError as e:
                 logger.error(

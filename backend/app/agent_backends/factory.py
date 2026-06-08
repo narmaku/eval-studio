@@ -14,7 +14,7 @@ def create_agent_backend(config: dict) -> AgentBackendAdapter:
     Args:
         config: Dictionary with at least a "backend_type" key. Currently
             supported: "litellm" (default). Also accepts provider resolution
-            keys (provider_id, litellm_model, api_base, etc.) which are
+            keys (provider_id, default_model, api_base, etc.) which are
             forwarded to resolve_model_config.
 
     Returns:

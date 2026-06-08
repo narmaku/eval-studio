@@ -19,7 +19,7 @@ def _register_test_providers():
     provider_registry._items["__test__"] = ProviderProfile(
         id="__test__",
         name="Test Judge",
-        litellm_model="test-judge-model",
+        default_model="test-judge-model",
         purpose="judge",
     )
     yield
@@ -57,8 +57,8 @@ async def arena_evaluation_with_dataset(db_session: AsyncSession):
         dataset_id=dataset.id,
         config={
             "contestants": [
-                {"litellm_model": "model-a"},
-                {"litellm_model": "model-b"},
+                {"default_model": "model-a"},
+                {"default_model": "model-b"},
             ],
             "judge_config": {"provider_id": "__test__"},
         },
@@ -198,7 +198,7 @@ async def test_arena_validation_fewer_than_2_contestants(db_session: AsyncSessio
         status="pending",
         dataset_id=dataset.id,
         config={
-            "contestants": [{"litellm_model": "only-one"}],
+            "contestants": [{"default_model": "only-one"}],
             "judge_config": {"provider_id": "__test__"},
         },
     )
@@ -303,7 +303,7 @@ async def test_arena_evaluation_skipped_when_not_pending(db_session: AsyncSessio
         status="running",
         dataset_id=dataset.id,
         config={
-            "contestants": [{"litellm_model": "a"}, {"litellm_model": "b"}],
+            "contestants": [{"default_model": "a"}, {"default_model": "b"}],
             "judge_config": {"provider_id": "__test__"},
         },
     )
@@ -329,7 +329,7 @@ async def test_arena_evaluation_no_dataset_id(db_session: AsyncSession):
         status="pending",
         dataset_id=None,
         config={
-            "contestants": [{"litellm_model": "a"}, {"litellm_model": "b"}],
+            "contestants": [{"default_model": "a"}, {"default_model": "b"}],
             "judge_config": {"provider_id": "__test__"},
         },
     )
@@ -354,7 +354,7 @@ async def test_arena_evaluation_dataset_not_found(db_session: AsyncSession):
         status="pending",
         dataset_id="nonexistent-dataset-id",
         config={
-            "contestants": [{"litellm_model": "a"}, {"litellm_model": "b"}],
+            "contestants": [{"default_model": "a"}, {"default_model": "b"}],
             "judge_config": {"provider_id": "__test__"},
         },
     )
@@ -386,7 +386,7 @@ async def test_arena_contestant_resolve_failure_drops_below_minimum(db_session: 
         dataset_id=dataset.id,
         config={
             "contestants": [
-                {"litellm_model": "model-a"},
+                {"default_model": "model-a"},
                 {"provider_id": "bad-provider-1"},
                 {"provider_id": "bad-provider-2"},
             ],
@@ -427,7 +427,7 @@ async def test_arena_judge_resolve_failure(db_session: AsyncSession):
         status="pending",
         dataset_id=dataset.id,
         config={
-            "contestants": [{"litellm_model": "a"}, {"litellm_model": "b"}],
+            "contestants": [{"default_model": "a"}, {"default_model": "b"}],
             # No judge_config -- and we'll make resolve_judge_config raise
         },
     )
@@ -501,8 +501,8 @@ async def test_arena_duplicate_contestant_models(db_session: AsyncSession):
         dataset_id=dataset.id,
         config={
             "contestants": [
-                {"litellm_model": "same-model"},
-                {"litellm_model": "same-model"},
+                {"default_model": "same-model"},
+                {"default_model": "same-model"},
             ],
             "judge_config": {"provider_id": "__test__"},
         },

@@ -10,8 +10,8 @@ async def _create_arena_evaluation(client, name="Arena Test", contestants=None):
     """Helper to create an arena evaluation."""
     if contestants is None:
         contestants = [
-            {"litellm_model": "model-a"},
-            {"litellm_model": "model-b"},
+            {"default_model": "model-a"},
+            {"default_model": "model-b"},
         ]
     payload = {
         "name": name,
@@ -41,7 +41,7 @@ async def test_create_arena_evaluation_fewer_than_2_contestants(client):
     """POST /evaluations with arena mode and < 2 contestants returns 422."""
     response = await _create_arena_evaluation(
         client,
-        contestants=[{"litellm_model": "only-one"}],
+        contestants=[{"default_model": "only-one"}],
     )
     assert response.status_code == 422
 
@@ -80,8 +80,8 @@ async def test_run_arena_evaluation_accepted(client, db_session):
             "dataset_id": dataset.id,
             "config": {
                 "contestants": [
-                    {"litellm_model": "model-a"},
-                    {"litellm_model": "model-b"},
+                    {"default_model": "model-a"},
+                    {"default_model": "model-b"},
                 ],
                 "judge_config": {"provider_id": "__test__"},
             },
@@ -118,8 +118,8 @@ async def test_rerun_arena_evaluation_accepted(client, db_session):
             "dataset_id": dataset.id,
             "config": {
                 "contestants": [
-                    {"litellm_model": "model-a"},
-                    {"litellm_model": "model-b"},
+                    {"default_model": "model-a"},
+                    {"default_model": "model-b"},
                 ],
                 "judge_config": {"provider_id": "__test__"},
             },
@@ -240,8 +240,8 @@ async def test_create_arena_evaluation_exactly_2_contestants(client):
     response = await _create_arena_evaluation(
         client,
         contestants=[
-            {"litellm_model": "model-1"},
-            {"litellm_model": "model-2"},
+            {"default_model": "model-1"},
+            {"default_model": "model-2"},
         ],
     )
     assert response.status_code == 201
