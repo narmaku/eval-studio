@@ -220,7 +220,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 litellm_kwargs["api_base"] = resolved_model.api_base
             apply_llm_params(litellm_kwargs, contestant_params)
 
-            with proxy_env(resolved_model.proxy, resolved_model.ssl_cert_path):
+            with proxy_env(resolved_model.proxy, resolved_model.ssl_cert_path, resolved_model.ssl_client_key):
                 response = await litellm.acompletion(**litellm_kwargs)
             actual_answer = response.choices[0].message.content or ""
 

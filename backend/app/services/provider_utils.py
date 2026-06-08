@@ -26,6 +26,7 @@ class ResolvedModel:
     api_base: str | None = None
     proxy: str | None = None
     ssl_cert_path: str | None = None
+    ssl_client_key: str | None = None
     default_params: dict | None = None
 
 
@@ -65,6 +66,7 @@ def resolve_model_config(
     provider = registry.get_provider(provider_id) if provider_id else None
 
     ssl_cert_path: str | None = None
+    ssl_client_key: str | None = None
 
     if provider:
         model = provider.litellm_model
@@ -72,6 +74,7 @@ def resolve_model_config(
         api_key = provider.api_key
         proxy = provider.proxy
         ssl_cert_path = provider.ssl_cert_path
+        ssl_client_key = provider.ssl_client_key
         default_params = provider.default_params
     else:
         # 2. Direct config fields
@@ -95,6 +98,8 @@ def resolve_model_config(
 
     if not ssl_cert_path:
         ssl_cert_path = settings.ssl_cert_file
+    if not ssl_client_key:
+        ssl_client_key = getattr(settings, "ssl_client_key", None)
 
     return ResolvedModel(
         model=model,
@@ -102,6 +107,7 @@ def resolve_model_config(
         api_base=api_base,
         proxy=proxy,
         ssl_cert_path=ssl_cert_path,
+        ssl_client_key=ssl_client_key,
         default_params=default_params,
     )
 
@@ -184,17 +190,22 @@ def apply_llm_params(litellm_kwargs: dict, params: dict) -> None:
 
 
 @contextmanager
-def proxy_env(proxy: str | None, ssl_cert_path: str | None = None):
-    """Temporarily set HTTP_PROXY/HTTPS_PROXY and SSL cert env vars for LiteLLM calls.
+def proxy_env(proxy: str | None, ssl_cert_path: str | None = None, ssl_client_key: str | None = None):
+    """Temporarily configure proxy and SSL for LiteLLM calls.
 
-    Sets SSL_CERT_FILE, REQUESTS_CA_BUNDLE, and CURL_CA_BUNDLE when a custom
-    CA certificate bundle is needed (common in enterprise environments with
-    MITM proxies).
+    Two modes:
+    - **CA-only** (ssl_cert_path without ssl_client_key): sets SSL_CERT_FILE,
+      REQUESTS_CA_BUNDLE, and CURL_CA_BUNDLE for server certificate verification.
+    - **mTLS** (ssl_cert_path + ssl_client_key): sets ``litellm.ssl_certificate``
+      to a ``(cert, key)`` tuple for mutual TLS client authentication.
+      LiteLLM passes this directly to httpx's ``cert=`` parameter.
 
-    Note: env vars are process-global. For concurrent evaluations with different
-    proxies, this could race. Acceptable for MVP -- a proper fix would use
-    httpx transport-level proxy config.
+    Note: both env vars and litellm.ssl_certificate are process-global.
+    For concurrent calls with different providers this could race.
+    Acceptable for MVP.
     """
+    import litellm as _litellm
+
     if not proxy and not ssl_cert_path:
         yield
         return
@@ -202,6 +213,13 @@ def proxy_env(proxy: str | None, ssl_cert_path: str | None = None):
     saved: dict[str, str | None] = {}
     cert_vars = ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
     proxy_vars = ("HTTP_PROXY", "HTTPS_PROXY")
+    saved_ssl_certificate = getattr(_litellm, "ssl_certificate", None)
+    mtls_mode = bool(ssl_cert_path and ssl_client_key)
+
+    if mtls_mode:
+        for path, label in [(ssl_cert_path, "ssl_cert_path"), (ssl_client_key, "ssl_client_key")]:
+            if not os.path.isfile(path):
+                raise FileNotFoundError(f"{label} not found: {path}")
 
     try:
         if proxy:
@@ -209,7 +227,9 @@ def proxy_env(proxy: str | None, ssl_cert_path: str | None = None):
                 saved[var] = os.environ.get(var)
                 os.environ[var] = proxy
 
-        if ssl_cert_path:
+        if mtls_mode:
+            _litellm.ssl_certificate = (ssl_cert_path, ssl_client_key)
+        elif ssl_cert_path:
             for var in cert_vars:
                 saved[var] = os.environ.get(var)
                 os.environ[var] = ssl_cert_path
@@ -221,6 +241,8 @@ def proxy_env(proxy: str | None, ssl_cert_path: str | None = None):
                 os.environ.pop(var, None)
             else:
                 os.environ[var] = old_val
+        if mtls_mode:
+            _litellm.ssl_certificate = saved_ssl_certificate
 
 
 async def resolve_provider(
@@ -261,6 +283,8 @@ async def resolve_provider(
             api_base=db_provider.api_base,
             api_key_env=db_provider.api_key_env,
             proxy=db_provider.proxy,
+            ssl_cert_path=getattr(db_provider, "ssl_cert_path", None),
+            ssl_client_key=getattr(db_provider, "ssl_client_key", None),
             tags=db_provider.tags or [],
             purpose=db_provider.purpose,
             default_params=getattr(db_provider, "default_params", None),

@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     auth_enabled: bool = False
 
     ssl_cert_file: str | None = None
+    ssl_client_key: str | None = None
 
     evaluator_config_dir: str = "config/evaluators"
 

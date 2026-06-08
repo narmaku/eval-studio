@@ -116,3 +116,41 @@ async def test_resolve_provider_id_not_found(registry):
     result = resolve_model_config(config, registry=registry)
 
     assert result.model == "direct-model"
+
+
+@pytest.mark.asyncio
+async def test_resolve_from_provider_with_mtls():
+    """Provider with ssl_cert_path and ssl_client_key resolves both."""
+    reg = ProviderRegistry()
+    reg._items["mtls-provider"] = ProviderProfile(
+        id="mtls-provider",
+        name="mTLS Provider",
+        litellm_model="openai/granite",
+        api_base="https://staging.example.com/v1",
+        proxy="http://squid:3128",
+        ssl_cert_path="/path/to/cert.pem",
+        ssl_client_key="/path/to/key.pem",
+    )
+    config = {"provider_id": "mtls-provider"}
+    result = resolve_model_config(config, registry=reg)
+
+    assert result.ssl_cert_path == "/path/to/cert.pem"
+    assert result.ssl_client_key == "/path/to/key.pem"
+    assert result.proxy == "http://squid:3128"
+
+
+@pytest.mark.asyncio
+async def test_resolve_ssl_cert_path_only_backward_compat():
+    """Provider with only ssl_cert_path (no key) resolves with ssl_client_key=None."""
+    reg = ProviderRegistry()
+    reg._items["ca-only"] = ProviderProfile(
+        id="ca-only",
+        name="CA Only",
+        litellm_model="openai/model",
+        ssl_cert_path="/path/to/ca-bundle.pem",
+    )
+    config = {"provider_id": "ca-only"}
+    result = resolve_model_config(config, registry=reg)
+
+    assert result.ssl_cert_path == "/path/to/ca-bundle.pem"
+    assert result.ssl_client_key is None

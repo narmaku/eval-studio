@@ -12,6 +12,7 @@ class ProviderCreate(BaseModel):
     api_key_env: str | None = None
     proxy: str | None = None
     ssl_cert_path: str | None = None
+    ssl_client_key: str | None = None
     tags: list[str] = Field(default_factory=list)
     purpose: str = "test"
     default_params: dict | None = None
@@ -26,6 +27,7 @@ class ProviderUpdate(BaseModel):
     api_key_env: str | None = None
     proxy: str | None = None
     ssl_cert_path: str | None = None
+    ssl_client_key: str | None = None
     tags: list[str] | None = None
     purpose: str | None = None
     default_params: dict | None = None
@@ -41,6 +43,7 @@ class ProviderResponse(BaseModel):
     has_api_key: bool = False
     proxy: str | None = None
     ssl_cert_path: str | None = None
+    has_ssl_client_key: bool = False
     tags: list[str] = []
     purpose: str = "test"
     default_params: dict | None = None

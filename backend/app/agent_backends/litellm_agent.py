@@ -25,11 +25,15 @@ class LiteLLMAgentAdapter(AgentBackendAdapter):
         api_key: str | None = None,
         api_base: str | None = None,
         proxy: str | None = None,
+        ssl_cert_path: str | None = None,
+        ssl_client_key: str | None = None,
     ):
         self.model = model
         self.api_key = api_key
         self.api_base = api_base
         self.proxy = proxy
+        self.ssl_cert_path = ssl_cert_path
+        self.ssl_client_key = ssl_client_key
 
     async def send_message(
         self,
@@ -72,7 +76,7 @@ class LiteLLMAgentAdapter(AgentBackendAdapter):
             message_count=len(llm_messages),
         )
 
-        with proxy_env(self.proxy):
+        with proxy_env(self.proxy, self.ssl_cert_path, self.ssl_client_key):
             stream = await litellm.acompletion(**litellm_kwargs)
             async for chunk in stream:
                 delta = chunk.choices[0].delta

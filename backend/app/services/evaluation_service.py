@@ -105,6 +105,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         model_api_key = resolved.api_key
         model_proxy = resolved.proxy
         model_ssl_cert = resolved.ssl_cert_path
+        model_ssl_key = resolved.ssl_client_key
 
         # Merge LLM params: provider defaults < eval-level overrides
         model_params = merge_llm_params(resolved.default_params, config.get("model_params"))
@@ -189,7 +190,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             if model_api_base:
                 litellm_kwargs["api_base"] = model_api_base
             apply_llm_params(litellm_kwargs, model_params)
-            with proxy_env(model_proxy, model_ssl_cert):
+            with proxy_env(model_proxy, model_ssl_cert, model_ssl_key):
                 response = await litellm.acompletion(**litellm_kwargs)
             actual_answer = response.choices[0].message.content or ""
 

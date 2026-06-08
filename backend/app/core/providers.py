@@ -18,6 +18,7 @@ class ProviderProfile:
     api_key_env: str | None = None
     proxy: str | None = None
     ssl_cert_path: str | None = None
+    ssl_client_key: str | None = None
     tags: list[str] = field(default_factory=list)
     purpose: str = "test"  # "test" (model under test) or "judge"
     default_params: dict | None = None  # e.g. {"max_tokens": 2048, "temperature": 0.7}
@@ -45,6 +46,7 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
             api_key_env=raw.get("api_key_env"),
             proxy=raw.get("proxy"),
             ssl_cert_path=raw.get("ssl_cert_path"),
+            ssl_client_key=raw.get("ssl_client_key"),
             tags=raw.get("tags", []),
             purpose=raw.get("purpose", "test"),
             default_params=raw.get("default_params"),
@@ -59,6 +61,7 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
             **({"api_key_env": item.api_key_env} if item.api_key_env else {}),
             **({"proxy": item.proxy} if item.proxy else {}),
             **({"ssl_cert_path": item.ssl_cert_path} if item.ssl_cert_path else {}),
+            **({"ssl_client_key": item.ssl_client_key} if item.ssl_client_key else {}),
             **({"tags": item.tags} if item.tags else {}),
             **({"purpose": item.purpose} if item.purpose != "test" else {}),
             **({"default_params": item.default_params} if item.default_params else {}),

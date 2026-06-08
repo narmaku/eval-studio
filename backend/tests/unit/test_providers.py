@@ -180,8 +180,43 @@ class TestProviderRegistry:
         assert p.api_base is None
         assert p.api_key_env is None
         assert p.proxy is None
+        assert p.ssl_cert_path is None
+        assert p.ssl_client_key is None
         assert p.tags == []
         assert p.purpose == "test"
+
+    def test_ssl_client_key_round_trips_through_yaml(self, tmp_path):
+        """Both ssl_cert_path and ssl_client_key persist and reload from YAML."""
+        config = {
+            "providers": [
+                {
+                    "id": "mtls-provider",
+                    "name": "mTLS Provider",
+                    "litellm_model": "openai/granite",
+                    "proxy": "http://squid:3128",
+                    "ssl_cert_path": "/path/to/cert.pem",
+                    "ssl_client_key": "/path/to/key.pem",
+                }
+            ]
+        }
+        config_file = tmp_path / "providers.yaml"
+        config_file.write_text(yaml.dump(config))
+
+        registry = ProviderRegistry()
+        registry.load_from_yaml(config_file)
+
+        p = registry.get_provider("mtls-provider")
+        assert p is not None
+        assert p.ssl_cert_path == "/path/to/cert.pem"
+        assert p.ssl_client_key == "/path/to/key.pem"
+
+        # Round-trip: serialize back and reload
+        registry._persist_yaml()
+        registry2 = ProviderRegistry()
+        registry2.load_from_yaml(config_file)
+        p2 = registry2.get_provider("mtls-provider")
+        assert p2.ssl_cert_path == "/path/to/cert.pem"
+        assert p2.ssl_client_key == "/path/to/key.pem"
 
 
 class TestProxyEnv:
@@ -234,3 +269,86 @@ class TestProxyEnv:
 
         assert "HTTP_PROXY" not in os.environ
         assert "HTTPS_PROXY" not in os.environ
+
+    def test_proxy_env_mtls_sets_litellm_ssl_certificate(self, tmp_path):
+        """When both ssl_cert_path and ssl_client_key are set, litellm.ssl_certificate is set."""
+        import litellm
+
+        cert = tmp_path / "cert.pem"
+        key = tmp_path / "key.pem"
+        cert.write_text("CERT")
+        key.write_text("KEY")
+
+        original = getattr(litellm, "ssl_certificate", None)
+        try:
+            with proxy_env(None, str(cert), str(key)):
+                assert litellm.ssl_certificate == (str(cert), str(key))
+
+            # Restored after exit
+            assert getattr(litellm, "ssl_certificate", None) == original
+        finally:
+            litellm.ssl_certificate = original
+
+    def test_proxy_env_mtls_does_not_set_ssl_cert_file(self, tmp_path):
+        """mTLS mode does NOT set SSL_CERT_FILE env vars."""
+        cert = tmp_path / "cert.pem"
+        key = tmp_path / "key.pem"
+        cert.write_text("CERT")
+        key.write_text("KEY")
+
+        os.environ.pop("SSL_CERT_FILE", None)
+
+        with proxy_env(None, str(cert), str(key)):
+            assert "SSL_CERT_FILE" not in os.environ
+
+    def test_proxy_env_ca_only_backward_compat(self, tmp_path):
+        """When only ssl_cert_path is set (no key), SSL_CERT_FILE is set (backward compat)."""
+        cert = tmp_path / "ca-bundle.pem"
+        cert.write_text("CA")
+
+        os.environ.pop("SSL_CERT_FILE", None)
+        os.environ.pop("REQUESTS_CA_BUNDLE", None)
+
+        with proxy_env(None, str(cert)):
+            assert os.environ["SSL_CERT_FILE"] == str(cert)
+            assert os.environ["REQUESTS_CA_BUNDLE"] == str(cert)
+
+        assert "SSL_CERT_FILE" not in os.environ
+        assert "REQUESTS_CA_BUNDLE" not in os.environ
+
+    def test_proxy_env_mtls_restores_on_exception(self, tmp_path):
+        """litellm.ssl_certificate is restored even on exception."""
+        import litellm
+
+        cert = tmp_path / "cert.pem"
+        key = tmp_path / "key.pem"
+        cert.write_text("CERT")
+        key.write_text("KEY")
+
+        original = getattr(litellm, "ssl_certificate", None)
+        try:
+            with pytest.raises(RuntimeError), proxy_env(None, str(cert), str(key)):
+                assert litellm.ssl_certificate == (str(cert), str(key))
+                raise RuntimeError("test")
+
+            assert getattr(litellm, "ssl_certificate", None) == original
+        finally:
+            litellm.ssl_certificate = original
+
+    def test_proxy_env_mtls_missing_cert_raises(self, tmp_path):
+        """mTLS mode raises FileNotFoundError when cert file is missing."""
+        key = tmp_path / "key.pem"
+        key.write_text("KEY")
+
+        with pytest.raises(FileNotFoundError, match="ssl_cert_path"):
+            with proxy_env(None, "/nonexistent/cert.pem", str(key)):
+                pass
+
+    def test_proxy_env_mtls_missing_key_raises(self, tmp_path):
+        """mTLS mode raises FileNotFoundError when key file is missing."""
+        cert = tmp_path / "cert.pem"
+        cert.write_text("CERT")
+
+        with pytest.raises(FileNotFoundError, match="ssl_client_key"):
+            with proxy_env(None, str(cert), "/nonexistent/key.pem"):
+                pass

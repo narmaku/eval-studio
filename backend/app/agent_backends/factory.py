@@ -30,6 +30,8 @@ def create_agent_backend(config: dict) -> AgentBackendAdapter:
             api_key=resolved.api_key,
             api_base=resolved.api_base,
             proxy=resolved.proxy,
+            ssl_cert_path=resolved.ssl_cert_path,
+            ssl_client_key=resolved.ssl_client_key,
         )
     else:
         raise ValueError(f"Unknown agent backend type: {backend_type}")

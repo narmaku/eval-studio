@@ -25,6 +25,7 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
         has_api_key=p.api_key is not None,
         proxy=p.proxy,
         ssl_cert_path=p.ssl_cert_path,
+        has_ssl_client_key=p.ssl_client_key is not None,
         tags=p.tags,
         purpose=p.purpose,
         default_params=p.default_params,
@@ -60,6 +61,7 @@ async def create_provider(payload: ProviderCreate) -> ProviderResponse:
         api_key_env=payload.api_key_env,
         proxy=payload.proxy,
         ssl_cert_path=payload.ssl_cert_path,
+        ssl_client_key=payload.ssl_client_key,
         tags=payload.tags,
         purpose=payload.purpose,
         default_params=payload.default_params,
@@ -115,7 +117,15 @@ async def list_provider_models(provider_id: str) -> list[ProviderModelResponse]:
         headers["Authorization"] = "Bearer no-key-needed"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        client_kwargs: dict = {"timeout": 10.0}
+        if provider.proxy:
+            client_kwargs["proxy"] = provider.proxy
+        if provider.ssl_cert_path and provider.ssl_client_key:
+            client_kwargs["cert"] = (provider.ssl_cert_path, provider.ssl_client_key)
+        elif provider.ssl_cert_path:
+            client_kwargs["verify"] = provider.ssl_cert_path
+
+        async with httpx.AsyncClient(**client_kwargs) as client:
             resp = await client.get(url, headers=headers)
             resp.raise_for_status()
             data = resp.json()

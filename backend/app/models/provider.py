@@ -20,6 +20,8 @@ class Provider(Base):
     api_base: Mapped[str | None] = mapped_column(String(512), nullable=True)
     api_key_env: Mapped[str | None] = mapped_column(String(255), nullable=True)
     proxy: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    ssl_cert_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    ssl_client_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     purpose: Mapped[str] = mapped_column(String(50), nullable=False, default="test")
     source: Mapped[str] = mapped_column(String(50), nullable=False, default="user")

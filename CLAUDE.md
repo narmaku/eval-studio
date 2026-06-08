@@ -283,6 +283,11 @@ Examples:
    values override `.env` file values. If a variable appears in both, the
    `environment:` section wins.
 
+8. **Test isolation for YAML configs**: Tests must NEVER use actual config
+   file paths (e.g., `config/tool_servers.yaml`, `config/harnesses.yaml`).
+   Always use `tmp_path` fixtures to create isolated temporary config files.
+   Using real paths will erase contributor configurations during development.
+
 ## Development Workflows
 
 ### Adding a New Evaluation Adapter
