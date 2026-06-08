@@ -20,7 +20,6 @@ class ProviderProfile:
     ssl_cert_path: str | None = None
     ssl_client_key: str | None = None
     tags: list[str] = field(default_factory=list)
-    purpose: str = "test"  # "test" (model under test) or "judge"
     default_params: dict | None = None  # e.g. {"max_tokens": 2048, "temperature": 0.7}
     provider_type: str = "litellm"  # "litellm" (default) or "custom"
     endpoint_url: str | None = None  # Full URL for custom providers (e.g. "https://host/api/v1/infer")
@@ -52,7 +51,6 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
             ssl_cert_path=raw.get("ssl_cert_path"),
             ssl_client_key=raw.get("ssl_client_key"),
             tags=raw.get("tags", []),
-            purpose=raw.get("purpose", "test"),
             default_params=raw.get("default_params"),
             provider_type=raw.get("provider_type", "litellm"),
             endpoint_url=raw.get("endpoint_url"),
@@ -71,7 +69,6 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
             **({"ssl_cert_path": item.ssl_cert_path} if item.ssl_cert_path else {}),
             **({"ssl_client_key": item.ssl_client_key} if item.ssl_client_key else {}),
             **({"tags": item.tags} if item.tags else {}),
-            **({"purpose": item.purpose} if item.purpose != "test" else {}),
             **({"default_params": item.default_params} if item.default_params else {}),
             **({"provider_type": item.provider_type} if item.provider_type != "litellm" else {}),
             **({"endpoint_url": item.endpoint_url} if item.endpoint_url else {}),
@@ -86,13 +83,10 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
     def _get_item_id(self, item: ProviderProfile) -> str:
         return item.id
 
-    def list_providers(self, purpose: str | None = None) -> list[ProviderProfile]:
-        """Return all providers, optionally filtered by purpose."""
+    def list_providers(self) -> list[ProviderProfile]:
+        """Return all providers."""
         self._check_reload()
-        providers = list(self._items.values())
-        if purpose:
-            providers = [p for p in providers if p.purpose == purpose]
-        return providers
+        return list(self._items.values())
 
     def get_provider(self, provider_id: str) -> ProviderProfile | None:
         """Return a single provider by ID, or None if not found."""

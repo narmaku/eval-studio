@@ -4,7 +4,7 @@ import uuid
 
 import httpx
 import structlog
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Response
 
 from app.core.exceptions import NotFoundException
 from app.core.providers import ProviderProfile, provider_registry
@@ -28,7 +28,6 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
         ssl_cert_path=p.ssl_cert_path,
         has_ssl_client_key=p.ssl_client_key is not None,
         tags=p.tags,
-        purpose=p.purpose,
         default_params=p.default_params,
         provider_type=p.provider_type,
         endpoint_url=p.endpoint_url,
@@ -44,11 +43,9 @@ async def get_provider_schema() -> dict:
 
 
 @router.get("", response_model=list[ProviderResponse])
-async def list_providers(
-    purpose: str | None = Query(None),
-) -> list[ProviderResponse]:
-    """List all providers, optionally filtered by purpose."""
-    providers = provider_registry.list_providers(purpose=purpose)
+async def list_providers() -> list[ProviderResponse]:
+    """List all providers."""
+    providers = provider_registry.list_providers()
     return [_provider_to_response(p) for p in providers]
 
 
@@ -74,7 +71,6 @@ async def create_provider(payload: ProviderCreate) -> ProviderResponse:
         ssl_cert_path=payload.ssl_cert_path,
         ssl_client_key=payload.ssl_client_key,
         tags=payload.tags,
-        purpose=payload.purpose,
         default_params=payload.default_params,
         provider_type=payload.provider_type,
         endpoint_url=payload.endpoint_url,

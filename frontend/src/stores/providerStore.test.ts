@@ -24,7 +24,6 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   proxy: null,
   ssl_cert_path: null,
   tags: [],
-  purpose: 'test',
   default_params: null,
   provider_type: 'litellm',
   endpoint_url: null,
@@ -63,15 +62,7 @@ describe('providerStore', () => {
 
       expect(useProviderStore.getState().isLoading).toBe(false);
       expect(useProviderStore.getState().providers).toEqual(mockProviders);
-      expect(mockedApi.listProviders).toHaveBeenCalledWith(undefined);
-    });
-
-    it('passes purpose filter when provided', async () => {
-      mockedApi.listProviders.mockResolvedValue([]);
-
-      await useProviderStore.getState().fetchProviders('judge');
-
-      expect(mockedApi.listProviders).toHaveBeenCalledWith('judge');
+      expect(mockedApi.listProviders).toHaveBeenCalledWith();
     });
 
     it('handles API error: sets error string', async () => {

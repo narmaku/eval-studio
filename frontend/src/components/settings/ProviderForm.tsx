@@ -107,7 +107,6 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
   const [apiKeyEnv, setApiKeyEnv] = useState('');
   const [proxy, setProxy] = useState(provider?.proxy ?? '');
   const [sslCertPath, setSslCertPath] = useState(provider?.ssl_cert_path ?? '');
-  const [purpose, setPurpose] = useState(provider?.purpose ?? 'test');
   const [tagsInput, setTagsInput] = useState(provider?.tags?.join(', ') ?? '');
   const [defaultParams, setDefaultParams] = useState<LLMParams>(
     (provider?.default_params as LLMParams) ?? {},
@@ -157,7 +156,6 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         proxy: proxy.trim() || null,
         ssl_cert_path: sslCertPath.trim() || null,
         tags,
-        purpose,
         default_params:
           Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, unknown>) : null,
         provider_type: providerType,
@@ -351,22 +349,6 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
           onChange={(e) => setSslCertPath(e.target.value)}
           placeholder="e.g., /etc/pki/tls/certs/ca-bundle.crt"
         />
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Label htmlFor="provider-purpose">Purpose</Label>
-          {fieldDescriptions.purpose && <FieldTooltip description={fieldDescriptions.purpose} />}
-        </div>
-        <Select value={purpose} onValueChange={setPurpose}>
-          <SelectTrigger className="w-full" id="provider-purpose">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="test">Test (model under test)</SelectItem>
-            <SelectItem value="judge">Judge (scoring model)</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {!isCustom && (

@@ -54,7 +54,6 @@ describe('RubricRefineDialog', () => {
         has_api_key: true,
         proxy: null,
         tags: [],
-        purpose: 'judge',
       },
     ]);
   });

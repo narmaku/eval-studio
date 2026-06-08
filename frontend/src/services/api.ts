@@ -215,11 +215,8 @@ export const api = {
     request<ArenaLeaderboardResponse>(`/api/v1/results/arena/${evaluationId}`),
 
   // --- Providers ---
-  listProviders: (purpose?: string) => {
-    const query = new URLSearchParams();
-    if (purpose) query.set('purpose', purpose);
-    const qs = query.toString();
-    return request<Provider[]>(`/api/v1/providers${qs ? `?${qs}` : ''}`);
+  listProviders: () => {
+    return request<Provider[]>('/api/v1/providers');
   },
   getProvider: (id: string) => request<Provider>(`/api/v1/providers/${id}`),
   createProvider: (data: CreateProviderRequest) =>

@@ -28,11 +28,6 @@ class TestProviderProfile:
         profile = ProviderProfile(id="test", name="Test", default_model="gpt-4")
         assert profile.api_key is None
 
-    def test_default_purpose_is_test(self):
-        """Default purpose should be 'test'."""
-        profile = ProviderProfile(id="test", name="Test", default_model="gpt-4")
-        assert profile.purpose == "test"
-
     def test_default_tags_empty(self):
         """Default tags should be an empty list."""
         profile = ProviderProfile(id="test", name="Test", default_model="gpt-4")
@@ -52,13 +47,11 @@ class TestProviderRegistry:
                     "api_key_env": "TEST_KEY",
                     "proxy": "http://proxy:3128",
                     "tags": ["test", "dev"],
-                    "purpose": "test",
                 },
                 {
                     "id": "judge-provider",
                     "name": "Judge",
                     "default_model": "gpt-4.1",
-                    "purpose": "judge",
                 },
             ]
         }
@@ -85,29 +78,6 @@ class TestProviderRegistry:
         registry = ProviderRegistry()
         registry.load_from_yaml(config_file)
         assert registry.list_providers() == []
-
-    def test_list_providers_filters_by_purpose(self, tmp_path):
-        """list_providers(purpose=...) filters correctly."""
-        config = {
-            "providers": [
-                {"id": "a", "name": "A", "default_model": "m1", "purpose": "test"},
-                {"id": "b", "name": "B", "default_model": "m2", "purpose": "judge"},
-                {"id": "c", "name": "C", "default_model": "m3", "purpose": "test"},
-            ]
-        }
-        config_file = tmp_path / "providers.yaml"
-        config_file.write_text(yaml.dump(config))
-
-        registry = ProviderRegistry()
-        registry.load_from_yaml(config_file)
-
-        test_providers = registry.list_providers(purpose="test")
-        assert len(test_providers) == 2
-        assert all(p.purpose == "test" for p in test_providers)
-
-        judge_providers = registry.list_providers(purpose="judge")
-        assert len(judge_providers) == 1
-        assert judge_providers[0].id == "b"
 
     def test_get_provider_found(self, tmp_path):
         """get_provider returns the correct profile by ID."""
@@ -144,7 +114,6 @@ class TestProviderRegistry:
                     "api_key_env": "MY_KEY",
                     "proxy": "http://squid:3128",
                     "tags": ["staging", "granite"],
-                    "purpose": "test",
                 }
             ]
         }
@@ -160,7 +129,6 @@ class TestProviderRegistry:
         assert p.api_key_env == "MY_KEY"
         assert p.proxy == "http://squid:3128"
         assert p.tags == ["staging", "granite"]
-        assert p.purpose == "test"
 
     def test_default_values_for_optional_fields(self, tmp_path):
         """Omitted optional fields get correct defaults."""
@@ -183,7 +151,6 @@ class TestProviderRegistry:
         assert p.ssl_cert_path is None
         assert p.ssl_client_key is None
         assert p.tags == []
-        assert p.purpose == "test"
 
     def test_ssl_client_key_round_trips_through_yaml(self, tmp_path):
         """Both ssl_cert_path and ssl_client_key persist and reload from YAML."""

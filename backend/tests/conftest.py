@@ -86,7 +86,6 @@ def _isolate_yaml_registries(tmp_path):
         id="__test__",
         name="Test Judge",
         default_model="test-judge-model",
-        purpose="judge",
     )
     provider_registry._persist_yaml()
 

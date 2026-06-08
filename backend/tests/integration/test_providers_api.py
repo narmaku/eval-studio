@@ -21,7 +21,6 @@ def _seed_test_providers(tmp_path):
         api_base="http://localhost:8000",
         api_key_env="TEST_API_KEY_FOR_PROVIDERS",
         tags=["test"],
-        purpose="test",
     )
     provider_registry._items["test-judge"] = ProviderProfile(
         id="test-judge",
@@ -30,7 +29,6 @@ def _seed_test_providers(tmp_path):
         api_key_env="TEST_JUDGE_KEY_FOR_PROVIDERS",
         proxy="http://proxy:3128",
         tags=["judge"],
-        purpose="judge",
     )
     provider_registry._items["no-key-provider"] = ProviderProfile(
         id="no-key-provider",
@@ -38,7 +36,6 @@ def _seed_test_providers(tmp_path):
         default_model="ollama/llama3",
         api_base="http://localhost:11434",
         tags=["local"],
-        purpose="test",
     )
     provider_registry._persist_yaml()
 
@@ -55,24 +52,6 @@ async def test_list_providers(client):
     ids = {p["id"] for p in data}
     assert "test-model" in ids
     assert "test-judge" in ids
-
-
-@pytest.mark.asyncio
-async def test_list_providers_filter_by_purpose(client):
-    response = await client.get("/api/v1/providers?purpose=test")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 2
-    assert all(p["purpose"] == "test" for p in data)
-
-
-@pytest.mark.asyncio
-async def test_list_providers_filter_by_judge_purpose(client):
-    response = await client.get("/api/v1/providers?purpose=judge")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 1
-    assert data[0]["id"] == "test-judge"
 
 
 @pytest.mark.asyncio
@@ -127,7 +106,6 @@ PROVIDER_PAYLOAD = {
     "api_base": "https://api.example.com/v1",
     "api_key_env": "NEW_PROVIDER_KEY",
     "tags": ["custom"],
-    "purpose": "test",
 }
 
 
@@ -152,7 +130,6 @@ async def test_create_provider_minimal(client):
     data = response.json()
     assert data["api_base"] is None
     assert data["tags"] == []
-    assert data["purpose"] == "test"
 
 
 @pytest.mark.asyncio

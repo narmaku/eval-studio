@@ -147,9 +147,9 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                No judge providers configured. Add providers with{' '}
-                <code className="text-xs">purpose: &quot;judge&quot;</code> in{' '}
-                <code className="text-xs">config/providers.yaml</code>, or use the Advanced tab.
+                No providers configured. Add providers in{' '}
+                <code className="text-xs">config/providers.yaml</code> or via Settings, or use the
+                Advanced tab.
               </p>
             )}
           </TabsContent>

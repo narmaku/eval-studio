@@ -8,7 +8,7 @@ interface ProviderStore {
   error: string | null;
 
   clearError: () => void;
-  fetchProviders: (purpose?: string) => Promise<void>;
+  fetchProviders: () => Promise<void>;
   createProvider: (data: CreateProviderRequest) => Promise<Provider>;
   updateProvider: (id: string, data: UpdateProviderRequest) => Promise<Provider>;
   deleteProvider: (id: string) => Promise<void>;
@@ -21,10 +21,10 @@ export const useProviderStore = create<ProviderStore>((set) => ({
 
   clearError: () => set({ error: null }),
 
-  fetchProviders: async (purpose?: string) => {
+  fetchProviders: async () => {
     set({ isLoading: true, error: null });
     try {
-      const providers = await api.listProviders(purpose);
+      const providers = await api.listProviders();
       set({ providers, isLoading: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch providers';

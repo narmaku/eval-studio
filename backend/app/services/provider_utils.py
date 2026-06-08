@@ -356,7 +356,6 @@ async def resolve_provider(
             ssl_cert_path=getattr(db_provider, "ssl_cert_path", None),
             ssl_client_key=getattr(db_provider, "ssl_client_key", None),
             tags=db_provider.tags or [],
-            purpose=db_provider.purpose,
             default_params=getattr(db_provider, "default_params", None),
             provider_type=getattr(db_provider, "provider_type", "litellm"),
             endpoint_url=getattr(db_provider, "endpoint_url", None),
