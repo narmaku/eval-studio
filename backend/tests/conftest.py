@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.providers import ProviderProfile, provider_registry
 from app.core.tool_servers import tool_server_registry
@@ -9,6 +10,19 @@ from app.harnesses.registry import harness_registry
 from app.main import app
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"  # in-memory
+
+
+@pytest.fixture(autouse=True)
+def _disable_auth():
+    """Disable authentication for all tests by default.
+
+    Tests that need to exercise auth behaviour should override this
+    by setting ``settings.auth_disabled = False`` explicitly.
+    """
+    original = settings.auth_disabled
+    settings.auth_disabled = True
+    yield
+    settings.auth_disabled = original
 
 
 @pytest.fixture

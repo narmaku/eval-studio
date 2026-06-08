@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     litellm_api_key: str | None = None
     default_model: str | None = None
 
-    auth_enabled: bool = False
+    auth_disabled: bool = False
 
     ssl_cert_file: str | None = None
     ssl_client_key: str | None = None

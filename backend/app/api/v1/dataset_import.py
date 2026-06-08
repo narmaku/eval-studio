@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.exceptions import AppException, NotFoundException
+from app.core.security import require_auth
 from app.models.dataset import Dataset, DatasetItem
 from app.schemas.dataset import DatasetDetailResponse, DatasetItemResponse
 from app.schemas.dataset_import import (
@@ -31,7 +32,7 @@ from app.services.dataset_import_service import (
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/datasets", tags=["dataset-import"])
+router = APIRouter(prefix="/datasets", tags=["dataset-import"], dependencies=[Depends(require_auth)])
 
 
 @router.post("/analyze", response_model=AnalyzeResponse, status_code=200)

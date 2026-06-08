@@ -4,15 +4,16 @@ import uuid
 
 import httpx
 import structlog
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from app.core.exceptions import NotFoundException
 from app.core.providers import ProviderProfile, provider_registry
+from app.core.security import require_auth
 from app.schemas.provider import ProviderCreate, ProviderModelResponse, ProviderResponse, ProviderUpdate
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/providers", tags=["providers"])
+router = APIRouter(prefix="/providers", tags=["providers"], dependencies=[Depends(require_auth)])
 
 
 def _provider_to_response(p: ProviderProfile) -> ProviderResponse:

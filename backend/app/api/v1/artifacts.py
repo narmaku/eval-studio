@@ -7,13 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.exceptions import AppException, NotFoundException
+from app.core.security import require_auth
 from app.models.artifact import Artifact
 from app.schemas.artifact import ArtifactResponse
 from app.services.artifact_service import delete_artifact_file, get_artifact_path
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/artifacts", tags=["artifacts"])
+router = APIRouter(prefix="/artifacts", tags=["artifacts"], dependencies=[Depends(require_auth)])
 
 # Maximum size for inline preview (1 MB)
 PREVIEW_MAX_SIZE = 1_048_576

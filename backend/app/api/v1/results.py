@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundException, ValidationException
+from app.core.security import require_auth
 from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.schemas.common import PaginatedResponse
@@ -21,7 +22,7 @@ from app.schemas.result import (
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/results", tags=["results"])
+router = APIRouter(prefix="/results", tags=["results"], dependencies=[Depends(require_auth)])
 
 
 @router.get("", response_model=PaginatedResponse[ResultResponse])

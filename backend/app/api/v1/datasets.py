@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundException
+from app.core.security import require_auth
 from app.models.dataset import Dataset, DatasetItem
 from app.schemas.common import PaginatedResponse
 from app.schemas.dataset import (
@@ -19,7 +20,7 @@ from app.schemas.dataset import (
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/datasets", tags=["datasets"])
+router = APIRouter(prefix="/datasets", tags=["datasets"], dependencies=[Depends(require_auth)])
 
 
 @router.post("", response_model=DatasetDetailResponse, status_code=201)

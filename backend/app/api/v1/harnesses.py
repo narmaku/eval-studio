@@ -4,17 +4,18 @@ import shutil
 import uuid
 
 import structlog
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from app.core.config import settings
 from app.core.exceptions import AppException, NotFoundException, ValidationException, sanitize_error_for_client
+from app.core.security import require_auth
 from app.core.subprocess_validation import load_allowed_commands, validate_command
 from app.harnesses.registry import HarnessProfile, harness_registry
 from app.schemas.harness import HarnessCreate, HarnessResponse, HarnessUpdate
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/harnesses", tags=["harnesses"])
+router = APIRouter(prefix="/harnesses", tags=["harnesses"], dependencies=[Depends(require_auth)])
 
 
 def _validate_binary_path(binary_path: str | None, harness_type: str) -> None:

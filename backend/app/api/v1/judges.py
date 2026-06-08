@@ -8,13 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundException
+from app.core.security import require_auth
 from app.models.evaluation import JudgeConfig
 from app.schemas.common import PaginatedResponse
 from app.schemas.judge import JudgeConfigCreate, JudgeConfigResponse, JudgeConfigUpdate
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/judges", tags=["judges"])
+router = APIRouter(prefix="/judges", tags=["judges"], dependencies=[Depends(require_auth)])
 
 
 @router.post("", response_model=JudgeConfigResponse, status_code=201)

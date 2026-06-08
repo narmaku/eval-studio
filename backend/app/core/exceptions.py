@@ -29,6 +29,13 @@ class ForbiddenException(AppException):
         super().__init__(403, "Forbidden", detail)
 
 
+class UnauthorizedException(AppException):
+    """Raised when authentication fails or is missing."""
+
+    def __init__(self, detail: str = "Invalid or missing API key"):
+        super().__init__(401, "Unauthorized", detail)
+
+
 class NotImplementedException(AppException):
     """Raised when a feature is not yet implemented."""
 
