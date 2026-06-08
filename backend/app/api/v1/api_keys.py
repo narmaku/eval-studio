@@ -8,10 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.exceptions import ConflictException, NotFoundException, UnauthorizedException
 from app.core.security import (
-    _extract_bearer_token,
+    extract_bearer_token,
     generate_api_key,
     hash_api_key,
     require_auth,
+    verify_api_key,
 )
 from app.models.api_key import ApiKey
 from app.schemas.api_key import ApiKeyCreate, ApiKeyCreateResponse, ApiKeyResponse
@@ -45,14 +46,10 @@ async def create_api_key(
         bootstrap = await _is_bootstrap_mode(db)
         if not bootstrap:
             # Require auth when keys already exist
-            token = _extract_bearer_token(request)
+            token = extract_bearer_token(request)
             if not token:
                 raise UnauthorizedException()
-            token_hash = hash_api_key(token)
-            result = await db.execute(select(ApiKey).where(ApiKey.key_hash == token_hash, ApiKey.is_active.is_(True)))
-            caller_key = result.scalar_one_or_none()
-            if not caller_key:
-                raise UnauthorizedException()
+            await verify_api_key(token, db)
 
     raw_key = generate_api_key()
     key_hash = hash_api_key(raw_key)

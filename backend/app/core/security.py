@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import secrets
 from datetime import UTC, datetime
 
@@ -35,7 +36,7 @@ def hash_api_key(raw_key: str) -> str:
     return hashlib.sha256(raw_key.encode()).hexdigest()
 
 
-def _extract_bearer_token(request: Request) -> str | None:
+def extract_bearer_token(request: Request) -> str | None:
     """Extract bearer token from the Authorization header."""
     auth_header = request.headers.get("authorization")
     if not auth_header:
@@ -44,6 +45,33 @@ def _extract_bearer_token(request: Request) -> str | None:
     if len(parts) != 2 or parts[0].lower() != "bearer":
         return None
     return parts[1]
+
+
+async def verify_api_key(token: str, db: AsyncSession) -> ApiKey:
+    """Look up and validate an API key token against the database.
+
+    Uses timing-safe comparison via ``hmac.compare_digest`` to prevent
+    side-channel attacks on the hash lookup.
+
+    Args:
+        token: The raw bearer token string.
+        db: An async database session.
+
+    Returns:
+        The matching :class:`ApiKey` row.
+
+    Raises:
+        UnauthorizedException: If no matching active key is found.
+    """
+    token_hash = hash_api_key(token)
+    result = await db.execute(select(ApiKey).where(ApiKey.is_active.is_(True)))
+    active_keys = result.scalars().all()
+
+    for api_key in active_keys:
+        if hmac.compare_digest(api_key.key_hash, token_hash):
+            return api_key
+
+    raise UnauthorizedException()
 
 
 async def require_auth(
@@ -65,15 +93,11 @@ async def require_auth(
     if settings.auth_disabled:
         return None
 
-    token = _extract_bearer_token(request)
+    token = extract_bearer_token(request)
     if not token:
         raise UnauthorizedException()
 
-    token_hash = hash_api_key(token)
-    result = await db.execute(select(ApiKey).where(ApiKey.key_hash == token_hash, ApiKey.is_active.is_(True)))
-    api_key = result.scalar_one_or_none()
-    if not api_key:
-        raise UnauthorizedException()
+    api_key = await verify_api_key(token, db)
 
     api_key.last_used_at = datetime.now(UTC)
     await db.commit()
