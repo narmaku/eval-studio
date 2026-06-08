@@ -1,5 +1,8 @@
 """API endpoints for inference provider profiles (YAML-backed CRUD)."""
 
+import json
+import os
+import ssl
 import uuid
 
 import httpx
@@ -9,7 +12,13 @@ from fastapi import APIRouter, Depends, Response
 from app.core.exceptions import NotFoundException
 from app.core.providers import ProviderProfile, provider_registry
 from app.core.security import require_auth
-from app.schemas.provider import ProviderCreate, ProviderModelResponse, ProviderResponse, ProviderUpdate
+from app.schemas.provider import (
+    ProviderCreate,
+    ProviderModelResponse,
+    ProviderResponse,
+    ProviderUpdate,
+    TestConnectionResponse,
+)
 
 logger = structlog.get_logger()
 
@@ -40,6 +49,105 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
 async def get_provider_schema() -> dict:
     """Return JSON Schema for provider creation, including field descriptions."""
     return ProviderCreate.model_json_schema()
+
+
+@router.post("/test", response_model=TestConnectionResponse)
+async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
+    """Test connectivity to a provider endpoint without saving it.
+
+    For LiteLLM providers, fetches /v1/models from the API base.
+    For custom providers, sends a test request using the configured template.
+    """
+    client_kwargs: dict = {"timeout": 15.0}
+    if payload.proxy:
+        client_kwargs["proxy"] = payload.proxy
+    if payload.ssl_cert_path and payload.ssl_client_key:
+        client_kwargs["cert"] = (payload.ssl_cert_path, payload.ssl_client_key)
+    elif payload.ssl_cert_path:
+        client_kwargs["verify"] = payload.ssl_cert_path
+
+    headers: dict[str, str] = {}
+    if payload.api_key_env:
+        api_key = os.environ.get(payload.api_key_env)
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+    if payload.provider_type == "litellm":
+        if not payload.api_base:
+            return TestConnectionResponse(
+                success=True,
+                message="No API base configured — cannot verify connectivity, but provider config is valid",
+            )
+
+        base = payload.api_base.rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3]
+        url = f"{base}/v1/models"
+
+        try:
+            async with httpx.AsyncClient(**client_kwargs) as client:
+                resp = await client.get(url, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                model_count = len(data.get("data", []))
+                return TestConnectionResponse(
+                    success=True,
+                    message=f"Connected successfully — {model_count} model(s) available",
+                )
+        except httpx.ConnectError as exc:
+            return TestConnectionResponse(success=False, message=f"Connection failed: {exc}")
+        except httpx.TimeoutException:
+            return TestConnectionResponse(success=False, message="Connection timed out after 15 seconds")
+        except httpx.HTTPStatusError as exc:
+            return TestConnectionResponse(
+                success=False,
+                message=f"Server returned {exc.response.status_code}: {exc.response.reason_phrase}",
+            )
+        except ssl.SSLError as exc:
+            return TestConnectionResponse(success=False, message=f"SSL error: {exc}")
+        except FileNotFoundError as exc:
+            return TestConnectionResponse(success=False, message=f"Certificate file not found: {exc}")
+        except Exception as exc:
+            return TestConnectionResponse(success=False, message=f"Unexpected error: {exc}")
+
+    else:
+        # Custom provider
+        if not payload.endpoint_url:
+            return TestConnectionResponse(
+                success=False,
+                message="Endpoint URL is required for custom providers",
+            )
+
+        template = payload.request_body_template or '{"messages": [{"role": "user", "content": "{{message}}"}]}'
+        body_str = template.replace("{{message}}", "test")
+        try:
+            body = json.loads(body_str)
+        except json.JSONDecodeError as exc:
+            return TestConnectionResponse(success=False, message=f"Invalid request body template: {exc}")
+
+        try:
+            async with httpx.AsyncClient(**client_kwargs) as client:
+                resp = await client.post(payload.endpoint_url, json=body, headers=headers)
+                resp.raise_for_status()
+                return TestConnectionResponse(
+                    success=True,
+                    message=f"Connected successfully — received {resp.status_code} response",
+                )
+        except httpx.ConnectError as exc:
+            return TestConnectionResponse(success=False, message=f"Connection failed: {exc}")
+        except httpx.TimeoutException:
+            return TestConnectionResponse(success=False, message="Connection timed out after 15 seconds")
+        except httpx.HTTPStatusError as exc:
+            return TestConnectionResponse(
+                success=False,
+                message=f"Server returned {exc.response.status_code}: {exc.response.reason_phrase}",
+            )
+        except ssl.SSLError as exc:
+            return TestConnectionResponse(success=False, message=f"SSL error: {exc}")
+        except FileNotFoundError as exc:
+            return TestConnectionResponse(success=False, message=f"Certificate file not found: {exc}")
+        except Exception as exc:
+            return TestConnectionResponse(success=False, message=f"Unexpected error: {exc}")
 
 
 @router.get("", response_model=list[ProviderResponse])

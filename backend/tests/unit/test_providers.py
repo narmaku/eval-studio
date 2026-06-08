@@ -1,7 +1,9 @@
-"""Unit tests for provider profiles loading, registry, and proxy context manager."""
+"""Unit tests for provider profiles loading, registry, proxy context manager, and test connection."""
 
 import os
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 import yaml
 
@@ -323,3 +325,144 @@ class TestProxyEnv:
             proxy_env(None, str(cert), "/nonexistent/key.pem"),
         ):
             pass
+
+
+class TestTestConnection:
+    """Tests for the POST /api/v1/providers/test endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_test_connection_litellm_success(self, client):
+        """LiteLLM provider with valid API base returns success with model count."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"data": [{"id": "gpt-4"}, {"id": "gpt-3.5"}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("app.api.v1.providers.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            response = await client.post(
+                "/api/v1/providers/test",
+                json={
+                    "name": "Test",
+                    "api_base": "http://localhost:8000/v1",
+                    "provider_type": "litellm",
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "2 model(s)" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_test_connection_litellm_connect_error(self, client):
+        """LiteLLM provider with unreachable endpoint returns connection failure."""
+        with patch("app.api.v1.providers.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            response = await client.post(
+                "/api/v1/providers/test",
+                json={
+                    "name": "Test",
+                    "api_base": "http://unreachable:9999",
+                    "provider_type": "litellm",
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "Connection failed" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_test_connection_litellm_no_api_base(self, client):
+        """LiteLLM provider without API base returns success with 'cannot verify' message."""
+        response = await client.post(
+            "/api/v1/providers/test",
+            json={
+                "name": "Test",
+                "provider_type": "litellm",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "cannot verify" in data["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_test_connection_custom_success(self, client):
+        """Custom provider with valid endpoint returns success."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("app.api.v1.providers.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            response = await client.post(
+                "/api/v1/providers/test",
+                json={
+                    "name": "Custom Test",
+                    "provider_type": "custom",
+                    "endpoint_url": "https://example.com/api/infer",
+                    "request_body_template": '{"question": "{{message}}"}',
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "Connected successfully" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_test_connection_custom_timeout(self, client):
+        """Custom provider that times out returns timeout failure."""
+        with patch("app.api.v1.providers.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            response = await client.post(
+                "/api/v1/providers/test",
+                json={
+                    "name": "Custom Test",
+                    "provider_type": "custom",
+                    "endpoint_url": "https://slow.example.com/api",
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "timed out" in data["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_test_connection_custom_no_endpoint(self, client):
+        """Custom provider without endpoint URL returns failure."""
+        response = await client.post(
+            "/api/v1/providers/test",
+            json={
+                "name": "Custom Test",
+                "provider_type": "custom",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "required" in data["message"].lower()
