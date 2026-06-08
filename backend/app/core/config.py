@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Artifact storage directory (relative to backend working directory)
     artifacts_dir: str = "data/artifacts"
 
+    # Run-and-wait endpoint timeouts (seconds)
+    run_timeout_default: int = 300
+    run_timeout_max: int = 600
+
     # Dataset import settings
     max_import_file_size: int = 10_485_760  # 10 MB
     max_import_total_size: int = 104_857_600  # 100 MB aggregate across all files

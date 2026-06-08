@@ -1,11 +1,13 @@
 import asyncio
 import math
+import time
 
 import structlog
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import async_session_factory, get_db
 from app.core.exceptions import ConflictException, NotFoundException, NotImplementedException, ValidationException
 from app.models.dataset import Dataset
@@ -18,9 +20,11 @@ from app.schemas.evaluation import (
     EvaluationResponse,
     EvaluationStatus,
 )
+from app.schemas.run import RunAsyncResponse, RunRequest
 from app.services.arena_evaluation_service import run_arena_evaluation
 from app.services.evaluation_service import run_qa_evaluation
 from app.services.rag_evaluation_service import run_rag_evaluation
+from app.services.run_service import compute_run_results, execute_evaluation_sync
 
 logger = structlog.get_logger()
 
@@ -94,6 +98,114 @@ async def list_evaluations(
         page=page,
         page_size=page_size,
         pages=max(1, math.ceil(total / page_size)),
+    )
+
+
+@router.post("/run", status_code=200)
+async def run_and_wait(
+    payload: RunRequest,
+    request: Request,
+    async_mode: bool = Query(False, alias="async"),
+    timeout: int | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Create an evaluation and run it, returning results in a single request.
+
+    When ``async=true``, launches the evaluation as a background task and
+    returns 202 with a poll URL.  Otherwise blocks until the evaluation
+    completes (or times out) and returns the full ``RunResponse``.
+
+    Content negotiation: if the ``Accept`` header is ``text/plain``, the
+    response body is ``{score}\\n{VERDICT}`` for easy CLI/pipeline usage.
+    """
+    # Validate timeout
+    effective_timeout = timeout if timeout is not None else settings.run_timeout_default
+    if effective_timeout > settings.run_timeout_max:
+        raise ValidationException(
+            f"Timeout {effective_timeout}s exceeds maximum allowed value of {settings.run_timeout_max}s."
+        )
+
+    # Validate dataset exists
+    ds_result = await db.execute(select(Dataset).where(Dataset.id == payload.dataset_id))
+    if not ds_result.scalar_one_or_none():
+        raise NotFoundException("Dataset", payload.dataset_id)
+
+    # Create the evaluation
+    evaluation = Evaluation(
+        name=payload.name,
+        mode=payload.mode.value,
+        status="pending",
+        dataset_id=payload.dataset_id,
+        environment_id=payload.environment_id,
+        judge_config_id=payload.judge_config_id,
+        config=payload.config,
+    )
+    db.add(evaluation)
+    await db.commit()
+    await db.refresh(evaluation)
+    evaluation_id = evaluation.id
+
+    logger.info("evaluation.run_and_wait.created", id=evaluation_id, mode=payload.mode.value, async_mode=async_mode)
+
+    # ── Async mode: launch background and return 202 ─────────────────
+    if async_mode:
+
+        async def _run_bg() -> None:
+            async with async_session_factory() as bg_session:
+                if evaluation.mode == "arena":
+                    await run_arena_evaluation(evaluation_id, bg_session)
+                elif evaluation.mode == "rag":
+                    await run_rag_evaluation(evaluation_id, bg_session)
+                else:
+                    await run_qa_evaluation(evaluation_id, bg_session)
+
+        task = asyncio.create_task(_run_bg())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+
+        async_resp = RunAsyncResponse(
+            evaluation_id=evaluation_id,
+            status="running",
+            poll_url=f"/api/v1/evaluations/{evaluation_id}",
+        )
+        return Response(
+            content=async_resp.model_dump_json(),
+            status_code=202,
+            media_type="application/json",
+        )
+
+    # ── Sync mode: run inline and return results ─────────────────────
+    start = time.monotonic()
+    timed_out = False
+    try:
+        await execute_evaluation_sync(evaluation_id, timeout=effective_timeout)
+    except TimeoutError:
+        timed_out = True
+        logger.warning("evaluation.run_and_wait.timeout", id=evaluation_id, timeout=effective_timeout)
+
+    duration = time.monotonic() - start
+
+    # Re-fetch using the request-scoped session for response building
+    run_response = await compute_run_results(
+        evaluation_id=evaluation_id,
+        db=db,
+        pass_threshold=payload.pass_threshold,
+        duration=duration,
+    )
+
+    # Content negotiation
+    accept = request.headers.get("accept", "")
+    if "text/plain" in accept:
+        verdict_str = run_response.verdict.upper()
+        body = f"{run_response.average_score:.2f}\n{verdict_str}"
+        status = 504 if timed_out else 200
+        return Response(content=body, status_code=status, media_type="text/plain")
+
+    status = 504 if timed_out else 200
+    return Response(
+        content=run_response.model_dump_json(),
+        status_code=status,
+        media_type="application/json",
     )
 
 
