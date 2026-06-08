@@ -61,3 +61,4 @@ site/
 
 # OS
 Thumbs.db
+.claude/worktrees/
