@@ -150,7 +150,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
     try {
       const data: CreateProviderRequest = {
         name: name.trim() || 'test',
-        litellm_model: isCustom ? '' : litellmModel.trim(),
+        default_model: isCustom ? '' : defaultModel.trim(),
         api_base: apiBase.trim() || null,
         api_key_env: apiKeyEnv.trim() || null,
         proxy: proxy.trim() || null,
