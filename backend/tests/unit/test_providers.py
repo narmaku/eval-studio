@@ -475,8 +475,11 @@ class TestTestConnection:
         with patch("app.api.v1.providers.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.get = AsyncMock(
-                side_effect=ssl.SSLError(1, "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
-                                         "unable to get local issuer certificate (_ssl.c:1007)")
+                side_effect=ssl.SSLError(
+                    1,
+                    "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+                    "unable to get local issuer certificate (_ssl.c:1007)",
+                )
             )
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -502,9 +505,7 @@ class TestTestConnection:
         """Generic exceptions do not leak internal details to the client."""
         with patch("app.api.v1.providers.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            mock_client.get = AsyncMock(
-                side_effect=RuntimeError("internal detail at /home/deploy/app/secrets.py")
-            )
+            mock_client.get = AsyncMock(side_effect=RuntimeError("internal detail at /home/deploy/app/secrets.py"))
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_client_cls.return_value = mock_client
