@@ -1,12 +1,14 @@
 """Unit tests for provider profiles loading, registry, proxy context manager, and test connection."""
 
 import os
+import ssl
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 import yaml
 
+from app.api.v1.providers import _handle_connection_error
 from app.core.providers import ProviderProfile, ProviderRegistry
 from app.services.provider_utils import proxy_env
 
@@ -466,3 +468,89 @@ class TestTestConnection:
         data = response.json()
         assert data["success"] is False
         assert "required" in data["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_test_connection_ssl_error_sanitized(self, client):
+        """SSL errors do not leak certificate file paths."""
+        with patch("app.api.v1.providers.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(
+                side_effect=ssl.SSLError(1, "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+                                         "unable to get local issuer certificate (_ssl.c:1007)")
+            )
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            response = await client.post(
+                "/api/v1/providers/test",
+                json={
+                    "name": "Test",
+                    "api_base": "https://example.com",
+                    "provider_type": "litellm",
+                },
+            )
+
+        data = response.json()
+        assert data["success"] is False
+        # Must not contain internal details like _ssl.c paths
+        assert "_ssl.c" not in data["message"]
+        assert "SSL error" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_test_connection_generic_error_sanitized(self, client):
+        """Generic exceptions do not leak internal details to the client."""
+        with patch("app.api.v1.providers.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(
+                side_effect=RuntimeError("internal detail at /home/deploy/app/secrets.py")
+            )
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            response = await client.post(
+                "/api/v1/providers/test",
+                json={
+                    "name": "Test",
+                    "api_base": "https://example.com",
+                    "provider_type": "litellm",
+                },
+            )
+
+        data = response.json()
+        assert data["success"] is False
+        # Must not contain file paths or internal error details
+        assert "/home/" not in data["message"]
+        assert "secrets" not in data["message"]
+        assert "server logs" in data["message"].lower()
+
+
+class TestHandleConnectionError:
+    """Unit tests for the _handle_connection_error helper."""
+
+    def test_connect_error_sanitized(self):
+        """ConnectError does not leak internal hostname details."""
+        exc = httpx.ConnectError("All connection attempts failed for host.internal:443")
+        result = _handle_connection_error(exc)
+        assert result.success is False
+        assert "host.internal" not in result.message
+        assert "unable to reach the server" in result.message
+
+    def test_file_not_found_sanitized(self):
+        """FileNotFoundError does not leak filesystem paths."""
+        exc = FileNotFoundError("[Errno 2] No such file or directory: '/etc/pki/tls/certs/custom.pem'")
+        result = _handle_connection_error(exc)
+        assert result.success is False
+        assert "/etc/pki" not in result.message
+        assert "custom.pem" not in result.message
+        assert "ssl_cert_path" in result.message
+
+    def test_generic_exception_sanitized(self):
+        """Unknown exceptions do not leak str(exc) to the client."""
+        exc = ValueError("SECRET_API_KEY=abc123 at /opt/app/config.py")
+        result = _handle_connection_error(exc)
+        assert result.success is False
+        assert "SECRET_API_KEY" not in result.message
+        assert "/opt/app" not in result.message
+        assert "server logs" in result.message.lower()

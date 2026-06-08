@@ -25,6 +25,30 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/providers", tags=["providers"], dependencies=[Depends(require_auth)])
 
 
+def _handle_connection_error(exc: Exception) -> TestConnectionResponse:
+    """Convert an HTTP-request exception into a sanitized TestConnectionResponse.
+
+    Uses curated messages for known exception types to avoid leaking internal
+    details (file paths, environment variables, stack traces) to the client.
+    """
+    if isinstance(exc, httpx.ConnectError):
+        return TestConnectionResponse(success=False, message="Connection failed: unable to reach the server")
+    if isinstance(exc, httpx.TimeoutException):
+        return TestConnectionResponse(success=False, message="Connection timed out after 15 seconds")
+    if isinstance(exc, httpx.HTTPStatusError):
+        return TestConnectionResponse(
+            success=False,
+            message=f"Server returned {exc.response.status_code}: {exc.response.reason_phrase}",
+        )
+    if isinstance(exc, ssl.SSLError):
+        return TestConnectionResponse(success=False, message="SSL error: certificate verification failed")
+    if isinstance(exc, FileNotFoundError):
+        return TestConnectionResponse(success=False, message="Certificate file not found — check ssl_cert_path")
+    # Generic fallback — never expose str(exc) which may contain paths/secrets
+    logger.warning("test_connection.unexpected_error", error=str(exc), error_type=type(exc).__name__)
+    return TestConnectionResponse(success=False, message="Unexpected error — check server logs for details")
+
+
 def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
     """Convert a ProviderProfile to a ProviderResponse."""
     return ProviderResponse(
@@ -94,21 +118,8 @@ async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
                     success=True,
                     message=f"Connected successfully — {model_count} model(s) available",
                 )
-        except httpx.ConnectError as exc:
-            return TestConnectionResponse(success=False, message=f"Connection failed: {exc}")
-        except httpx.TimeoutException:
-            return TestConnectionResponse(success=False, message="Connection timed out after 15 seconds")
-        except httpx.HTTPStatusError as exc:
-            return TestConnectionResponse(
-                success=False,
-                message=f"Server returned {exc.response.status_code}: {exc.response.reason_phrase}",
-            )
-        except ssl.SSLError as exc:
-            return TestConnectionResponse(success=False, message=f"SSL error: {exc}")
-        except FileNotFoundError as exc:
-            return TestConnectionResponse(success=False, message=f"Certificate file not found: {exc}")
         except Exception as exc:
-            return TestConnectionResponse(success=False, message=f"Unexpected error: {exc}")
+            return _handle_connection_error(exc)
 
     else:
         # Custom provider
@@ -133,21 +144,8 @@ async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
                     success=True,
                     message=f"Connected successfully — received {resp.status_code} response",
                 )
-        except httpx.ConnectError as exc:
-            return TestConnectionResponse(success=False, message=f"Connection failed: {exc}")
-        except httpx.TimeoutException:
-            return TestConnectionResponse(success=False, message="Connection timed out after 15 seconds")
-        except httpx.HTTPStatusError as exc:
-            return TestConnectionResponse(
-                success=False,
-                message=f"Server returned {exc.response.status_code}: {exc.response.reason_phrase}",
-            )
-        except ssl.SSLError as exc:
-            return TestConnectionResponse(success=False, message=f"SSL error: {exc}")
-        except FileNotFoundError as exc:
-            return TestConnectionResponse(success=False, message=f"Certificate file not found: {exc}")
         except Exception as exc:
-            return TestConnectionResponse(success=False, message=f"Unexpected error: {exc}")
+            return _handle_connection_error(exc)
 
 
 @router.get("", response_model=list[ProviderResponse])
