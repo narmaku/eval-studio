@@ -144,10 +144,7 @@ export function ProviderList() {
                   </p>
                 )}
                 {provider.api_base && (
-                  <p
-                    className="text-xs text-muted-foreground truncate"
-                    title={provider.api_base}
-                  >
+                  <p className="text-xs text-muted-foreground truncate" title={provider.api_base}>
                     {provider.api_base}
                   </p>
                 )}
