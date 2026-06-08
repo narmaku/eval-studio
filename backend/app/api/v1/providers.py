@@ -36,6 +36,12 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
     )
 
 
+@router.get("/schema", response_model=dict)
+async def get_provider_schema() -> dict:
+    """Return JSON Schema for provider creation, including field descriptions."""
+    return ProviderCreate.model_json_schema()
+
+
 @router.get("", response_model=list[ProviderResponse])
 async def list_providers(
     purpose: str | None = Query(None),

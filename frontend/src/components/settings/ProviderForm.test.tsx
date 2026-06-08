@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Provider } from '@/types';
 
 const mockCreateProvider = vi.fn();
@@ -21,6 +21,24 @@ vi.mock('@/stores/providerStore', () => ({
 
 import { ProviderForm } from './ProviderForm';
 
+/** A minimal JSON Schema response matching ProviderCreate's schema output. */
+const mockSchemaResponse = {
+  properties: {
+    name: { description: 'A descriptive name for this provider.' },
+    default_model: { description: 'The default LLM model identifier.' },
+    api_base: { description: 'Base URL for the LLM API endpoint.' },
+    api_key_env: { description: 'Name of the environment variable containing the API key.' },
+    proxy: { description: 'HTTP proxy URL for routing requests.' },
+    ssl_cert_path: { description: 'Path to the SSL client certificate file.' },
+    tags: { description: 'Tags for organizing and filtering providers.' },
+    purpose: { description: "Provider purpose: 'test' or 'judge'." },
+    provider_type: { description: "Provider type: 'litellm' or 'custom'." },
+    endpoint_url: { description: 'Full URL for custom provider endpoints.' },
+    request_format: { description: 'Request body format for custom providers.' },
+    response_json_path: { description: 'Dot-path to extract response text.' },
+  },
+};
+
 const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   id: 'p-1',
   name: 'Existing Provider',
@@ -40,8 +58,21 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
 });
 
 describe('ProviderForm', () => {
+  const originalFetch = globalThis.fetch;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    globalThis.fetch = vi.fn((url: string | URL | Request) => {
+      const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
+      if (urlStr.includes('/api/v1/providers/schema')) {
+        return Promise.resolve(new Response(JSON.stringify(mockSchemaResponse), { status: 200 }));
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }));
+    }) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   it('renders form fields when open', () => {
@@ -55,6 +86,18 @@ describe('ProviderForm', () => {
     expect(screen.getByLabelText(/purpose/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/tags/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/provider type/i)).toBeInTheDocument();
+  });
+
+  it('renders tooltip icons after schema is fetched', async () => {
+    render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+
+    // Tooltips appear asynchronously after schema fetch resolves
+    await waitFor(() => {
+      const infoButtons = screen.getAllByRole('button', { name: /field info/i });
+      // Expect tooltips for the visible litellm fields:
+      // provider_type, name, default_model, api_base, api_key_env, proxy, ssl_cert_path, purpose, tags
+      expect(infoButtons.length).toBeGreaterThanOrEqual(9);
+    });
   });
 
   it('renders "New Provider" title in create mode', () => {
@@ -216,10 +259,7 @@ describe('ProviderForm', () => {
       await user.click(screen.getByText('Custom API'));
 
       await user.type(screen.getByLabelText(/name/i), 'RLS Staging');
-      await user.type(
-        screen.getByLabelText(/endpoint url/i),
-        'https://example.com/api/v1/infer',
-      );
+      await user.type(screen.getByLabelText(/endpoint url/i), 'https://example.com/api/v1/infer');
 
       // Select rls_infer format
       await user.click(screen.getByLabelText(/request format/i));
@@ -253,13 +293,7 @@ describe('ProviderForm', () => {
         response_json_path: 'data.text',
       });
 
-      render(
-        <ProviderForm
-          open={true}
-          onOpenChange={vi.fn()}
-          provider={customProvider}
-        />,
-      );
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} provider={customProvider} />);
 
       // Custom fields should be visible and populated
       expect(screen.getByLabelText(/endpoint url/i)).toHaveValue(

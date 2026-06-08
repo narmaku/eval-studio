@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FieldTooltip } from '@/components/ui/FieldTooltip';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
 import { useProviderStore } from '@/stores/providerStore';
 import type { Provider, CreateProviderRequest, LLMParams } from '@/types';
@@ -61,9 +62,38 @@ interface ProviderFormInnerProps {
   onClose: () => void;
 }
 
+/** Map of field name -> description, extracted from JSON Schema. */
+type FieldDescriptions = Record<string, string>;
+
 function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProps) {
   const createProvider = useProviderStore((s) => s.createProvider);
   const updateProvider = useProviderStore((s) => s.updateProvider);
+
+  const [fieldDescriptions, setFieldDescriptions] = useState<FieldDescriptions>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/providers/schema')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((schema: Record<string, unknown> | null) => {
+        if (cancelled || !schema) return;
+        const props = schema.properties as Record<string, { description?: string }> | undefined;
+        if (!props) return;
+        const descs: FieldDescriptions = {};
+        for (const [key, value] of Object.entries(props)) {
+          if (value.description) {
+            descs[key] = value.description;
+          }
+        }
+        setFieldDescriptions(descs);
+      })
+      .catch(() => {
+        /* schema fetch is best-effort; tooltips simply won't appear */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isEditMode = !!provider;
 
@@ -128,7 +158,8 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         ssl_cert_path: sslCertPath.trim() || null,
         tags,
         purpose,
-        default_params: Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, unknown>) : null,
+        default_params:
+          Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, unknown>) : null,
         provider_type: providerType,
         endpoint_url: isCustom ? endpointUrl.trim() || null : null,
         request_format: isCustom ? requestFormat : 'openai',
@@ -161,7 +192,12 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="provider-type">Provider Type</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="provider-type">Provider Type</Label>
+          {fieldDescriptions.provider_type && (
+            <FieldTooltip description={fieldDescriptions.provider_type} />
+          )}
+        </div>
         <Select
           value={providerType}
           onValueChange={(v) => setProviderType(v as 'litellm' | 'custom')}
@@ -177,7 +213,10 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="provider-name">Name</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="provider-name">Name</Label>
+          {fieldDescriptions.name && <FieldTooltip description={fieldDescriptions.name} />}
+        </div>
         <Input
           id="provider-name"
           value={name}
@@ -188,7 +227,12 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
 
       {!isCustom && (
         <div className="space-y-2">
-          <Label htmlFor="provider-model">LiteLLM Model</Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="provider-model">LiteLLM Model</Label>
+            {fieldDescriptions.default_model && (
+              <FieldTooltip description={fieldDescriptions.default_model} />
+            )}
+          </div>
           <Input
             id="provider-model"
             value={litellmModel}
@@ -201,20 +245,27 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
       {isCustom && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="provider-endpoint-url">Endpoint URL</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="provider-endpoint-url">Endpoint URL</Label>
+              {fieldDescriptions.endpoint_url && (
+                <FieldTooltip description={fieldDescriptions.endpoint_url} />
+              )}
+            </div>
             <Input
               id="provider-endpoint-url"
               value={endpointUrl}
               onChange={(e) => setEndpointUrl(e.target.value)}
               placeholder="e.g., https://host/api/lightspeed/v1/infer"
             />
-            <p className="text-xs text-muted-foreground">
-              Full URL for the API endpoint to call directly via HTTP.
-            </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="provider-request-format">Request Format</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="provider-request-format">Request Format</Label>
+              {fieldDescriptions.request_format && (
+                <FieldTooltip description={fieldDescriptions.request_format} />
+              )}
+            </div>
             <Select value={requestFormat} onValueChange={setRequestFormat}>
               <SelectTrigger className="w-full" id="provider-request-format">
                 <SelectValue />
@@ -227,23 +278,30 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="provider-response-path">Response JSON Path</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="provider-response-path">Response JSON Path</Label>
+              {fieldDescriptions.response_json_path && (
+                <FieldTooltip description={fieldDescriptions.response_json_path} />
+              )}
+            </div>
             <Input
               id="provider-response-path"
               value={responseJsonPath}
               onChange={(e) => setResponseJsonPath(e.target.value)}
               placeholder="e.g., data.text"
             />
-            <p className="text-xs text-muted-foreground">
-              Dot-path to extract the response text from the JSON response body.
-            </p>
           </div>
         </>
       )}
 
       {!isCustom && (
         <div className="space-y-2">
-          <Label htmlFor="provider-api-base">API Base (optional)</Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="provider-api-base">API Base (optional)</Label>
+            {fieldDescriptions.api_base && (
+              <FieldTooltip description={fieldDescriptions.api_base} />
+            )}
+          </div>
           <Input
             id="provider-api-base"
             value={apiBase}
@@ -254,20 +312,25 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="provider-api-key-env">API Key Env Var (optional)</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="provider-api-key-env">API Key Env Var (optional)</Label>
+          {fieldDescriptions.api_key_env && (
+            <FieldTooltip description={fieldDescriptions.api_key_env} />
+          )}
+        </div>
         <Input
           id="provider-api-key-env"
           value={apiKeyEnv}
           onChange={(e) => setApiKeyEnv(e.target.value)}
           placeholder="e.g., OPENAI_API_KEY"
         />
-        <p className="text-xs text-muted-foreground">
-          Name of the environment variable containing the API key. No direct key storage.
-        </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="provider-proxy">Proxy (optional)</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="provider-proxy">Proxy (optional)</Label>
+          {fieldDescriptions.proxy && <FieldTooltip description={fieldDescriptions.proxy} />}
+        </div>
         <Input
           id="provider-proxy"
           value={proxy}
@@ -277,20 +340,25 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="provider-ssl-cert">SSL Certificate Bundle (optional)</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="provider-ssl-cert">SSL Certificate Bundle (optional)</Label>
+          {fieldDescriptions.ssl_cert_path && (
+            <FieldTooltip description={fieldDescriptions.ssl_cert_path} />
+          )}
+        </div>
         <Input
           id="provider-ssl-cert"
           value={sslCertPath}
           onChange={(e) => setSslCertPath(e.target.value)}
           placeholder="e.g., /etc/pki/tls/certs/ca-bundle.crt"
         />
-        <p className="text-xs text-muted-foreground">
-          Path to a custom CA certificate bundle for proxy/TLS verification.
-        </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="provider-purpose">Purpose</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="provider-purpose">Purpose</Label>
+          {fieldDescriptions.purpose && <FieldTooltip description={fieldDescriptions.purpose} />}
+        </div>
         <Select value={purpose} onValueChange={setPurpose}>
           <SelectTrigger className="w-full" id="provider-purpose">
             <SelectValue />
@@ -303,11 +371,18 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
       </div>
 
       {!isCustom && (
-        <LLMParamsPanel label="Default LLM Parameters" value={defaultParams} onChange={setDefaultParams} />
+        <LLMParamsPanel
+          label="Default LLM Parameters"
+          value={defaultParams}
+          onChange={setDefaultParams}
+        />
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="provider-tags">Tags (optional, comma-separated)</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="provider-tags">Tags (optional, comma-separated)</Label>
+          {fieldDescriptions.tags && <FieldTooltip description={fieldDescriptions.tags} />}
+        </div>
         <Input
           id="provider-tags"
           value={tagsInput}
