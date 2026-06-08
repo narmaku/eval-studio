@@ -68,7 +68,7 @@ export interface CreateSessionRequest {
   mode: SessionMode;
   agent_config?: {
     provider_id?: string;
-    litellm_model?: string;
+    default_model?: string;
     api_base?: string;
     system_prompt?: string;
     evaluator_id?: string;

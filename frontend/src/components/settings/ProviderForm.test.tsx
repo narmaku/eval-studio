@@ -41,7 +41,7 @@ const mockSchemaResponse = {
 const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   id: 'p-1',
   name: 'Existing Provider',
-  litellm_model: 'openai/gpt-4',
+  default_model: 'openai/gpt-4',
   api_base: 'https://api.example.com',
   has_api_key: true,
   proxy: null,
@@ -85,7 +85,7 @@ describe('ProviderForm', () => {
     render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
 
     expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/litellm model/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/default model/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/api base/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/api key env/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/proxy/i)).toBeInTheDocument();
@@ -119,7 +119,7 @@ describe('ProviderForm', () => {
     render(<ProviderForm open={true} onOpenChange={vi.fn()} provider={makeProvider()} />);
 
     expect(screen.getByLabelText(/name/i)).toHaveValue('Existing Provider');
-    expect(screen.getByLabelText(/litellm model/i)).toHaveValue('openai/gpt-4');
+    expect(screen.getByLabelText(/default model/i)).toHaveValue('openai/gpt-4');
     expect(screen.getByLabelText(/api base/i)).toHaveValue('https://api.example.com');
   });
 
@@ -128,7 +128,7 @@ describe('ProviderForm', () => {
     render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
 
     // Fill in model but not name
-    await user.type(screen.getByLabelText(/litellm model/i), 'openai/gpt-4');
+    await user.type(screen.getByLabelText(/default model/i), 'openai/gpt-4');
     await user.click(screen.getByRole('button', { name: /save/i }));
 
     expect(screen.getByText(/name is required/i)).toBeInTheDocument();
@@ -156,7 +156,7 @@ describe('ProviderForm', () => {
     render(<ProviderForm open={true} onOpenChange={onOpenChange} onSaved={onSaved} />);
 
     await user.type(screen.getByLabelText(/name/i), 'New Provider');
-    await user.type(screen.getByLabelText(/litellm model/i), 'openai/gpt-4');
+    await user.type(screen.getByLabelText(/default model/i), 'openai/gpt-4');
 
     await user.click(screen.getByRole('button', { name: /save/i }));
 
@@ -164,7 +164,7 @@ describe('ProviderForm', () => {
     expect(mockCreateProvider).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'New Provider',
-        litellm_model: 'openai/gpt-4',
+        default_model: 'openai/gpt-4',
         provider_type: 'litellm',
       }),
     );
@@ -198,19 +198,19 @@ describe('ProviderForm', () => {
   });
 
   describe('custom provider type', () => {
-    it('hides LiteLLM Model field when custom type is selected', async () => {
+    it('hides Default Model field when custom type is selected', async () => {
       const user = userEvent.setup();
       render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
 
-      // Initially LiteLLM Model should be visible
-      expect(screen.getByLabelText(/litellm model/i)).toBeInTheDocument();
+      // Initially Default Model should be visible
+      expect(screen.getByLabelText(/default model/i)).toBeInTheDocument();
 
       // Select "Custom API" type
       await user.click(screen.getByLabelText(/provider type/i));
       await user.click(screen.getByText('Custom API'));
 
-      // LiteLLM Model should be hidden
-      expect(screen.queryByLabelText(/litellm model/i)).not.toBeInTheDocument();
+      // Default Model should be hidden
+      expect(screen.queryByLabelText(/default model/i)).not.toBeInTheDocument();
     });
 
     it('shows custom fields when custom type is selected', async () => {

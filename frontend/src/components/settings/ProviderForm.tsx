@@ -103,7 +103,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
     (provider?.provider_type as 'litellm' | 'custom') ?? 'litellm',
   );
   const [name, setName] = useState(provider?.name ?? '');
-  const [litellmModel, setLitellmModel] = useState(provider?.litellm_model ?? '');
+  const [defaultModel, setDefaultModel] = useState(provider?.default_model ?? '');
   const [apiBase, setApiBase] = useState(provider?.api_base ?? '');
   const [apiKeyEnv, setApiKeyEnv] = useState('');
   const [proxy, setProxy] = useState(provider?.proxy ?? '');
@@ -182,7 +182,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
 
       const data: CreateProviderRequest = {
         name: name.trim(),
-        litellm_model: isCustom ? '' : litellmModel.trim(),
+        default_model: isCustom ? '' : defaultModel.trim(),
         api_base: apiBase.trim() || null,
         api_key_env: apiKeyEnv.trim() || null,
         proxy: proxy.trim() || null,
@@ -258,15 +258,15 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
       {!isCustom && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label htmlFor="provider-model">LiteLLM Model</Label>
+            <Label htmlFor="provider-model">Default Model</Label>
             {fieldDescriptions.default_model && (
               <FieldTooltip description={fieldDescriptions.default_model} />
             )}
           </div>
           <Input
             id="provider-model"
-            value={litellmModel}
-            onChange={(e) => setLitellmModel(e.target.value)}
+            value={defaultModel}
+            onChange={(e) => setDefaultModel(e.target.value)}
             placeholder="e.g., openai/gpt-4 or ollama/llama3"
           />
         </div>

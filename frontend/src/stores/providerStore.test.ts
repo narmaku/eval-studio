@@ -18,7 +18,7 @@ const mockedApi = vi.mocked(api);
 const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   id: 'p-1',
   name: 'Test Provider',
-  litellm_model: 'openai/gpt-4',
+  default_model: 'openai/gpt-4',
   api_base: null,
   has_api_key: false,
   proxy: null,
@@ -80,7 +80,7 @@ describe('providerStore', () => {
     it('calls API and adds provider to store', async () => {
       const request: CreateProviderRequest = {
         name: 'New Provider',
-        litellm_model: 'openai/gpt-4',
+        default_model: 'openai/gpt-4',
       };
       const created = makeProvider({ id: 'p-new', name: 'New Provider' });
       mockedApi.createProvider.mockResolvedValue(created);
@@ -98,7 +98,7 @@ describe('providerStore', () => {
       await expect(
         useProviderStore.getState().createProvider({
           name: 'Bad',
-          litellm_model: 'x',
+          default_model: 'x',
         }),
       ).rejects.toThrow('Create failed');
     });
