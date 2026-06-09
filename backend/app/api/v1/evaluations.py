@@ -4,7 +4,7 @@ import time
 
 import structlog
 from fastapi import APIRouter, Depends, Query, Request, Response
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -93,8 +93,46 @@ async def list_evaluations(
     result = await db.execute(query)
     evaluations = result.scalars().all()
 
+    # Batch query for per-evaluation stats
+    eval_ids = [e.id for e in evaluations]
+    stats_map: dict[str, dict] = {}
+    if eval_ids:
+        stats_query = (
+            select(
+                Result.evaluation_id,
+                func.count(Result.id).label("result_count"),
+                func.avg(Result.score).label("avg_score"),
+                func.sum(case((Result.passed == True, 1), else_=0)).label("passed_count"),  # noqa: E712
+            )
+            .where(Result.evaluation_id.in_(eval_ids))
+            .group_by(Result.evaluation_id)
+        )
+        stats_result = await db.execute(stats_query)
+        for row in stats_result.all():
+            result_count = row.result_count or 0
+            passed_count = row.passed_count or 0
+            avg_score = float(row.avg_score) if row.avg_score is not None else None
+            pass_rate = passed_count / result_count if result_count > 0 else None
+            stats_map[row.evaluation_id] = {
+                "result_count": result_count,
+                "average_score": avg_score,
+                "pass_rate": pass_rate,
+            }
+
+    items = []
+    for e in evaluations:
+        response = EvaluationResponse.model_validate(e)
+        stats = stats_map.get(e.id)
+        if stats:
+            response.result_count = stats["result_count"]
+            response.average_score = stats["average_score"]
+            response.pass_rate = stats["pass_rate"]
+        else:
+            response.result_count = 0
+        items.append(response)
+
     return PaginatedResponse[EvaluationResponse](
-        items=[EvaluationResponse.model_validate(e) for e in evaluations],
+        items=items,
         total=total,
         page=page,
         page_size=page_size,
