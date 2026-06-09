@@ -177,9 +177,7 @@ async def import_dataset(payload: ImportRequest, db: AsyncSession = Depends(get_
     for af in session.files:
         if af.error:
             continue
-        if af.schema and af.schema.sample_rows:
-            # Use total rows stored in schema — for real production, we'd
-            # re-parse from stored content, but sample_rows represent the data
+        if af.schema and af.rows:
             all_rows_by_file.append((af.filename, af.rows))
 
     if payload.merge_mode == "single":
