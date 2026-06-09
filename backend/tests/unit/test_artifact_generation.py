@@ -605,9 +605,7 @@ class TestArtifactGenerationEdgeCases:
     @pytest.mark.asyncio
     async def test_config_json_with_none_config(self, db_session, tmp_path):
         """config.json uses empty dict when evaluation.config is None."""
-        evaluation = await self._create_evaluation_with_results(
-            db_session, results_data=[], config=None
-        )
+        evaluation = await self._create_evaluation_with_results(db_session, results_data=[], config=None)
         artifacts_dir = str(tmp_path / "artifacts")
 
         await generate_evaluation_artifacts(evaluation.id, db_session, artifacts_dir)

@@ -209,6 +209,46 @@ async def test_resolve_custom_provider_no_model_required():
     assert result.model == ""
 
 
+@pytest.mark.asyncio
+async def test_resolve_rate_limits_from_provider():
+    """Provider with rate_limited and rate_limits resolves both fields."""
+    reg = ProviderRegistry()
+    reg._items["rate-limited"] = ProviderProfile(
+        id="rate-limited",
+        name="Rate Limited Provider",
+        default_model="openai/gpt-4",
+        rate_limited=True,
+        rate_limits=[
+            {"value": 10, "unit": "requests", "per": "minute"},
+            {"value": 1000, "unit": "tokens", "per": "minute"},
+        ],
+    )
+    config = {"provider_id": "rate-limited"}
+    result = resolve_model_config(config, registry=reg)
+
+    assert result.rate_limited is True
+    assert result.rate_limits == [
+        {"value": 10, "unit": "requests", "per": "minute"},
+        {"value": 1000, "unit": "tokens", "per": "minute"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_resolve_rate_limits_default_when_not_set():
+    """Provider without rate limit fields resolves with defaults."""
+    reg = ProviderRegistry()
+    reg._items["no-limits"] = ProviderProfile(
+        id="no-limits",
+        name="No Limits",
+        default_model="openai/gpt-4",
+    )
+    config = {"provider_id": "no-limits"}
+    result = resolve_model_config(config, registry=reg)
+
+    assert result.rate_limited is False
+    assert result.rate_limits is None
+
+
 class TestCallModel:
     """Tests for the call_model helper function."""
 

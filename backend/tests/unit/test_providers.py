@@ -189,6 +189,62 @@ class TestProviderRegistry:
         assert p2.ssl_cert_path == "/path/to/cert.pem"
         assert p2.ssl_client_key == "/path/to/key.pem"
 
+    def test_rate_limits_round_trips_through_yaml(self, tmp_path):
+        """rate_limited and rate_limits persist and reload from YAML."""
+        config = {
+            "providers": [
+                {
+                    "id": "rate-limited",
+                    "name": "Rate Limited Provider",
+                    "default_model": "openai/gpt-4",
+                    "rate_limited": True,
+                    "rate_limits": [
+                        {"value": 10, "unit": "requests", "per": "minute"},
+                        {"value": 1000, "unit": "tokens", "per": "minute"},
+                    ],
+                }
+            ]
+        }
+        config_file = tmp_path / "providers.yaml"
+        config_file.write_text(yaml.dump(config))
+
+        registry = ProviderRegistry()
+        registry.load_from_yaml(config_file)
+
+        p = registry.get_provider("rate-limited")
+        assert p is not None
+        assert p.rate_limited is True
+        assert len(p.rate_limits) == 2
+        assert p.rate_limits[0]["value"] == 10
+        assert p.rate_limits[0]["unit"] == "requests"
+        assert p.rate_limits[1]["unit"] == "tokens"
+
+        # Round-trip: serialize back and reload
+        registry._persist_yaml()
+        registry2 = ProviderRegistry()
+        registry2.load_from_yaml(config_file)
+        p2 = registry2.get_provider("rate-limited")
+        assert p2.rate_limited is True
+        assert p2.rate_limits == p.rate_limits
+
+    def test_rate_limits_default_when_not_in_yaml(self, tmp_path):
+        """Providers without rate limit fields get correct defaults."""
+        config = {
+            "providers": [
+                {"id": "basic", "name": "Basic", "default_model": "gpt-4"},
+            ]
+        }
+        config_file = tmp_path / "providers.yaml"
+        config_file.write_text(yaml.dump(config))
+
+        registry = ProviderRegistry()
+        registry.load_from_yaml(config_file)
+
+        p = registry.get_provider("basic")
+        assert p is not None
+        assert p.rate_limited is False
+        assert p.rate_limits is None
+
 
 class TestProxyEnv:
     def test_proxy_env_sets_and_restores(self):

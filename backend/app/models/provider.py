@@ -29,3 +29,5 @@ class Provider(Base):
     endpoint_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     request_body_template: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     response_json_path: Mapped[str] = mapped_column(String(255), nullable=False, default="choices.0.message.content")
+    rate_limited: Mapped[bool] = mapped_column(default=False)
+    rate_limits: Mapped[list | None] = mapped_column(JSON, nullable=True, default=None)
