@@ -9,15 +9,7 @@ import type { EvaluationResultRow } from '@/components/results';
 
 export default function Results() {
   const navigate = useNavigate();
-  const {
-    results,
-    isLoading: resultsLoading,
-    error: resultsError,
-    fetchResults,
-    selectedEvaluationIds,
-    referenceEvaluationId,
-    clearSelection,
-  } = useResultStore();
+  const { selectedEvaluationIds, referenceEvaluationId, clearSelection } = useResultStore();
 
   const {
     evaluations,
@@ -28,48 +20,32 @@ export default function Results() {
 
   useEffect(() => {
     void fetchEvaluations();
-    void fetchResults();
-  }, [fetchEvaluations, fetchResults]);
+  }, [fetchEvaluations]);
 
-  const isLoading = resultsLoading || evaluationsLoading;
-  const error = resultsError ?? evaluationsError;
+  const isLoading = evaluationsLoading;
+  const error = evaluationsError;
 
   const rows = useMemo<EvaluationResultRow[]>(() => {
-    // Group results by evaluation_id and compute aggregates
-    const resultsByEval = new Map<string, typeof results>();
-    for (const r of results) {
-      const existing = resultsByEval.get(r.evaluation_id) ?? [];
-      existing.push(r);
-      resultsByEval.set(r.evaluation_id, existing);
-    }
-
-    // Build rows from evaluations that have completed
+    // Build rows from evaluations that have completed, using server-side aggregates
     const completedEvals = evaluations.filter(
       (e) => e.status === 'completed' || e.status === 'failed',
     );
 
     return completedEvals.map((evaluation) => {
-      const evalResults = resultsByEval.get(evaluation.id) ?? [];
-      const scores = evalResults.filter((r) => r.score != null).map((r) => r.score!);
-      const passedCount = evalResults.filter((r) => r.passed === true).length;
-      const totalItems = evalResults.length;
-      const meanScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-      const passRate = totalItems > 0 ? passedCount / totalItems : 0;
-
       return {
         evaluationId: evaluation.id,
         resultId: evaluation.id,
         name: evaluation.name,
         mode: evaluation.mode ?? 'qa',
         status: evaluation.status,
-        totalItems,
-        passRate,
-        meanScore,
+        totalItems: evaluation.result_count ?? 0,
+        passRate: evaluation.pass_rate ?? 0,
+        meanScore: evaluation.average_score ?? 0,
         createdAt: evaluation.created_at,
         datasetId: evaluation.dataset_id,
       };
     });
-  }, [results, evaluations]);
+  }, [evaluations]);
 
   const canCompare = selectedEvaluationIds.length >= 2;
 

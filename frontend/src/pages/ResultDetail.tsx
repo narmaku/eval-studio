@@ -81,7 +81,7 @@ export default function ResultDetail() {
     mean_score: meanScore,
     median_score: medianScore,
     pass_rate: results.length > 0 ? passedCount / results.length : 0,
-    score_distribution: {},
+    score_distribution: [],
   };
 
   return (
