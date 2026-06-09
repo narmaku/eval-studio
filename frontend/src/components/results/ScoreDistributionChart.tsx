@@ -1,17 +1,15 @@
-import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { bucketScores } from './scoreUtils';
-import type { Result } from '@/types';
+import type { ScoreBucket } from '@/types';
 
 interface ScoreDistributionChartProps {
-  results: Result[];
+  distribution: ScoreBucket[];
 }
 
-export function ScoreDistributionChart({ results }: ScoreDistributionChartProps) {
-  const data = useMemo(() => bucketScores(results), [results]);
+export function ScoreDistributionChart({ distribution }: ScoreDistributionChartProps) {
+  const isEmpty = distribution.length === 0 || distribution.every((b) => b.count === 0);
 
-  if (results.length === 0) {
+  if (isEmpty) {
     return (
       <Card>
         <CardHeader>
@@ -31,7 +29,7 @@ export function ScoreDistributionChart({ results }: ScoreDistributionChartProps)
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data}>
+          <BarChart data={distribution}>
             <XAxis dataKey="label" fontSize={12} />
             <YAxis allowDecimals={false} />
             <Tooltip />

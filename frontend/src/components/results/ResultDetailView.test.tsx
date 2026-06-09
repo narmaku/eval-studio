@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -12,9 +12,10 @@ class ResizeObserverMock {
 }
 globalThis.ResizeObserver = ResizeObserverMock;
 
-const { mockExportResultsPdf, mockToastError } = vi.hoisted(() => ({
+const { mockExportResultsPdf, mockToastError, mockToastInfo } = vi.hoisted(() => ({
   mockExportResultsPdf: vi.fn(() => Promise.resolve()),
   mockToastError: vi.fn(),
+  mockToastInfo: vi.fn(),
 }));
 
 vi.mock('@/lib/exportPdf', () => ({
@@ -22,7 +23,7 @@ vi.mock('@/lib/exportPdf', () => ({
 }));
 
 vi.mock('sonner', () => ({
-  toast: { error: mockToastError },
+  toast: { error: mockToastError, info: mockToastInfo },
 }));
 
 import { ResultDetailView } from './ResultDetailView';
@@ -51,7 +52,18 @@ const defaultProps = {
     mean_score: 0.7,
     median_score: 0.7,
     pass_rate: 1.0,
-    score_distribution: {},
+    score_distribution: [
+      { label: '0.0-0.1', count: 0 },
+      { label: '0.1-0.2', count: 0 },
+      { label: '0.2-0.3', count: 0 },
+      { label: '0.3-0.4', count: 0 },
+      { label: '0.4-0.5', count: 0 },
+      { label: '0.5-0.6', count: 1 },
+      { label: '0.6-0.7', count: 0 },
+      { label: '0.7-0.8', count: 1 },
+      { label: '0.8-0.9', count: 0 },
+      { label: '0.9-1.0', count: 0 },
+    ],
   },
   evaluationName: 'Test Evaluation',
   evaluationMode: 'qa' as const,
@@ -194,5 +206,138 @@ describe('ResultDetailView — PDF export', () => {
     await user.click(button);
 
     await vi.waitFor(() => expect(button).not.toBeDisabled());
+  });
+
+  it('fetches all results before export when paginated', async () => {
+    const allResults = [makeResult('r1', 0.8), makeResult('r2', 0.6), makeResult('r3', 0.9)];
+    const mockFetchAll = vi.fn(() => Promise.resolve(allResults));
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderWithRouter(
+      <ResultDetailView
+        {...defaultProps}
+        pagination={{ total: 200, page: 1, page_size: 100, pages: 2 }}
+        onFetchAllForExport={mockFetchAll}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /export pdf/i }));
+
+    await vi.waitFor(() => {
+      expect(mockFetchAll).toHaveBeenCalledTimes(1);
+    });
+
+    await vi.waitFor(() => {
+      expect(mockExportResultsPdf).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockToastInfo).toHaveBeenCalledWith('Fetching all results for export...');
+    expect(mockExportResultsPdf.mock.calls[0][0].results).toHaveLength(3);
+  });
+});
+
+describe('ResultDetailView — pagination controls', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does not render pagination when pagination prop is absent', () => {
+    renderWithRouter(<ResultDetailView {...defaultProps} />);
+    expect(screen.queryByTestId('pagination-controls')).not.toBeInTheDocument();
+  });
+
+  it('does not render pagination when there is only one page', () => {
+    renderWithRouter(
+      <ResultDetailView
+        {...defaultProps}
+        pagination={{ total: 2, page: 1, page_size: 100, pages: 1 }}
+      />,
+    );
+    expect(screen.queryByTestId('pagination-controls')).not.toBeInTheDocument();
+  });
+
+  it('renders pagination controls when multiple pages exist', () => {
+    renderWithRouter(
+      <ResultDetailView
+        {...defaultProps}
+        pagination={{ total: 250, page: 1, page_size: 100, pages: 3 }}
+      />,
+    );
+    const controls = screen.getByTestId('pagination-controls');
+    expect(controls).toBeInTheDocument();
+    expect(within(controls).getByText(/Showing 1–100 of 250 results/)).toBeInTheDocument();
+    expect(within(controls).getByText(/Page 1 of 3/)).toBeInTheDocument();
+  });
+
+  it('disables Previous button on first page', () => {
+    renderWithRouter(
+      <ResultDetailView
+        {...defaultProps}
+        pagination={{ total: 200, page: 1, page_size: 100, pages: 2 }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /previous page/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /next page/i })).not.toBeDisabled();
+  });
+
+  it('disables Next button on last page', () => {
+    renderWithRouter(
+      <ResultDetailView
+        {...defaultProps}
+        pagination={{ total: 200, page: 2, page_size: 100, pages: 2 }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /previous page/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /next page/i })).toBeDisabled();
+  });
+
+  it('calls onPageChange when clicking Next', async () => {
+    const user = userEvent.setup();
+    const onPageChange = vi.fn();
+    renderWithRouter(
+      <ResultDetailView
+        {...defaultProps}
+        pagination={{ total: 200, page: 1, page_size: 100, pages: 2 }}
+        onPageChange={onPageChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it('calls onPageChange when clicking Previous', async () => {
+    const user = userEvent.setup();
+    const onPageChange = vi.fn();
+    renderWithRouter(
+      <ResultDetailView
+        {...defaultProps}
+        pagination={{ total: 300, page: 2, page_size: 100, pages: 3 }}
+        onPageChange={onPageChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /previous page/i }));
+    expect(onPageChange).toHaveBeenCalledWith(1);
+  });
+
+  it('shows correct range on middle page', () => {
+    renderWithRouter(
+      <ResultDetailView
+        {...defaultProps}
+        pagination={{ total: 300, page: 2, page_size: 100, pages: 3 }}
+      />,
+    );
+    expect(screen.getByText(/Showing 101–200 of 300 results/)).toBeInTheDocument();
+  });
+
+  it('shows correct range on last page with partial results', () => {
+    renderWithRouter(
+      <ResultDetailView
+        {...defaultProps}
+        pagination={{ total: 250, page: 3, page_size: 100, pages: 3 }}
+      />,
+    );
+    expect(screen.getByText(/Showing 201–250 of 250 results/)).toBeInTheDocument();
   });
 });
