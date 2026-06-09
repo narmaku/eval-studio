@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -13,9 +14,10 @@ import {
 } from '@/components/ui/select';
 import { FieldTooltip } from '@/components/ui/FieldTooltip';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
+import { Plus, Trash2 } from 'lucide-react';
 import { useProviderStore } from '@/stores/providerStore';
 import { api } from '@/services/api';
-import type { Provider, CreateProviderRequest, LLMParams } from '@/types';
+import type { Provider, CreateProviderRequest, LLMParams, RateLimit } from '@/types';
 
 interface ProviderFormProps {
   open: boolean;
@@ -114,6 +116,10 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
     (provider?.default_params as LLMParams) ?? {},
   );
 
+  // Rate limit fields
+  const [rateLimited, setRateLimited] = useState(provider?.rate_limited ?? false);
+  const [rateLimits, setRateLimits] = useState<RateLimit[]>(provider?.rate_limits ?? []);
+
   // Custom provider fields
   const [endpointUrl, setEndpointUrl] = useState(provider?.endpoint_url ?? '');
   const [requestBodyTemplate, setRequestBodyTemplate] = useState(
@@ -132,6 +138,26 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
   const [isTesting, setIsTesting] = useState(false);
 
   const isCustom = providerType === 'custom';
+
+  const handleRateLimitedChange = (checked: boolean | 'indeterminate') => {
+    const isChecked = checked === true;
+    setRateLimited(isChecked);
+    if (isChecked && rateLimits.length === 0) {
+      setRateLimits([{ value: 10, unit: 'requests', per: 'minute' }]);
+    }
+  };
+
+  const addRateLimit = () => {
+    setRateLimits([...rateLimits, { value: 10, unit: 'requests', per: 'minute' }]);
+  };
+
+  const removeRateLimit = (index: number) => {
+    setRateLimits(rateLimits.filter((_, i) => i !== index));
+  };
+
+  const updateRateLimit = (index: number, field: keyof RateLimit, value: unknown) => {
+    setRateLimits(rateLimits.map((rl, i) => (i === index ? { ...rl, [field]: value } : rl)));
+  };
 
   const validate = (): boolean => {
     const newErrors: string[] = [];
@@ -197,6 +223,8 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         endpoint_url: isCustom ? endpointUrl.trim() || null : null,
         request_body_template: isCustom ? requestBodyTemplate.trim() || null : null,
         response_json_path: isCustom ? responseJsonPath.trim() : 'choices.0.message.content',
+        rate_limited: rateLimited,
+        rate_limits: rateLimited && rateLimits.length > 0 ? rateLimits : null,
       };
 
       if (isEditMode && provider) {
@@ -399,6 +427,82 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
           onChange={(e) => setSslClientKey(e.target.value)}
           placeholder="e.g., /path/to/key.pem"
         />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="provider-rate-limited"
+            checked={rateLimited}
+            onCheckedChange={handleRateLimitedChange}
+          />
+          <Label htmlFor="provider-rate-limited" className="cursor-pointer">
+            This provider is rate-limited
+          </Label>
+        </div>
+
+        {rateLimited && (
+          <div className="space-y-2 pl-6">
+            {rateLimits.map((rl, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={rl.value}
+                  onChange={(e) => updateRateLimit(index, 'value', parseInt(e.target.value) || 1)}
+                  className="w-20"
+                  aria-label={`Rate limit value ${index + 1}`}
+                />
+                <Select
+                  value={rl.unit}
+                  onValueChange={(v) => updateRateLimit(index, 'unit', v)}
+                >
+                  <SelectTrigger className="w-28" aria-label={`Rate limit unit ${index + 1}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="requests">requests</SelectItem>
+                    <SelectItem value="tokens">tokens</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">/</span>
+                <Select
+                  value={rl.per}
+                  onValueChange={(v) => updateRateLimit(index, 'per', v)}
+                >
+                  <SelectTrigger className="w-28" aria-label={`Rate limit per ${index + 1}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="second">second</SelectItem>
+                    <SelectItem value="minute">minute</SelectItem>
+                    <SelectItem value="hour">hour</SelectItem>
+                    <SelectItem value="day">day</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => removeRateLimit(index)}
+                  aria-label={`Remove rate limit ${index + 1}`}
+                  type="button"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addRateLimit}
+              type="button"
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              Add Limit
+            </Button>
+          </div>
+        )}
       </div>
 
       {!isCustom && (
