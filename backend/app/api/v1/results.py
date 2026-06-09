@@ -1,8 +1,9 @@
 import math
+from statistics import median
 
 import structlog
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,12 +13,14 @@ from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.schemas.common import PaginatedResponse
 from app.schemas.result import (
+    AggregateMetricsResponse,
     ArenaContestantSummary,
     ArenaLeaderboardResponse,
     ComparisonResponse,
     CrossEvaluationItemComparison,
     EvaluationComparisonItem,
     ResultResponse,
+    ScoreBucket,
 )
 
 logger = structlog.get_logger()
@@ -54,6 +57,80 @@ async def list_results(
         page=page,
         page_size=page_size,
         pages=max(1, math.ceil(total / page_size)),
+    )
+
+
+@router.get("/aggregate", response_model=AggregateMetricsResponse)
+async def get_aggregate_metrics(
+    evaluation_id: str = Query(..., description="ID of the evaluation to aggregate metrics for."),
+    db: AsyncSession = Depends(get_db),
+) -> AggregateMetricsResponse:
+    """Get aggregate metrics (counts, mean, median, distribution) for an evaluation's results."""
+    # Validate evaluation exists
+    eval_result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
+    if not eval_result.scalar_one_or_none():
+        raise NotFoundException("Evaluation", evaluation_id)
+
+    # Aggregate query: total, passed, failed, mean score
+    stats_query = select(
+        func.count(Result.id).label("total"),
+        func.sum(case((Result.passed == True, 1), else_=0)).label("passed"),  # noqa: E712
+        func.sum(case((Result.passed == False, 1), else_=0)).label("failed"),  # noqa: E712
+        func.avg(Result.score).label("mean_score"),
+    ).where(Result.evaluation_id == evaluation_id)
+
+    stats_result = await db.execute(stats_query)
+    row = stats_result.one()
+
+    total_items = row.total or 0
+    passed_items = row.passed or 0
+    failed_items = row.failed or 0
+    mean_score = float(row.mean_score) if row.mean_score is not None else 0.0
+    pass_rate = passed_items / total_items if total_items > 0 else 0.0
+
+    # Fetch all non-null scores for median and distribution (SQLite lacks PERCENTILE_CONT)
+    scores_query = (
+        select(Result.score)
+        .where(Result.evaluation_id == evaluation_id)
+        .where(Result.score.isnot(None))
+        .order_by(Result.score)
+    )
+    scores_result = await db.execute(scores_query)
+    scores = [r[0] for r in scores_result.all()]
+
+    median_score = median(scores) if scores else 0.0
+
+    # Build score distribution: 10 buckets from 0.0-0.1 to 0.9-1.0
+    bucket_labels = [
+        "0.0-0.1",
+        "0.1-0.2",
+        "0.2-0.3",
+        "0.3-0.4",
+        "0.4-0.5",
+        "0.5-0.6",
+        "0.6-0.7",
+        "0.7-0.8",
+        "0.8-0.9",
+        "0.9-1.0",
+    ]
+    bucket_counts = [0] * 10
+    for score in scores:
+        idx = min(int(score * 10), 9)
+        bucket_counts[idx] += 1
+
+    score_distribution = [
+        ScoreBucket(label=label, count=count) for label, count in zip(bucket_labels, bucket_counts, strict=True)
+    ]
+
+    logger.info("results.aggregate", evaluation_id=evaluation_id, total=total_items)
+    return AggregateMetricsResponse(
+        total_items=total_items,
+        passed_items=passed_items,
+        failed_items=failed_items,
+        mean_score=mean_score,
+        median_score=median_score,
+        pass_rate=pass_rate,
+        score_distribution=score_distribution,
     )
 
 

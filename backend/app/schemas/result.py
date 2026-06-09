@@ -72,3 +72,22 @@ class ArenaLeaderboardResponse(BaseModel):
     evaluation_id: str
     evaluation_name: str
     contestants: list[ArenaContestantSummary]
+
+
+class ScoreBucket(BaseModel):
+    """A single bucket in a score distribution histogram."""
+
+    label: str
+    count: int
+
+
+class AggregateMetricsResponse(BaseModel):
+    """Aggregate metrics for an evaluation's results."""
+
+    total_items: int
+    passed_items: int
+    failed_items: int
+    mean_score: float
+    median_score: float
+    pass_rate: float
+    score_distribution: list[ScoreBucket]

@@ -44,6 +44,8 @@ class EvaluationResponse(BaseModel):
     judge_config_id: str | None = Field(description="ID of the judge configuration used for scoring.")
     config: dict[str, Any] = Field(description="Mode-specific configuration.")
     result_count: int | None = Field(default=None, description="Number of results (populated on detail endpoint).")
+    average_score: float | None = Field(default=None, description="Average score across results.")
+    pass_rate: float | None = Field(default=None, description="Fraction of results that passed.")
     created_at: datetime = Field(description="Timestamp when the evaluation was created.")
     updated_at: datetime = Field(description="Timestamp when the evaluation was last updated.")
 
