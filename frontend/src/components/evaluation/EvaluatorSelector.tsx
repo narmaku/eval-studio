@@ -17,6 +17,14 @@ export function EvaluatorSelector({ mode, onSelect }: EvaluatorSelectorProps) {
     void fetchEvaluators(mode);
   }, [mode, fetchEvaluators]);
 
+  // Auto-select first available evaluator when selection is reset externally
+  useEffect(() => {
+    if (!selectedEvaluatorId && evaluators.length > 0) {
+      const firstAvailable = evaluators.find((e) => e.available);
+      if (firstAvailable) selectEvaluator(firstAvailable.id);
+    }
+  }, [selectedEvaluatorId, evaluators, selectEvaluator]);
+
   const handleSelect = (evaluatorId: string) => {
     selectEvaluator(evaluatorId);
     onSelect?.(evaluatorId);

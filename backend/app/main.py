@@ -13,6 +13,25 @@ from app.core.logging import configure_logging, get_logger
 from app.schemas.common import ProblemDetail
 
 
+async def _migrate_scored_sessions() -> None:
+    """Fix legacy sessions that were auto-scored but left with status 'ended'."""
+    from sqlalchemy import text
+
+    from app.core.database import async_session_factory
+
+    async with async_session_factory() as db:
+        result = await db.execute(
+            text(
+                "UPDATE sessions SET status = 'completed' "
+                "WHERE status = 'ended' AND scores IS NOT NULL AND scores != 'null' AND length(scores) > 4"
+            )
+        )
+        if result.rowcount:
+            logger = get_logger("app.main")
+            logger.info("Migrated legacy scored sessions", count=result.rowcount)
+        await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown events."""
@@ -25,6 +44,7 @@ async def lifespan(app: FastAPI):
     )
     if settings.auth_disabled:
         logger.warning("Authentication is DISABLED (AUTH_DISABLED=true). All endpoints are publicly accessible.")
+    await _migrate_scored_sessions()
     yield
     logger = get_logger("app.main")
     logger.info("Shutting down eval-studio backend")
