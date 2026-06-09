@@ -14,17 +14,13 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.base import JudgeConfigParams, Message, ToolCall
-from app.adapters.factory import create_evaluation_adapter
 from app.agent_backends.factory import create_agent_backend
 from app.core.exceptions import sanitize_error_for_client
 from app.harnesses.factory import create_harness
 from app.harnesses.registry import harness_registry
 from app.mcp.manager import cleanup_manager, get_or_create_manager
 from app.models.evaluation import Evaluation
-from app.models.result import Result
 from app.models.session import Session
-from app.services.provider_utils import resolve_model_config
 
 logger = structlog.get_logger()
 
@@ -536,8 +532,10 @@ async def _subprocess_process(
         await harness.stop_session()
 
 
-async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
-    """End a session and optionally score it with a judge.
+async def end_session(session_id: str, db: AsyncSession) -> dict:
+    """End a session and clean up resources. Does NOT score.
+
+    Scoring is a separate explicit step via the POST /sessions/{id}/score endpoint.
 
     Also cleans up any MCP server managers associated with the session.
 
@@ -546,7 +544,7 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
         db: Async database session.
 
     Returns:
-        Dict with session status and scores.
+        Dict with session status and ended_at.
 
     Raises:
         ValueError: If session not found.
@@ -563,100 +561,22 @@ async def end_and_score_session(session_id: str, db: AsyncSession) -> dict:
     if session.status != "active":
         return {
             "status": session.status,
-            "scores": session.scores,
             "ended_at": session.ended_at.isoformat() if session.ended_at else None,
         }
 
     session.status = "ended"
     session.ended_at = datetime.now(UTC)
 
-    # Score with judge if configured
-    if session.judge_config_snapshot:
-        try:
-            judge_config = session.judge_config_snapshot
-
-            # Resolve judge model via provider registry or direct config
-            judge_resolved = resolve_model_config(judge_config)
-
-            judge_params = JudgeConfigParams(
-                model=judge_resolved.model,
-                temperature=judge_config.get("temperature", 0.0),
-                prompt_template=judge_config.get("prompt_template"),
-                pass_threshold=judge_config.get("pass_threshold", 0.7),
-                dimensions=judge_config.get("dimensions"),
-                aggregation=judge_config.get("aggregation"),
-            )
-
-            adapter = create_evaluation_adapter(
-                model=judge_resolved.model,
-                api_key=judge_resolved.api_key,
-                api_base=judge_resolved.api_base,
-            )
-
-            # Convert transcript to adapter types
-            transcript = session.transcript or []
-            messages = [
-                Message(
-                    role=msg["role"],
-                    content=msg.get("content", ""),
-                )
-                for msg in transcript
-                if msg.get("role") in ("user", "assistant", "system")
-            ]
-            tool_calls = []
-            for msg in transcript:
-                for tc in msg.get("tool_calls", []):
-                    tool_calls.append(
-                        ToolCall(
-                            tool_name=tc.get("tool_name", ""),
-                            arguments=tc.get("arguments", {}),
-                            result=tc.get("result"),
-                            duration_ms=tc.get("duration_ms"),
-                        )
-                    )
-
-            score = await adapter.evaluate_conversation(messages, tool_calls, judge_params)
-
-            session.scores = {
-                "overall": score.value,
-                "passed": score.passed,
-                "reasoning": score.reasoning,
-                "breakdown": score.breakdown,
-            }
-
-            logger.info(
-                "agent_chat.session_scored",
-                session_id=session_id,
-                score=score.value,
-                passed=score.passed,
-            )
-
-        except Exception as exc:
-            logger.exception("agent_chat.judge_error", session_id=session_id)
-            session.error = f"Judge scoring failed: {sanitize_error_for_client(exc)}"
-
-    # Create Result and update Evaluation if session is linked to one
+    # Update linked Evaluation status to "completed"
     if session.evaluation_id:
-        result_record = Result(
-            evaluation_id=session.evaluation_id,
-            session_id=session.id,
-            score=session.scores.get("overall") if session.scores else None,
-            passed=session.scores.get("passed") if session.scores else None,
-            judge_reasoning=session.scores.get("reasoning") if session.scores else None,
-            scores_breakdown=session.scores.get("breakdown") if session.scores else None,
-            actual_answer=None,
-        )
-        db.add(result_record)
-
         eval_result = await db.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
         evaluation = eval_result.scalar_one_or_none()
         if evaluation:
-            evaluation.status = "failed" if session.error else "completed"
+            evaluation.status = "completed"
 
     await db.commit()
 
     return {
         "status": session.status,
-        "scores": session.scores,
         "ended_at": session.ended_at.isoformat() if session.ended_at else None,
     }

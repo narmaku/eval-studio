@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.evaluation import Evaluation
 from app.models.session import Session
-from app.services.agent_chat_service import end_and_score_session, process_user_message
+from app.services.agent_chat_service import end_session, process_user_message
 
 
 def _make_streaming_chunks(content: str, tool_calls: list | None = None):
@@ -176,25 +176,26 @@ async def test_process_user_message_session_not_found(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_end_and_score_session_without_judge(db_session: AsyncSession, session_with_config):
-    """end_and_score_session ends the session when no judge is configured."""
+async def test_end_session_without_judge(db_session: AsyncSession, session_with_config):
+    """end_session ends the session without scoring, even if judge is configured."""
     session = session_with_config
 
-    result = await end_and_score_session(session.id, db_session)
+    result = await end_session(session.id, db_session)
 
     assert result["status"] == "ended"
-    assert result["scores"] is None
+    assert "scores" not in result
 
     # Verify DB state
     db_result = await db_session.execute(select(Session).where(Session.id == session.id))
     updated = db_result.scalar_one()
     assert updated.status == "ended"
     assert updated.ended_at is not None
+    assert updated.scores is None
 
 
 @pytest.mark.asyncio
-async def test_end_and_score_session_with_judge(db_session: AsyncSession, session_with_config):
-    """end_and_score_session calls judge and stores scores."""
+async def test_end_session_does_not_score_even_with_judge_config(db_session: AsyncSession, session_with_config):
+    """end_session does NOT invoke the judge, even when judge_config_snapshot is present."""
     session = session_with_config
     session.judge_config_snapshot = {"model": "judge-model", "pass_threshold": 0.7}
     session.transcript = [
@@ -203,55 +204,69 @@ async def test_end_and_score_session_with_judge(db_session: AsyncSession, sessio
     ]
     await db_session.commit()
 
-    mock_score = MagicMock()
-    mock_score.value = 0.9
-    mock_score.passed = True
-    mock_score.reasoning = "Great conversation"
-    mock_score.breakdown = {"helpfulness": 0.9}
-
     with patch(
         "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
         new_callable=AsyncMock,
-        return_value=mock_score,
-    ):
-        result = await end_and_score_session(session.id, db_session)
+    ) as mock_judge:
+        result = await end_session(session.id, db_session)
 
-    assert result["scores"]["overall"] == 0.9
-    assert result["scores"]["passed"] is True
-    assert result["scores"]["reasoning"] == "Great conversation"
+    # Judge should NOT have been called
+    mock_judge.assert_not_called()
 
-    # Verify DB state
+    assert result["status"] == "ended"
+    assert "scores" not in result
+
+    # Verify DB state — no scores stored
     db_result = await db_session.execute(select(Session).where(Session.id == session.id))
     updated = db_result.scalar_one()
-    assert updated.scores is not None
-    assert updated.scores["overall"] == 0.9
+    assert updated.scores is None
+    assert updated.status == "ended"
+    assert updated.ended_at is not None
 
 
 @pytest.mark.asyncio
-async def test_end_and_score_session_judge_error(db_session: AsyncSession, session_with_config):
-    """end_and_score_session stores error when judge fails but still ends session."""
+async def test_end_session_sets_evaluation_to_completed(db_session: AsyncSession, session_with_config):
+    """end_session sets the linked evaluation status to 'completed'."""
     session = session_with_config
-    session.judge_config_snapshot = {"model": "judge-model"}
-    session.transcript = [
-        {"role": "user", "content": "Hello", "timestamp": datetime.now(UTC).isoformat()},
-    ]
-    await db_session.commit()
 
-    with patch(
-        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
-        new_callable=AsyncMock,
-        side_effect=RuntimeError("Judge API down"),
-    ):
-        result = await end_and_score_session(session.id, db_session)
+    # Verify the evaluation starts as non-completed
+    eval_result = await db_session.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
+    evaluation = eval_result.scalar_one()
+    assert evaluation.status != "completed"
+
+    result = await end_session(session.id, db_session)
 
     assert result["status"] == "ended"
-    assert result["scores"] is None
 
-    # Verify error was stored
-    db_result = await db_session.execute(select(Session).where(Session.id == session.id))
-    updated = db_result.scalar_one()
-    assert updated.error is not None
-    assert "Judge scoring failed" in updated.error
-    # RuntimeError details should be sanitized — the raw message must NOT leak
-    assert "Judge API down" not in updated.error
-    assert updated.status == "ended"
+    # Verify evaluation is now completed
+    eval_result = await db_session.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
+    evaluation = eval_result.scalar_one()
+    assert evaluation.status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_end_session_does_not_create_result(db_session: AsyncSession, session_with_config):
+    """end_session does NOT create a Result record — that is the score endpoint's job."""
+    from app.models.result import Result
+
+    session = session_with_config
+
+    await end_session(session.id, db_session)
+
+    # Verify no Result was created
+    result_query = await db_session.execute(select(Result).where(Result.session_id == session.id))
+    results = result_query.scalars().all()
+    assert len(results) == 0
+
+
+@pytest.mark.asyncio
+async def test_end_session_idempotent(db_session: AsyncSession, session_with_config):
+    """end_session is idempotent — calling it on an already-ended session returns current state."""
+    session = session_with_config
+
+    result1 = await end_session(session.id, db_session)
+    assert result1["status"] == "ended"
+
+    result2 = await end_session(session.id, db_session)
+    assert result2["status"] == "ended"
+    assert result2["ended_at"] is not None
