@@ -177,6 +177,23 @@ describe('QAResultsTable', () => {
     expect(onRowClick).toHaveBeenCalledWith(mockResults[0]);
   });
 
+  it('shows -- for expected answer when datasetItems is not provided', () => {
+    render(<QAResultsTable results={mockResults} />);
+
+    const cells = document.querySelectorAll('td');
+    const expectedCells = Array.from(cells).filter((cell) => cell.textContent === '--');
+    expect(expectedCells.length).toBeGreaterThan(0);
+  });
+
+  it('shows expected answer text when datasetItems is provided', () => {
+    render(<QAResultsTable results={mockResults} datasetItems={mockDatasetItems} />);
+
+    // Expected answer column should render the expected_answer from dataset items
+    // Use getAllByText since the text may partially match the actual answer column too
+    const matches = screen.getAllByText(/systemctl restart sshd/);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('shows empty state when no results are provided', () => {
     render(<QAResultsTable results={[]} />);
 

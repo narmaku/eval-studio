@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,8 @@ import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
-import type { JudgeReference, Result, CreateEvaluationRequest, LLMParams } from '@/types';
+import { api } from '@/services/api';
+import type { JudgeReference, Result, CreateEvaluationRequest, LLMParams, DatasetItem } from '@/types';
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
@@ -56,11 +57,18 @@ export default function RAGEvaluation() {
   const [judgeParams, setJudgeParams] = useState<LLMParams>({});
   const [selectedResult, setSelectedResult] = useState<Result | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
 
   const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
     useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults } = useResultStore();
+
+  const itemMap = useMemo(() => {
+    const map = new Map<string, DatasetItem>();
+    datasetItems.forEach((item) => map.set(item.id, item));
+    return map;
+  }, [datasetItems]);
 
   const isRagEndpointValid = (() => {
     if (!ragEndpoint) return false;
@@ -135,6 +143,11 @@ export default function RAGEvaluation() {
         evaluationId: evaluation.id,
       });
       void fetchResults(evaluation.id);
+      if (selectedDatasetId) {
+        api.getDataset(selectedDatasetId)
+          .then((detail) => setDatasetItems(detail.items))
+          .catch(() => setDatasetItems([]));
+      }
       setPhase('complete');
     } else if (evaluation?.status === 'failed') {
       const errorMsg = evaluation.error || 'Unknown error';
@@ -156,7 +169,7 @@ export default function RAGEvaluation() {
       });
       setPhase('configure');
     }
-  }, [fetchResults]);
+  }, [fetchResults, selectedDatasetId]);
 
   const handleRowClick = (result: Result) => {
     setSelectedResult(result);
@@ -172,6 +185,7 @@ export default function RAGEvaluation() {
     setJudgeParams({});
     setSelectedResult(null);
     setDrawerOpen(false);
+    setDatasetItems([]);
     useEvaluatorStore.getState().resetSelection();
   };
 
@@ -236,10 +250,11 @@ export default function RAGEvaluation() {
       {/* Complete Phase */}
       {phase === 'complete' && (
         <>
-          <RAGResultsTable results={results} onRowClick={handleRowClick} />
+          <RAGResultsTable results={results} datasetItems={datasetItems} onRowClick={handleRowClick} />
 
           <RAGResultDetailDrawer
             result={selectedResult}
+            datasetItem={selectedResult?.dataset_item_id ? itemMap.get(selectedResult.dataset_item_id) : undefined}
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
           />
