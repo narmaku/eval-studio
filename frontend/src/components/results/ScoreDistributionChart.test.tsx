@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { bucketScores } from './scoreUtils';
-import type { Result } from '@/types';
+import type { Result, ScoreBucket } from '@/types';
 
 // Mock ResizeObserver for Recharts ResponsiveContainer
 class ResizeObserverMock {
@@ -69,9 +69,21 @@ describe('bucketScores', () => {
 });
 
 describe('ScoreDistributionChart', () => {
+  const sampleDistribution: ScoreBucket[] = [
+    { label: '0.0-0.1', count: 0 },
+    { label: '0.1-0.2', count: 0 },
+    { label: '0.2-0.3', count: 0 },
+    { label: '0.3-0.4', count: 0 },
+    { label: '0.4-0.5', count: 1 },
+    { label: '0.5-0.6', count: 0 },
+    { label: '0.6-0.7', count: 1 },
+    { label: '0.7-0.8', count: 0 },
+    { label: '0.8-0.9', count: 1 },
+    { label: '0.9-1.0', count: 0 },
+  ];
+
   it('renders with data without crashing', () => {
-    const results = [makeResult(0.5), makeResult(0.7), makeResult(0.9)];
-    const { container } = render(<ScoreDistributionChart results={results} />);
+    const { container } = render(<ScoreDistributionChart distribution={sampleDistribution} />);
 
     expect(screen.getByText('Score Distribution')).toBeInTheDocument();
     // Recharts renders SVG in real DOM, but in jsdom it may not fully render.
@@ -79,8 +91,14 @@ describe('ScoreDistributionChart', () => {
     expect(container.querySelector('[data-slot="card"]')).toBeInTheDocument();
   });
 
-  it('renders empty state when no scores provided', () => {
-    render(<ScoreDistributionChart results={[]} />);
+  it('renders empty state when no distribution provided', () => {
+    render(<ScoreDistributionChart distribution={[]} />);
+    expect(screen.getByText('No score data available.')).toBeInTheDocument();
+  });
+
+  it('renders empty state when all counts are zero', () => {
+    const allZero: ScoreBucket[] = sampleDistribution.map((b) => ({ ...b, count: 0 }));
+    render(<ScoreDistributionChart distribution={allZero} />);
     expect(screen.getByText('No score data available.')).toBeInTheDocument();
   });
 });

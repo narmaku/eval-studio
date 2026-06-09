@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationStore } from '@/stores/evaluationStore';
@@ -8,17 +8,27 @@ import type { DatasetItem, ArenaLeaderboardResponse } from '@/types';
 
 export default function ResultDetail() {
   const { resultId } = useParams<{ resultId: string }>();
-  const { results, isLoading, error, fetchResults } = useResultStore();
+  const {
+    results,
+    isLoading,
+    error,
+    pagination,
+    aggregateMetrics,
+    fetchResults,
+    fetchAggregateMetrics,
+    fetchAllResultsForExport,
+  } = useResultStore();
   const { evaluations, fetchEvaluations } = useEvaluationStore();
   const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
   const [arenaLeaderboard, setArenaLeaderboard] = useState<ArenaLeaderboardResponse | null>(null);
 
   useEffect(() => {
     if (resultId) {
-      void fetchResults(resultId);
+      void fetchResults(resultId, 1, 100);
+      void fetchAggregateMetrics(resultId);
       void fetchEvaluations();
     }
-  }, [resultId, fetchResults, fetchEvaluations]);
+  }, [resultId, fetchResults, fetchAggregateMetrics, fetchEvaluations]);
 
   const evaluation = evaluations.find((e) => e.id === resultId);
 
@@ -39,6 +49,29 @@ export default function ResultDetail() {
         .catch(() => setArenaLeaderboard(null));
     }
   }, [evaluation?.mode, resultId]);
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      if (resultId) {
+        void fetchResults(resultId, page, pagination?.page_size ?? 100);
+      }
+    },
+    [resultId, pagination?.page_size, fetchResults],
+  );
+
+  const handlePageSizeChange = useCallback(
+    (size: number) => {
+      if (resultId) {
+        void fetchResults(resultId, 1, size);
+      }
+    },
+    [resultId, fetchResults],
+  );
+
+  const handleFetchAllForExport = useCallback(() => {
+    if (!resultId) return Promise.resolve([]);
+    return fetchAllResultsForExport(resultId);
+  }, [resultId, fetchAllResultsForExport]);
 
   if (isLoading) {
     return (
@@ -67,23 +100,6 @@ export default function ResultDetail() {
     );
   }
 
-  const scores = results.filter((r) => r.score != null).map((r) => r.score!);
-  const passedCount = results.filter((r) => r.passed === true).length;
-  const failedCount = results.filter((r) => r.passed === false).length;
-  const sorted = [...scores].sort((a, b) => a - b);
-  const meanScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-  const medianScore = sorted.length > 0 ? (sorted[Math.floor(sorted.length / 2)] ?? 0) : 0;
-
-  const aggregateMetrics = {
-    total_items: results.length,
-    passed_items: passedCount,
-    failed_items: failedCount,
-    mean_score: meanScore,
-    median_score: medianScore,
-    pass_rate: results.length > 0 ? passedCount / results.length : 0,
-    score_distribution: [],
-  };
-
   return (
     <>
       <ResultDetailView
@@ -93,6 +109,10 @@ export default function ResultDetail() {
         evaluationMode={evaluation?.mode}
         datasetItems={datasetItems}
         arenaLeaderboard={arenaLeaderboard}
+        pagination={pagination}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+        onFetchAllForExport={handleFetchAllForExport}
       />
       {resultId && <ArtifactsList evaluationId={resultId} />}
     </>

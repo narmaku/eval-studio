@@ -10,11 +10,25 @@ import {
   type ExpandedState,
 } from '@tanstack/react-table';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronRight, FileDown, Loader2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  FileDown,
+  Loader2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -32,6 +46,13 @@ import { RadarComparisonChart } from './RadarComparisonChart';
 import { exportResultsPdf, type PdfExportData } from '@/lib/exportPdf';
 import type { Result, AggregateMetrics, DatasetItem, ArenaLeaderboardResponse } from '@/types';
 
+interface PaginationInfo {
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
 interface ResultDetailViewProps {
   results: Result[];
   aggregateMetrics?: AggregateMetrics | null;
@@ -39,6 +60,10 @@ interface ResultDetailViewProps {
   evaluationMode?: string;
   datasetItems?: DatasetItem[];
   arenaLeaderboard?: ArenaLeaderboardResponse | null;
+  pagination?: PaginationInfo | null;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
+  onFetchAllForExport?: () => Promise<Result[]>;
 }
 
 function ScoreBreakdownBadges({
@@ -292,6 +317,10 @@ export function ResultDetailView({
   evaluationMode,
   datasetItems,
   arenaLeaderboard,
+  pagination,
+  onPageChange,
+  onPageSizeChange,
+  onFetchAllForExport,
 }: ResultDetailViewProps) {
   const metrics = aggregateMetrics ?? EMPTY_METRICS;
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -302,6 +331,13 @@ export function ResultDetailView({
   const handleExportPdf = async () => {
     setIsExporting(true);
     try {
+      // If paginated, fetch all results before generating PDF
+      let exportResults = results;
+      if (onFetchAllForExport && pagination && pagination.pages > 1) {
+        toast.info('Fetching all results for export...');
+        exportResults = await onFetchAllForExport();
+      }
+
       const chartElements: HTMLElement[] = [];
       if (chartsRef.current) {
         chartsRef.current.querySelectorAll<HTMLElement>('[data-chart]').forEach((el) => {
@@ -313,14 +349,14 @@ export function ResultDetailView({
         evaluationName: evaluationName ?? 'Evaluation',
         evaluationMode: evaluationMode ?? 'qa',
         metrics: {
-          totalItems: metrics.total_items || results.length,
+          totalItems: metrics.total_items || exportResults.length,
           passRate: metrics.pass_rate,
           meanScore: metrics.mean_score,
           medianScore: metrics.median_score,
           passedItems: metrics.passed_items,
           failedItems: metrics.failed_items,
         },
-        results: results.map((r) => {
+        results: exportResults.map((r) => {
           const item = r.dataset_item_id ? itemMap.get(r.dataset_item_id) : undefined;
           return {
             question: item?.question ?? r.dataset_item_id ?? '--',
@@ -477,7 +513,7 @@ export function ResultDetailView({
             </CardContent>
           </Card>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2" ref={chartsRef}>
-            <div data-chart><ScoreDistributionChart results={results} /></div>
+            <div data-chart><ScoreDistributionChart distribution={metrics.score_distribution} /></div>
             <div data-chart><PassFailChart passedItems={metrics.passed_items} failedItems={metrics.failed_items} /></div>
           </div>
         </>
@@ -590,6 +626,60 @@ export function ResultDetailView({
           )}
         </CardContent>
       </Card>
+
+      {/* Pagination controls */}
+      {pagination && pagination.pages > 1 && (
+        <div className="flex items-center justify-between" data-testid="pagination-controls">
+          <p className="text-sm text-muted-foreground">
+            Showing {(pagination.page - 1) * pagination.page_size + 1}–
+            {Math.min(pagination.page * pagination.page_size, pagination.total)} of{' '}
+            {pagination.total} results
+          </p>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Per page</span>
+              <Select
+                value={String(pagination.page_size)}
+                onValueChange={(value) => onPageSizeChange?.(Number(value))}
+              >
+                <SelectTrigger size="sm" className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                  <SelectItem value="250">250</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagination.page <= 1}
+                onClick={() => onPageChange?.(pagination.page - 1)}
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <span className="px-2 text-sm text-muted-foreground">
+                Page {pagination.page} of {pagination.pages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagination.page >= pagination.pages}
+                onClick={() => onPageChange?.(pagination.page + 1)}
+                aria-label="Next page"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
