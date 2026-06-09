@@ -108,6 +108,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
   const [apiKeyEnv, setApiKeyEnv] = useState('');
   const [proxy, setProxy] = useState(provider?.proxy ?? '');
   const [sslCertPath, setSslCertPath] = useState(provider?.ssl_cert_path ?? '');
+  const [sslClientKey, setSslClientKey] = useState(provider?.ssl_client_key ?? '');
   const [tagsInput, setTagsInput] = useState(provider?.tags?.join(', ') ?? '');
   const [defaultParams, setDefaultParams] = useState<LLMParams>(
     (provider?.default_params as LLMParams) ?? {},
@@ -155,6 +156,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         api_key_env: apiKeyEnv.trim() || null,
         proxy: proxy.trim() || null,
         ssl_cert_path: sslCertPath.trim() || null,
+        ssl_client_key: sslClientKey.trim() || null,
         tags: [],
         provider_type: providerType,
         endpoint_url: isCustom ? endpointUrl.trim() || null : null,
@@ -187,6 +189,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         api_key_env: apiKeyEnv.trim() || null,
         proxy: proxy.trim() || null,
         ssl_cert_path: sslCertPath.trim() || null,
+        ssl_client_key: sslClientKey.trim() || null,
         tags,
         default_params:
           Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, unknown>) : null,
@@ -370,7 +373,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Label htmlFor="provider-ssl-cert">SSL Certificate Bundle (optional)</Label>
+          <Label htmlFor="provider-ssl-cert">SSL Client Certificate (optional)</Label>
           {fieldDescriptions.ssl_cert_path && (
             <FieldTooltip description={fieldDescriptions.ssl_cert_path} />
           )}
@@ -379,7 +382,22 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
           id="provider-ssl-cert"
           value={sslCertPath}
           onChange={(e) => setSslCertPath(e.target.value)}
-          placeholder="e.g., /etc/pki/tls/certs/ca-bundle.crt"
+          placeholder="e.g., /path/to/cert.pem"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="provider-ssl-key">SSL Client Key (optional)</Label>
+          {fieldDescriptions.ssl_client_key && (
+            <FieldTooltip description={fieldDescriptions.ssl_client_key} />
+          )}
+        </div>
+        <Input
+          id="provider-ssl-key"
+          value={sslClientKey}
+          onChange={(e) => setSslClientKey(e.target.value)}
+          placeholder="e.g., /path/to/key.pem"
         />
       </div>
 

@@ -6,6 +6,7 @@ import ssl
 import uuid
 
 import httpx
+import litellm
 import structlog
 from fastapi import APIRouter, Depends, Response
 
@@ -19,6 +20,7 @@ from app.schemas.provider import (
     ProviderUpdate,
     TestConnectionResponse,
 )
+from app.services.provider_utils import proxy_env
 
 logger = structlog.get_logger()
 
@@ -31,6 +33,12 @@ def _handle_connection_error(exc: Exception) -> TestConnectionResponse:
     Uses curated messages for known exception types to avoid leaking internal
     details (file paths, environment variables, stack traces) to the client.
     """
+    if isinstance(exc, litellm.AuthenticationError):
+        return TestConnectionResponse(success=False, message="Authentication failed — check API key")
+    if isinstance(exc, litellm.NotFoundError):
+        return TestConnectionResponse(success=False, message="Model not found — check model name")
+    if isinstance(exc, litellm.APIConnectionError):
+        return TestConnectionResponse(success=False, message="Connection failed — unable to reach the API")
     if isinstance(exc, httpx.ConnectError):
         return TestConnectionResponse(success=False, message="Connection failed: unable to reach the server")
     if isinstance(exc, httpx.TimeoutException):
@@ -59,7 +67,7 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
         has_api_key=p.api_key is not None,
         proxy=p.proxy,
         ssl_cert_path=p.ssl_cert_path,
-        has_ssl_client_key=p.ssl_client_key is not None,
+        ssl_client_key=p.ssl_client_key,
         tags=p.tags,
         default_params=p.default_params,
         provider_type=p.provider_type,
@@ -90,6 +98,7 @@ async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
     elif payload.ssl_cert_path:
         client_kwargs["verify"] = payload.ssl_cert_path
 
+    api_key: str | None = None
     headers: dict[str, str] = {}
     if payload.api_key_env:
         api_key = os.environ.get(payload.api_key_env)
@@ -97,29 +106,51 @@ async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
             headers["Authorization"] = f"Bearer {api_key}"
 
     if payload.provider_type == "litellm":
-        if not payload.api_base:
-            return TestConnectionResponse(
-                success=True,
-                message="No API base configured — cannot verify connectivity, but provider config is valid",
-            )
-
-        base = payload.api_base.rstrip("/")
-        if base.endswith("/v1"):
-            base = base[:-3]
-        url = f"{base}/v1/models"
-
-        try:
-            async with httpx.AsyncClient(**client_kwargs) as client:
-                resp = await client.get(url, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-                model_count = len(data.get("data", []))
+        if payload.default_model:
+            # Use litellm.acompletion to test the full pipeline (model routing, auth, proxy, SSL)
+            litellm_kwargs: dict = {
+                "model": payload.default_model,
+                "messages": [{"role": "user", "content": "hi"}],
+                "max_tokens": 1,
+            }
+            if api_key:
+                litellm_kwargs["api_key"] = api_key
+            if payload.api_base:
+                litellm_kwargs["api_base"] = payload.api_base
+            try:
+                with proxy_env(payload.proxy, payload.ssl_cert_path, payload.ssl_client_key):
+                    await litellm.acompletion(**litellm_kwargs)
                 return TestConnectionResponse(
                     success=True,
-                    message=f"Connected successfully — {model_count} model(s) available",
+                    message=f"Connected to {payload.default_model}",
                 )
-        except Exception as exc:
-            return _handle_connection_error(exc)
+            except Exception as exc:
+                return _handle_connection_error(exc)
+
+        elif payload.api_base:
+            # No model but has api_base — try /v1/models listing (local servers)
+            base = payload.api_base.rstrip("/")
+            if base.endswith("/v1"):
+                base = base[:-3]
+            url = f"{base}/v1/models"
+            try:
+                async with httpx.AsyncClient(**client_kwargs) as client:
+                    resp = await client.get(url, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    model_count = len(data.get("data", []))
+                    return TestConnectionResponse(
+                        success=True,
+                        message=f"Connected — {model_count} model(s) available",
+                    )
+            except Exception as exc:
+                return _handle_connection_error(exc)
+
+        else:
+            return TestConnectionResponse(
+                success=False,
+                message="Configure a default model or API base to test connectivity",
+            )
 
     else:
         # Custom provider
