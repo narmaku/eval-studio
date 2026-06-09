@@ -115,4 +115,44 @@ describe('exportResultsPdf', () => {
       expect(pageY).toBeLessThan(prevPageY);
     }
   });
+
+  it('does not call addPage when content fits on a single page', async () => {
+    // A short canvas: 800x600 -> scaled height = (600*190)/800 = 142.5mm < 277mm usable
+    const shortCanvas = {
+      ...mockCanvas,
+      height: 600,
+      width: 800,
+      toDataURL: vi.fn(() => 'data:image/png;base64,fake'),
+    };
+    mockHtml2canvas.mockResolvedValueOnce(shortCanvas);
+
+    await exportResultsPdf(container, 'short-eval');
+    expect(mockAddPage).not.toHaveBeenCalled();
+    expect(mockAddImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves underscores and hyphens in the filename', async () => {
+    await exportResultsPdf(container, 'my_eval-name');
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.stringMatching(/^evaluation-my_eval-name-\d{4}-\d{2}-\d{2}\.pdf$/),
+    );
+  });
+
+  it('handles an empty evaluation name', async () => {
+    await exportResultsPdf(container, '');
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.stringMatching(/^evaluation--\d{4}-\d{2}-\d{2}\.pdf$/),
+    );
+  });
+
+  it('passes scale:2 and white background to html2canvas', async () => {
+    await exportResultsPdf(container, 'test');
+    expect(mockHtml2canvas).toHaveBeenCalledWith(
+      container,
+      expect.objectContaining({
+        scale: 2,
+        backgroundColor: '#ffffff',
+      }),
+    );
+  });
 });

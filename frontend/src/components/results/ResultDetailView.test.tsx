@@ -149,4 +149,41 @@ describe('ResultDetailView — PDF export', () => {
     );
     expect(screen.getByRole('button', { name: /export pdf/i })).toBeInTheDocument();
   });
+
+  it('renders export button in rag mode', () => {
+    renderWithRouter(<ResultDetailView {...defaultProps} evaluationMode="rag" />);
+    expect(screen.getByRole('button', { name: /export pdf/i })).toBeInTheDocument();
+  });
+
+  it('renders export button in agent mode', () => {
+    renderWithRouter(<ResultDetailView {...defaultProps} evaluationMode="agent" />);
+    expect(screen.getByRole('button', { name: /export pdf/i })).toBeInTheDocument();
+  });
+
+  it('falls back to "evaluation" when evaluationName is undefined', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<ResultDetailView {...defaultProps} evaluationName={undefined} />);
+
+    const button = screen.getByRole('button', { name: /export pdf/i });
+    await user.click(button);
+
+    expect(mockExportResultsPdf).toHaveBeenCalledWith(expect.any(HTMLElement), 'evaluation');
+  });
+
+  it('renders export button even with empty results array', () => {
+    renderWithRouter(<ResultDetailView {...defaultProps} results={[]} />);
+    expect(screen.getByRole('button', { name: /export pdf/i })).toBeInTheDocument();
+  });
+
+  it('re-enables the button after a failed export', async () => {
+    mockExportResultsPdf.mockRejectedValueOnce(new Error('fail'));
+
+    const user = userEvent.setup();
+    renderWithRouter(<ResultDetailView {...defaultProps} />);
+
+    const button = screen.getByRole('button', { name: /export pdf/i });
+    await user.click(button);
+
+    await vi.waitFor(() => expect(button).not.toBeDisabled());
+  });
 });
