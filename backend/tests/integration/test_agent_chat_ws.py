@@ -211,13 +211,12 @@ async def test_ws_disconnect_marks_session_ended(ws_setup):
 
     mock_result = {
         "status": "ended",
-        "scores": None,
         "ended_at": "2024-01-01T00:00:00+00:00",
     }
 
     with (
         patch("app.websocket.chat.async_session_factory", setup["factory"]),
-        patch("app.websocket.chat.end_and_score_session", new_callable=AsyncMock, return_value=mock_result),
+        patch("app.websocket.chat.end_session", new_callable=AsyncMock, return_value=mock_result),
     ):
         client = TestClient(app)
         with client.websocket_connect(f"/ws/session/{setup['session_id']}") as ws:
@@ -232,20 +231,19 @@ async def test_ws_disconnect_marks_session_ended(ws_setup):
 
 @pytest.mark.asyncio
 async def test_ws_end_session_command(ws_setup):
-    """Sending end_session command should end and score the session."""
+    """Sending end_session command should end the session (no scoring)."""
     from app.main import app
 
     setup = ws_setup
 
     mock_result = {
         "status": "ended",
-        "scores": None,
         "ended_at": "2024-01-01T00:00:00+00:00",
     }
 
     with (
         patch("app.websocket.chat.async_session_factory", setup["factory"]),
-        patch("app.websocket.chat.end_and_score_session", new_callable=AsyncMock, return_value=mock_result),
+        patch("app.websocket.chat.end_session", new_callable=AsyncMock, return_value=mock_result),
     ):
         client = TestClient(app)
         with client.websocket_connect(f"/ws/session/{setup['session_id']}") as ws:
