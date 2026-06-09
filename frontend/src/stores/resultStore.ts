@@ -1,12 +1,21 @@
 import { create } from 'zustand';
-import type { Result, ComparisonResponse } from '@/types';
+import type { Result, AggregateMetrics, ComparisonResponse } from '@/types';
 import { api } from '@/services/api';
+
+interface PaginationState {
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
 
 interface ResultStore {
   results: Result[];
   currentResult: Result | null;
   isLoading: boolean;
   error: string | null;
+  pagination: PaginationState | null;
+  aggregateMetrics: AggregateMetrics | null;
 
   // Selection state for multi-select comparison
   selectedEvaluationIds: string[];
@@ -19,8 +28,10 @@ interface ResultStore {
   setError: (error: string | null) => void;
   clearError: () => void;
 
-  fetchResults: (evaluationId?: string) => Promise<void>;
+  fetchResults: (evaluationId: string, page?: number, pageSize?: number) => Promise<void>;
   fetchResult: (id: string) => Promise<void>;
+  fetchAggregateMetrics: (evaluationId: string) => Promise<void>;
+  fetchAllResultsForExport: (evaluationId: string) => Promise<Result[]>;
 
   // Selection actions
   toggleSelection: (evaluationId: string) => void;
@@ -34,6 +45,8 @@ export const useResultStore = create<ResultStore>((set, get) => ({
   currentResult: null,
   isLoading: false,
   error: null,
+  pagination: null,
+  aggregateMetrics: null,
   selectedEvaluationIds: [],
   referenceEvaluationId: null,
   comparisonData: null,
@@ -44,16 +57,24 @@ export const useResultStore = create<ResultStore>((set, get) => ({
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),
 
-  fetchResults: async (evaluationId?: string) => {
+  fetchResults: async (evaluationId: string, page = 1, pageSize = 100) => {
     set({ isLoading: true, error: null });
     try {
-      const params: { evaluation_id?: string; page_size?: number } = {};
-      if (evaluationId) {
-        params.evaluation_id = evaluationId;
-        params.page_size = 10000;
-      }
-      const response = await api.listResults(params);
-      set({ results: response.items, isLoading: false });
+      const response = await api.listResults({
+        evaluation_id: evaluationId,
+        page,
+        page_size: pageSize,
+      });
+      set({
+        results: response.items,
+        pagination: {
+          total: response.total,
+          page: response.page,
+          page_size: response.page_size,
+          pages: response.pages,
+        },
+        isLoading: false,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch results';
       set({ error: message, isLoading: false });
@@ -69,6 +90,33 @@ export const useResultStore = create<ResultStore>((set, get) => ({
       const message = err instanceof Error ? err.message : 'Failed to fetch result';
       set({ error: message, isLoading: false });
     }
+  },
+
+  fetchAggregateMetrics: async (evaluationId: string) => {
+    try {
+      const metrics = await api.getAggregateMetrics(evaluationId);
+      set({ aggregateMetrics: metrics });
+    } catch {
+      // Don't block on this -- set null
+      set({ aggregateMetrics: null });
+    }
+  },
+
+  fetchAllResultsForExport: async (evaluationId: string): Promise<Result[]> => {
+    const allResults: Result[] = [];
+    let page = 1;
+    const pageSize = 500; // larger pages for export
+    while (true) {
+      const response = await api.listResults({
+        evaluation_id: evaluationId,
+        page,
+        page_size: pageSize,
+      });
+      allResults.push(...response.items);
+      if (page >= response.pages) break;
+      page++;
+    }
+    return allResults;
   },
 
   toggleSelection: (evaluationId: string) => {

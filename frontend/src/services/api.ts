@@ -1,6 +1,7 @@
 import type {
   PaginatedResponse,
   ApiError,
+  AggregateMetrics,
   Artifact,
   Evaluation,
   CreateEvaluationRequest,
@@ -205,6 +206,10 @@ export const api = {
     return request<PaginatedResponse<Result>>(`/api/v1/results${qs ? `?${qs}` : ''}`);
   },
   getResult: (id: string) => request<Result>(`/api/v1/results/${id}`),
+  getAggregateMetrics: (evaluationId: string) =>
+    request<AggregateMetrics>(
+      `/api/v1/results/aggregate?evaluation_id=${encodeURIComponent(evaluationId)}`,
+    ),
   compareEvaluations: (evaluationIds: string[], referenceId?: string) => {
     const query = new URLSearchParams();
     evaluationIds.forEach((id) => query.append('evaluation_id', id));

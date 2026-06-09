@@ -5,6 +5,7 @@ vi.mock('@/services/api', () => ({
   api: {
     listResults: vi.fn(),
     getResult: vi.fn(),
+    getAggregateMetrics: vi.fn(),
     compareEvaluations: vi.fn(),
   },
 }));
@@ -20,6 +21,8 @@ describe('resultStore', () => {
       currentResult: null,
       isLoading: false,
       error: null,
+      pagination: null,
+      aggregateMetrics: null,
       selectedEvaluationIds: [],
       referenceEvaluationId: null,
       comparisonData: null,
@@ -33,6 +36,8 @@ describe('resultStore', () => {
     expect(state.currentResult).toBeNull();
     expect(state.isLoading).toBe(false);
     expect(state.error).toBeNull();
+    expect(state.pagination).toBeNull();
+    expect(state.aggregateMetrics).toBeNull();
   });
 
   it('can set and clear error', () => {
@@ -52,7 +57,7 @@ describe('resultStore', () => {
   });
 
   describe('fetchResults', () => {
-    it('sets loading, stores results, clears loading on success', async () => {
+    it('sets loading, stores results and pagination, clears loading on success', async () => {
       const mockResults = [
         {
           id: 'r1',
@@ -73,11 +78,11 @@ describe('resultStore', () => {
         items: mockResults,
         total: 1,
         page: 1,
-        page_size: 20,
+        page_size: 100,
         pages: 1,
       });
 
-      const promise = useResultStore.getState().fetchResults();
+      const promise = useResultStore.getState().fetchResults('e1');
       expect(useResultStore.getState().isLoading).toBe(true);
       expect(useResultStore.getState().error).toBeNull();
 
@@ -85,27 +90,47 @@ describe('resultStore', () => {
 
       expect(useResultStore.getState().isLoading).toBe(false);
       expect(useResultStore.getState().results).toEqual(mockResults);
-      expect(mockedApi.listResults).toHaveBeenCalledWith({});
+      expect(useResultStore.getState().pagination).toEqual({
+        total: 1,
+        page: 1,
+        page_size: 100,
+        pages: 1,
+      });
+      expect(mockedApi.listResults).toHaveBeenCalledWith({
+        evaluation_id: 'e1',
+        page: 1,
+        page_size: 100,
+      });
     });
 
-    it('passes evaluationId filter when provided', async () => {
+    it('passes custom page and pageSize when provided', async () => {
       mockedApi.listResults.mockResolvedValue({
         items: [],
         total: 0,
-        page: 1,
-        page_size: 20,
+        page: 2,
+        page_size: 50,
         pages: 0,
       });
 
-      await useResultStore.getState().fetchResults('eval-123');
+      await useResultStore.getState().fetchResults('eval-123', 2, 50);
 
-      expect(mockedApi.listResults).toHaveBeenCalledWith({ evaluation_id: 'eval-123', page_size: 10000 });
+      expect(mockedApi.listResults).toHaveBeenCalledWith({
+        evaluation_id: 'eval-123',
+        page: 2,
+        page_size: 50,
+      });
+      expect(useResultStore.getState().pagination).toEqual({
+        total: 0,
+        page: 2,
+        page_size: 50,
+        pages: 0,
+      });
     });
 
     it('handles API error: sets error string', async () => {
       mockedApi.listResults.mockRejectedValue(new Error('Network error'));
 
-      await useResultStore.getState().fetchResults();
+      await useResultStore.getState().fetchResults('e1');
 
       expect(useResultStore.getState().isLoading).toBe(false);
       expect(useResultStore.getState().error).toBe('Network error');
@@ -149,6 +174,155 @@ describe('resultStore', () => {
       expect(useResultStore.getState().isLoading).toBe(false);
       expect(useResultStore.getState().error).toBe('Not found');
       expect(useResultStore.getState().currentResult).toBeNull();
+    });
+  });
+
+  describe('fetchAggregateMetrics', () => {
+    it('stores aggregate metrics from the server', async () => {
+      const mockMetrics = {
+        total_items: 10,
+        passed_items: 8,
+        failed_items: 2,
+        mean_score: 0.85,
+        median_score: 0.9,
+        pass_rate: 0.8,
+        score_distribution: [
+          { label: '0.0-0.5', count: 2 },
+          { label: '0.5-1.0', count: 8 },
+        ],
+      };
+      mockedApi.getAggregateMetrics.mockResolvedValue(mockMetrics);
+
+      await useResultStore.getState().fetchAggregateMetrics('e1');
+
+      expect(useResultStore.getState().aggregateMetrics).toEqual(mockMetrics);
+      expect(mockedApi.getAggregateMetrics).toHaveBeenCalledWith('e1');
+    });
+
+    it('sets aggregateMetrics to null on error without blocking', async () => {
+      mockedApi.getAggregateMetrics.mockRejectedValue(new Error('Server error'));
+
+      await useResultStore.getState().fetchAggregateMetrics('e1');
+
+      expect(useResultStore.getState().aggregateMetrics).toBeNull();
+      // Should not set store-level error
+      expect(useResultStore.getState().error).toBeNull();
+    });
+  });
+
+  describe('fetchAllResultsForExport', () => {
+    it('accumulates results from multiple pages', async () => {
+      const page1Results = [
+        {
+          id: 'r1',
+          evaluation_id: 'e1',
+          dataset_item_id: 'item-1',
+          session_id: null,
+          contestant_model: null,
+          score: 0.8,
+          passed: true,
+          actual_answer: 'a1',
+          judge_reasoning: null,
+          scores_breakdown: null,
+          retrieved_chunks: null,
+          created_at: '2026-01-01T00:00:00Z',
+        },
+        {
+          id: 'r2',
+          evaluation_id: 'e1',
+          dataset_item_id: 'item-2',
+          session_id: null,
+          contestant_model: null,
+          score: 0.9,
+          passed: true,
+          actual_answer: 'a2',
+          judge_reasoning: null,
+          scores_breakdown: null,
+          retrieved_chunks: null,
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      ];
+      const page2Results = [
+        {
+          id: 'r3',
+          evaluation_id: 'e1',
+          dataset_item_id: 'item-3',
+          session_id: null,
+          contestant_model: null,
+          score: 0.7,
+          passed: false,
+          actual_answer: 'a3',
+          judge_reasoning: null,
+          scores_breakdown: null,
+          retrieved_chunks: null,
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      ];
+
+      mockedApi.listResults
+        .mockResolvedValueOnce({
+          items: page1Results,
+          total: 3,
+          page: 1,
+          page_size: 500,
+          pages: 2,
+        })
+        .mockResolvedValueOnce({
+          items: page2Results,
+          total: 3,
+          page: 2,
+          page_size: 500,
+          pages: 2,
+        });
+
+      const allResults = await useResultStore.getState().fetchAllResultsForExport('e1');
+
+      expect(allResults).toHaveLength(3);
+      expect(allResults[0].id).toBe('r1');
+      expect(allResults[2].id).toBe('r3');
+      expect(mockedApi.listResults).toHaveBeenCalledTimes(2);
+      expect(mockedApi.listResults).toHaveBeenCalledWith({
+        evaluation_id: 'e1',
+        page: 1,
+        page_size: 500,
+      });
+      expect(mockedApi.listResults).toHaveBeenCalledWith({
+        evaluation_id: 'e1',
+        page: 2,
+        page_size: 500,
+      });
+    });
+
+    it('handles single-page response', async () => {
+      const results = [
+        {
+          id: 'r1',
+          evaluation_id: 'e1',
+          dataset_item_id: 'item-1',
+          session_id: null,
+          contestant_model: null,
+          score: 0.85,
+          passed: true,
+          actual_answer: 'a1',
+          judge_reasoning: null,
+          scores_breakdown: null,
+          retrieved_chunks: null,
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      ];
+
+      mockedApi.listResults.mockResolvedValue({
+        items: results,
+        total: 1,
+        page: 1,
+        page_size: 500,
+        pages: 1,
+      });
+
+      const allResults = await useResultStore.getState().fetchAllResultsForExport('e1');
+
+      expect(allResults).toHaveLength(1);
+      expect(mockedApi.listResults).toHaveBeenCalledTimes(1);
     });
   });
 

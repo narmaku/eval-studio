@@ -43,11 +43,16 @@ export interface ArenaLeaderboardResponse {
   contestants: ArenaContestantSummary[];
 }
 
+export interface ScoreBucket {
+  label: string;
+  count: number;
+}
+
 export interface AggregateMetrics {
   mean_score: number;
   median_score: number;
   pass_rate: number;
-  score_distribution: Record<string, number>;
+  score_distribution: ScoreBucket[];
   total_items: number;
   passed_items: number;
   failed_items: number;

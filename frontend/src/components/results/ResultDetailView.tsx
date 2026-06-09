@@ -117,7 +117,7 @@ const EMPTY_METRICS: AggregateMetrics = {
   mean_score: 0,
   median_score: 0,
   pass_rate: 0,
-  score_distribution: {},
+  score_distribution: [],
 };
 
 // --- Column definitions ---

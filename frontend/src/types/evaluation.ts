@@ -15,6 +15,8 @@ export interface Evaluation {
   judge_config_id: string | null;
   config: EvaluationConfig;
   result_count: number | null;
+  average_score: number | null;
+  pass_rate: number | null;
   created_at: string;
   updated_at: string;
 }
