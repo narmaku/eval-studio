@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { Result } from '@/types';
 
@@ -65,6 +65,11 @@ function renderWithRouter(ui: React.ReactElement) {
 describe('ResultDetailView — PDF export', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders the Export PDF button', () => {
@@ -73,18 +78,19 @@ describe('ResultDetailView — PDF export', () => {
   });
 
   it('calls exportResultsPdf when the button is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderWithRouter(<ResultDetailView {...defaultProps} />);
 
     const button = screen.getByRole('button', { name: /export pdf/i });
     await user.click(button);
 
-    expect(mockExportResultsPdf).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(mockExportResultsPdf).toHaveBeenCalledTimes(1);
+    });
     expect(mockExportResultsPdf).toHaveBeenCalledWith(expect.any(HTMLElement), 'Test Evaluation');
   });
 
   it('disables the button while exporting', async () => {
-    // Make the export hang so we can observe loading state
     let resolveExport: () => void = () => {};
     mockExportResultsPdf.mockImplementation(
       () =>
@@ -93,24 +99,25 @@ describe('ResultDetailView — PDF export', () => {
         }),
     );
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderWithRouter(<ResultDetailView {...defaultProps} />);
 
     const button = screen.getByRole('button', { name: /export pdf/i });
     await user.click(button);
 
-    expect(button).toBeDisabled();
+    await vi.waitFor(() => expect(button).toBeDisabled());
 
-    // Resolve the export
+    // Resolve the export and flush microtasks
+    await vi.runOnlyPendingTimersAsync();
     resolveExport();
-    // Wait for state to settle
+    await vi.runOnlyPendingTimersAsync();
     await vi.waitFor(() => expect(button).not.toBeDisabled());
   });
 
   it('shows a toast error when export fails', async () => {
     mockExportResultsPdf.mockRejectedValueOnce(new Error('Export failed'));
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderWithRouter(<ResultDetailView {...defaultProps} />);
 
     const button = screen.getByRole('button', { name: /export pdf/i });
@@ -161,13 +168,15 @@ describe('ResultDetailView — PDF export', () => {
   });
 
   it('falls back to "evaluation" when evaluationName is undefined', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderWithRouter(<ResultDetailView {...defaultProps} evaluationName={undefined} />);
 
     const button = screen.getByRole('button', { name: /export pdf/i });
     await user.click(button);
 
-    expect(mockExportResultsPdf).toHaveBeenCalledWith(expect.any(HTMLElement), 'evaluation');
+    await vi.waitFor(() => {
+      expect(mockExportResultsPdf).toHaveBeenCalledWith(expect.any(HTMLElement), 'evaluation');
+    });
   });
 
   it('renders export button even with empty results array', () => {
@@ -178,7 +187,7 @@ describe('ResultDetailView — PDF export', () => {
   it('re-enables the button after a failed export', async () => {
     mockExportResultsPdf.mockRejectedValueOnce(new Error('fail'));
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderWithRouter(<ResultDetailView {...defaultProps} />);
 
     const button = screen.getByRole('button', { name: /export pdf/i });

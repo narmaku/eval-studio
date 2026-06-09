@@ -64,9 +64,11 @@ function ScoreBreakdownBadges({
 function ExpandableText({
   text,
   maxLength,
+  forceExpand,
 }: {
   text: string | null | undefined;
   maxLength: number;
+  forceExpand?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const content = text ?? '';
@@ -75,22 +77,35 @@ function ExpandableText({
     return <span className="text-muted-foreground">--</span>;
   }
 
-  if (content.length <= maxLength) {
-    return <span className="text-sm whitespace-pre-line">{content}</span>;
-  }
+  const showFull = expanded || forceExpand || content.length <= maxLength;
 
   return (
     <span className="text-sm whitespace-pre-line">
-      {expanded ? content : `${content.slice(0, maxLength)}...`}
-      <button
-        className="ml-1 text-primary underline text-xs whitespace-nowrap"
-        onClick={(e) => {
-          e.stopPropagation();
-          setExpanded(!expanded);
-        }}
-      >
-        {expanded ? 'less' : 'more'}
-      </button>
+      {showFull ? content : `${content.slice(0, maxLength)}...`}
+      {!showFull && (
+        <button
+          className="ml-1 text-primary underline text-xs whitespace-nowrap"
+          data-no-print
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(true);
+          }}
+        >
+          more
+        </button>
+      )}
+      {expanded && !forceExpand && (
+        <button
+          className="ml-1 text-primary underline text-xs whitespace-nowrap"
+          data-no-print
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(false);
+          }}
+        >
+          less
+        </button>
+      )}
     </span>
   );
 }
@@ -113,6 +128,7 @@ const expanderColumn: ColumnDef<Result> = {
   cell: ({ row }) => (
     <button
       type="button"
+      data-no-print
       onClick={(e) => {
         e.stopPropagation();
         row.toggleExpanded();
@@ -199,10 +215,12 @@ function ExpandedDetail({
   result,
   datasetItem,
   evaluationMode,
+  forceExpand,
 }: {
   result: Result;
   datasetItem?: DatasetItem;
   evaluationMode?: string;
+  forceExpand?: boolean;
 }) {
   const isQA = evaluationMode === 'qa';
   const isRAG = evaluationMode === 'rag';
@@ -215,19 +233,24 @@ function ExpandedDetail({
         <ExpandableText
           text={datasetItem?.question ?? result.dataset_item_id ?? null}
           maxLength={500}
+          forceExpand={forceExpand}
         />
       </div>
 
       {showExpected && (
         <div>
           <p className="font-medium">Expected Answer</p>
-          <ExpandableText text={datasetItem?.expected_answer ?? null} maxLength={500} />
+          <ExpandableText
+            text={datasetItem?.expected_answer ?? null}
+            maxLength={500}
+            forceExpand={forceExpand}
+          />
         </div>
       )}
 
       <div>
         <p className="font-medium">Actual Answer</p>
-        <ExpandableText text={result.actual_answer} maxLength={500} />
+        <ExpandableText text={result.actual_answer} maxLength={500} forceExpand={forceExpand} />
       </div>
 
       {isRAG && result.retrieved_chunks && result.retrieved_chunks.length > 0 && (
@@ -279,11 +302,24 @@ export function ResultDetailView({
   const handleExportPdf = async () => {
     if (!contentRef.current) return;
     setIsExporting(true);
+
+    // Expand all rows so the PDF shows full detail
+    const prevExpanded = expanded;
+    const allExpanded: ExpandedState = {};
+    results.forEach((_, i) => {
+      allExpanded[i] = true;
+    });
+    setExpanded(allExpanded);
+
+    // Wait for React to render expanded rows
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     try {
       await exportResultsPdf(contentRef.current, evaluationName ?? 'evaluation');
     } catch {
       toast.error('Failed to export PDF. Please try again.');
     } finally {
+      setExpanded(prevExpanded);
       setIsExporting(false);
     }
   };
@@ -520,6 +556,7 @@ export function ResultDetailView({
                                     : undefined
                                 }
                                 evaluationMode={evaluationMode}
+                                forceExpand={isExporting}
                               />
                             </TableCell>
                           </TableRow>

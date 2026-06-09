@@ -160,3 +160,27 @@ html.pdf-capture .truncate {
   text-overflow: unset;
   white-space: normal;
 }
+
+/* Ensure all text is fully visible in the PDF — no max-width truncation */
+html.pdf-capture [class*="max-w-"] {
+  max-width: none !important;
+}
+
+/* Make text slightly larger for readability on printed A4 */
+html.pdf-capture .text-sm {
+  font-size: 0.9rem !important;
+  line-height: 1.5 !important;
+}
+
+html.pdf-capture .text-xs {
+  font-size: 0.8rem !important;
+}
+
+html.pdf-capture .text-2xl {
+  font-size: 1.75rem !important;
+}
+
+/* Ensure expanded row details are fully visible */
+html.pdf-capture .whitespace-pre-line {
+  word-break: break-word;
+}
