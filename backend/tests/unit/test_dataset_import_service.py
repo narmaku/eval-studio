@@ -180,6 +180,71 @@ class TestExtractSchema:
 
 
 # -----------------------------------------------------------------------
+# all_rows preservation tests — import must not truncate to sample_size
+# -----------------------------------------------------------------------
+
+
+class TestAllRowsPreservation:
+    """Tests that FileSchema.all_rows stores every row, not just the sample."""
+
+    def test_yaml_all_rows_exceeds_sample(self):
+        """YAML file with 30 items: all_rows has 30, sample_rows has sample_size."""
+        data = [{"question": f"Q{i}", "answer": f"A{i}"} for i in range(30)]
+        content = yaml.dump(data).encode()
+        schema = extract_schema(content, DetectedFormat.yaml, sample_size=20)
+        assert len(schema.all_rows) == 30
+        assert len(schema.sample_rows) == 20
+        assert schema.total_rows == 30
+
+    def test_jsonl_all_rows_exceeds_sample(self):
+        """JSONL file with 25 items: all_rows has 25, sample_rows has sample_size."""
+        lines = [json.dumps({"input": f"I{i}", "output": f"O{i}"}) for i in range(25)]
+        content = "\n".join(lines).encode()
+        schema = extract_schema(content, DetectedFormat.jsonl, sample_size=20)
+        assert len(schema.all_rows) == 25
+        assert len(schema.sample_rows) == 20
+        assert schema.total_rows == 25
+
+    def test_json_all_rows_exceeds_sample(self):
+        """JSON array with 50 items: all_rows has 50, sample_rows has sample_size."""
+        data = [{"prompt": f"P{i}", "response": f"R{i}"} for i in range(50)]
+        content = json.dumps(data).encode()
+        schema = extract_schema(content, DetectedFormat.json, sample_size=20)
+        assert len(schema.all_rows) == 50
+        assert len(schema.sample_rows) == 20
+        assert schema.total_rows == 50
+
+    def test_csv_all_rows_exceeds_sample(self):
+        """CSV file with 50 items: all_rows has 50, sample_rows has sample_size."""
+        header = "question,answer"
+        rows = [f"Q{i},A{i}" for i in range(50)]
+        content = (header + "\n" + "\n".join(rows) + "\n").encode()
+        schema = extract_schema(content, DetectedFormat.csv, sample_size=20)
+        assert len(schema.all_rows) == 50
+        assert len(schema.sample_rows) == 20
+        assert schema.total_rows == 50
+
+    def test_all_rows_matches_sample_when_under_limit(self):
+        """When row count is under sample_size, all_rows == sample_rows."""
+        data = [{"q": f"Q{i}"} for i in range(5)]
+        content = json.dumps(data).encode()
+        schema = extract_schema(content, DetectedFormat.json, sample_size=20)
+        assert len(schema.all_rows) == 5
+        assert len(schema.sample_rows) == 5
+        assert schema.all_rows == schema.sample_rows
+
+    def test_tsv_all_rows_exceeds_sample(self):
+        """TSV file with 25 items: all_rows has 25, sample_rows has sample_size."""
+        header = "question\tanswer"
+        rows = [f"Q{i}\tA{i}" for i in range(25)]
+        content = (header + "\n" + "\n".join(rows) + "\n").encode()
+        schema = extract_schema(content, DetectedFormat.tsv, sample_size=20)
+        assert len(schema.all_rows) == 25
+        assert len(schema.sample_rows) == 20
+        assert schema.total_rows == 25
+
+
+# -----------------------------------------------------------------------
 # suggest_mapping tests
 # -----------------------------------------------------------------------
 
