@@ -110,55 +110,67 @@ export function RubricList() {
         </div>
       )}
 
-      {filteredRubrics.map((rubric) => (
-        <Card key={rubric.id}>
-          <CardContent className="flex items-center justify-between py-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium">{rubric.name}</h3>
-                <Badge variant="secondary">
-                  {rubric.dimensions.length}{' '}
-                  {rubric.dimensions.length === 1 ? 'dimension' : 'dimensions'}
-                </Badge>
-                <Badge variant="outline">{rubric.aggregation}</Badge>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredRubrics.map((rubric) => (
+          <Card key={rubric.id} className="flex flex-col">
+            <CardContent className="flex flex-col gap-2 py-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium truncate">{rubric.name}</h3>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setRefineTarget(rubric)}
+                    aria-label="Refine"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleEdit(rubric)}
+                    aria-label="Edit"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setDeleteTarget(rubric)}
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-              {rubric.description && (
-                <p className="text-xs text-muted-foreground line-clamp-1">{rubric.description}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Threshold: {rubric.pass_threshold} | Created:{' '}
-                {new Date(rubric.created_at).toLocaleDateString()}
-              </p>
-            </div>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setRefineTarget(rubric)}
-                aria-label="Refine"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleEdit(rubric)}
-                aria-label="Edit"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDeleteTarget(rubric)}
-                aria-label="Delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {rubric.dimensions.length}{' '}
+                    {rubric.dimensions.length === 1 ? 'dimension' : 'dimensions'}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {rubric.aggregation}
+                  </Badge>
+                </div>
+                {rubric.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2">{rubric.description}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Threshold: {rubric.pass_threshold} |{' '}
+                  {new Date(rubric.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       <RubricBuilder
         open={builderOpen}
