@@ -1,8 +1,16 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=str(_PROJECT_ROOT / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_name: str = "eval-studio"
     app_version: str = "0.1.0"
@@ -41,7 +49,7 @@ class Settings(BaseSettings):
     # Dataset import settings
     max_import_file_size: int = 10_485_760  # 10 MB
     max_import_total_size: int = 104_857_600  # 100 MB aggregate across all files
-    max_import_files: int = 1000
+    max_import_files: int = 50
     import_sample_rows: int = 20
 
     @property
