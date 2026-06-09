@@ -61,11 +61,14 @@ async def generate_evaluation_artifacts(evaluation_id: str, db: AsyncSession, ar
 
     except Exception as exc:
         logger.error("artifact_generation.failed", evaluation_id=evaluation_id, error=str(exc))
-        await broadcast_log(
-            evaluation_id=evaluation_id,
-            level="error",
-            message=f"Artifact generation failed: {exc}",
-        )
+        try:
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="error",
+                message=f"Artifact generation failed: {exc}",
+            )
+        except Exception:
+            logger.error("artifact_generation.broadcast_failed", evaluation_id=evaluation_id)
 
 
 def _serialize_result(result: Result) -> dict[str, Any]:
