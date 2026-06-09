@@ -146,10 +146,7 @@ async def _generate_summary_md(
         mean_score = sum(scores) / len(scores)
         sorted_scores = sorted(scores)
         n = len(sorted_scores)
-        if n % 2 == 0:
-            median_score = (sorted_scores[n // 2 - 1] + sorted_scores[n // 2]) / 2
-        else:
-            median_score = sorted_scores[n // 2]
+        median_score = (sorted_scores[n // 2 - 1] + sorted_scores[n // 2]) / 2 if n % 2 == 0 else sorted_scores[n // 2]
 
         lines.append(f"- **Mean Score**: {mean_score:.3f}")
         lines.append(f"- **Median Score**: {median_score:.3f}")
