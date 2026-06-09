@@ -1,4 +1,4 @@
-import { useMemo, useState, Fragment } from 'react';
+import { useMemo, useRef, useState, Fragment } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,9 +10,11 @@ import {
   type ExpandedState,
 } from '@tanstack/react-table';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, FileDown, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -27,6 +29,7 @@ import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { PassFailChart } from './PassFailChart';
 import { ContestantScoreChart } from './ContestantScoreChart';
 import { RadarComparisonChart } from './RadarComparisonChart';
+import { exportResultsPdf } from '@/lib/exportPdf';
 import type { Result, AggregateMetrics, DatasetItem, ArenaLeaderboardResponse } from '@/types';
 
 interface ResultDetailViewProps {
@@ -270,6 +273,20 @@ export function ResultDetailView({
   const metrics = aggregateMetrics ?? EMPTY_METRICS;
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
+  const [isExporting, setIsExporting] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPdf = async () => {
+    if (!contentRef.current) return;
+    setIsExporting(true);
+    try {
+      await exportResultsPdf(contentRef.current, evaluationName ?? 'evaluation');
+    } catch {
+      toast.error('Failed to export PDF. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const itemMap = useMemo(() => {
     const map = new Map<string, DatasetItem>();
@@ -326,14 +343,30 @@ export function ResultDetailView({
   });
 
   return (
-    <div className="space-y-6">
-      <Link
-        to="/results"
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Results
-      </Link>
+    <div className="space-y-6" ref={contentRef}>
+      <div className="flex items-center justify-between" data-no-print>
+        <Link
+          to="/results"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          data-no-print
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Results
+        </Link>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isExporting}
+          onClick={() => void handleExportPdf()}
+        >
+          {isExporting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <FileDown className="h-4 w-4" />
+          )}
+          Export PDF
+        </Button>
+      </div>
 
       {/* Summary Header — arena gets leaderboard + charts, others get aggregate metrics */}
       {evaluationMode === 'arena' && arenaLeaderboard ? (
@@ -399,9 +432,7 @@ export function ResultDetailView({
         (() => {
           const allBreakdowns = results
             .map((r) => r.scores_breakdown)
-            .filter(
-              (b): b is Record<string, number> => b != null && Object.keys(b).length > 0,
-            );
+            .filter((b): b is Record<string, number> => b != null && Object.keys(b).length > 0);
 
           if (allBreakdowns.length === 0) return null;
 
@@ -414,7 +445,9 @@ export function ResultDetailView({
           for (const key of allKeys) {
             const values = allBreakdowns.filter((b) => key in b).map((b) => b[key] ?? 0);
             avgData[key] =
-              values.length > 0 ? values.reduce((a, c) => (a ?? 0) + (c ?? 0), 0) / values.length : 0;
+              values.length > 0
+                ? values.reduce((a, c) => (a ?? 0) + (c ?? 0), 0) / values.length
+                : 0;
           }
 
           return (
