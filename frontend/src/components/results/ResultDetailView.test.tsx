@@ -12,7 +12,6 @@ class ResizeObserverMock {
 }
 globalThis.ResizeObserver = ResizeObserverMock;
 
-// Use vi.hoisted for mocks referenced in hoisted vi.mock factories
 const { mockExportResultsPdf, mockToastError } = vi.hoisted(() => ({
   mockExportResultsPdf: vi.fn(() => Promise.resolve()),
   mockToastError: vi.fn(),
@@ -77,17 +76,21 @@ describe('ResultDetailView — PDF export', () => {
     expect(screen.getByRole('button', { name: /export pdf/i })).toBeInTheDocument();
   });
 
-  it('calls exportResultsPdf when the button is clicked', async () => {
+  it('calls exportResultsPdf with data when clicked', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderWithRouter(<ResultDetailView {...defaultProps} />);
 
-    const button = screen.getByRole('button', { name: /export pdf/i });
-    await user.click(button);
+    await user.click(screen.getByRole('button', { name: /export pdf/i }));
 
     await vi.waitFor(() => {
       expect(mockExportResultsPdf).toHaveBeenCalledTimes(1);
     });
-    expect(mockExportResultsPdf).toHaveBeenCalledWith(expect.any(HTMLElement), 'Test Evaluation');
+
+    const call = mockExportResultsPdf.mock.calls[0][0];
+    expect(call.evaluationName).toBe('Test Evaluation');
+    expect(call.evaluationMode).toBe('qa');
+    expect(call.results).toHaveLength(2);
+    expect(call.metrics.totalItems).toBe(2);
   });
 
   it('disables the button while exporting', async () => {
@@ -107,7 +110,6 @@ describe('ResultDetailView — PDF export', () => {
 
     await vi.waitFor(() => expect(button).toBeDisabled());
 
-    // Resolve the export and flush microtasks
     await vi.runOnlyPendingTimersAsync();
     resolveExport();
     await vi.runOnlyPendingTimersAsync();
@@ -120,8 +122,7 @@ describe('ResultDetailView — PDF export', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderWithRouter(<ResultDetailView {...defaultProps} />);
 
-    const button = screen.getByRole('button', { name: /export pdf/i });
-    await user.click(button);
+    await user.click(screen.getByRole('button', { name: /export pdf/i }));
 
     await vi.waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('Failed to export PDF. Please try again.');
@@ -134,15 +135,14 @@ describe('ResultDetailView — PDF export', () => {
     expect(backLink).toHaveAttribute('data-no-print');
   });
 
-  it('marks the export button with data-no-print', () => {
+  it('marks the export button container with data-no-print', () => {
     renderWithRouter(<ResultDetailView {...defaultProps} />);
     const button = screen.getByRole('button', { name: /export pdf/i });
-    // The button or its container should have data-no-print
     const noPrintAncestor = button.closest('[data-no-print]');
     expect(noPrintAncestor).toBeInTheDocument();
   });
 
-  it('renders export button in arena mode too', () => {
+  it('renders export button in arena mode', () => {
     renderWithRouter(
       <ResultDetailView
         {...defaultProps}
@@ -167,19 +167,19 @@ describe('ResultDetailView — PDF export', () => {
     expect(screen.getByRole('button', { name: /export pdf/i })).toBeInTheDocument();
   });
 
-  it('falls back to "evaluation" when evaluationName is undefined', async () => {
+  it('falls back to "Evaluation" when evaluationName is undefined', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderWithRouter(<ResultDetailView {...defaultProps} evaluationName={undefined} />);
 
-    const button = screen.getByRole('button', { name: /export pdf/i });
-    await user.click(button);
+    await user.click(screen.getByRole('button', { name: /export pdf/i }));
 
     await vi.waitFor(() => {
-      expect(mockExportResultsPdf).toHaveBeenCalledWith(expect.any(HTMLElement), 'evaluation');
+      expect(mockExportResultsPdf).toHaveBeenCalledTimes(1);
     });
+    expect(mockExportResultsPdf.mock.calls[0][0].evaluationName).toBe('Evaluation');
   });
 
-  it('renders export button even with empty results array', () => {
+  it('renders export button even with empty results', () => {
     renderWithRouter(<ResultDetailView {...defaultProps} results={[]} />);
     expect(screen.getByRole('button', { name: /export pdf/i })).toBeInTheDocument();
   });

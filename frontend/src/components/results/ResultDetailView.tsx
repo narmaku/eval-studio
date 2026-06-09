@@ -29,7 +29,7 @@ import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { PassFailChart } from './PassFailChart';
 import { ContestantScoreChart } from './ContestantScoreChart';
 import { RadarComparisonChart } from './RadarComparisonChart';
-import { exportResultsPdf } from '@/lib/exportPdf';
+import { exportResultsPdf, type PdfExportData } from '@/lib/exportPdf';
 import type { Result, AggregateMetrics, DatasetItem, ArenaLeaderboardResponse } from '@/types';
 
 interface ResultDetailViewProps {
@@ -297,29 +297,49 @@ export function ResultDetailView({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
   const [isExporting, setIsExporting] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const chartsRef = useRef<HTMLDivElement>(null);
 
   const handleExportPdf = async () => {
-    if (!contentRef.current) return;
     setIsExporting(true);
-
-    // Expand all rows so the PDF shows full detail
-    const prevExpanded = expanded;
-    const allExpanded: ExpandedState = {};
-    results.forEach((_, i) => {
-      allExpanded[i] = true;
-    });
-    setExpanded(allExpanded);
-
-    // Wait for React to render expanded rows
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
     try {
-      await exportResultsPdf(contentRef.current, evaluationName ?? 'evaluation');
+      const chartElements: HTMLElement[] = [];
+      if (chartsRef.current) {
+        chartsRef.current.querySelectorAll<HTMLElement>('[data-chart]').forEach((el) => {
+          chartElements.push(el);
+        });
+      }
+
+      const pdfData: PdfExportData = {
+        evaluationName: evaluationName ?? 'Evaluation',
+        evaluationMode: evaluationMode ?? 'qa',
+        metrics: {
+          totalItems: metrics.total_items || results.length,
+          passRate: metrics.pass_rate,
+          meanScore: metrics.mean_score,
+          medianScore: metrics.median_score,
+          passedItems: metrics.passed_items,
+          failedItems: metrics.failed_items,
+        },
+        results: results.map((r) => {
+          const item = r.dataset_item_id ? itemMap.get(r.dataset_item_id) : undefined;
+          return {
+            question: item?.question ?? r.dataset_item_id ?? '--',
+            expectedAnswer: item?.expected_answer,
+            actualAnswer: r.actual_answer,
+            score: r.score,
+            passed: r.passed,
+            judgeReasoning: r.judge_reasoning,
+            scoresBreakdown: r.scores_breakdown,
+            contestantModel: r.contestant_model,
+          };
+        }),
+        chartElements,
+      };
+
+      await exportResultsPdf(pdfData);
     } catch {
       toast.error('Failed to export PDF. Please try again.');
     } finally {
-      setExpanded(prevExpanded);
       setIsExporting(false);
     }
   };
@@ -379,7 +399,7 @@ export function ResultDetailView({
   });
 
   return (
-    <div className="space-y-6" ref={contentRef}>
+    <div className="space-y-6">
       <div className="flex items-center justify-between" data-no-print>
         <Link
           to="/results"
@@ -456,9 +476,9 @@ export function ResultDetailView({
               </div>
             </CardContent>
           </Card>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <ScoreDistributionChart results={results} />
-            <PassFailChart passedItems={metrics.passed_items} failedItems={metrics.failed_items} />
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2" ref={chartsRef}>
+            <div data-chart><ScoreDistributionChart results={results} /></div>
+            <div data-chart><PassFailChart passedItems={metrics.passed_items} failedItems={metrics.failed_items} /></div>
           </div>
         </>
       )}
