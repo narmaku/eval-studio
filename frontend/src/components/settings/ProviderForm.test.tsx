@@ -46,6 +46,7 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   has_api_key: true,
   proxy: null,
   ssl_cert_path: null,
+  ssl_client_key: null,
   tags: ['fast'],
   default_params: null,
   provider_type: 'litellm',

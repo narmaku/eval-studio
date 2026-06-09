@@ -385,8 +385,29 @@ class TestTestConnection:
         assert "Connection failed" in data["message"]
 
     @pytest.mark.asyncio
-    async def test_test_connection_litellm_no_api_base(self, client):
-        """LiteLLM provider without API base returns success with 'cannot verify' message."""
+    async def test_test_connection_litellm_with_model(self, client):
+        """LiteLLM provider with model uses acompletion to test the full pipeline."""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(content="hi"))]
+
+        with patch("app.api.v1.providers.litellm.acompletion", new_callable=AsyncMock, return_value=mock_response):
+            response = await client.post(
+                "/api/v1/providers/test",
+                json={
+                    "name": "Test",
+                    "default_model": "gemini/gemini-flash-latest",
+                    "provider_type": "litellm",
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "gemini/gemini-flash-latest" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_test_connection_litellm_no_model_no_base(self, client):
+        """LiteLLM provider without model or API base returns failure."""
         response = await client.post(
             "/api/v1/providers/test",
             json={
@@ -397,8 +418,8 @@ class TestTestConnection:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
-        assert "cannot verify" in data["message"].lower()
+        assert data["success"] is False
+        assert "configure" in data["message"].lower()
 
     @pytest.mark.asyncio
     async def test_test_connection_custom_success(self, client):

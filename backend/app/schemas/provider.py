@@ -122,7 +122,7 @@ class ProviderResponse(BaseModel):
     has_api_key: bool = False
     proxy: str | None = None
     ssl_cert_path: str | None = None
-    has_ssl_client_key: bool = False
+    ssl_client_key: str | None = None
     tags: list[str] = []
     default_params: dict | None = None
     provider_type: str = "litellm"

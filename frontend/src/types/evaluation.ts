@@ -76,6 +76,7 @@ export interface Provider {
   has_api_key: boolean;
   proxy: string | null;
   ssl_cert_path: string | null;
+  ssl_client_key: string | null;
   tags: string[];
   default_params: Record<string, unknown> | null;
   provider_type: string;

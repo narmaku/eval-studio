@@ -5,6 +5,7 @@ export interface CreateProviderRequest {
   api_key_env?: string | null;
   proxy?: string | null;
   ssl_cert_path?: string | null;
+  ssl_client_key?: string | null;
   tags?: string[];
   default_params?: Record<string, unknown> | null;
   provider_type?: 'litellm' | 'custom';

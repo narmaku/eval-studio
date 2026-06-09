@@ -13,6 +13,7 @@ const mockProviders: Provider[] = [
     has_api_key: true,
     proxy: null,
     ssl_cert_path: null,
+    ssl_client_key: null,
     tags: ['fast'],
     default_params: null,
     provider_type: 'litellm',
@@ -28,6 +29,7 @@ const mockProviders: Provider[] = [
     has_api_key: true,
     proxy: null,
     ssl_cert_path: null,
+    ssl_client_key: null,
     tags: [],
     default_params: null,
     provider_type: 'litellm',
@@ -194,9 +196,7 @@ describe('ContestantSelector', () => {
       { name: 'Model B', default_model: 'openai/b' },
     ];
     const onChange = vi.fn();
-    render(
-      <ContestantSelector value={contestants} onChange={onChange} />,
-    );
+    render(<ContestantSelector value={contestants} onChange={onChange} />);
 
     // Add a third slot (empty)
     await user.click(screen.getByRole('button', { name: /add contestant/i }));
