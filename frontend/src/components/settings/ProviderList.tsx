@@ -129,6 +129,11 @@ export function ProviderList() {
                   >
                     {provider.provider_type === 'custom' ? 'Custom' : 'LiteLLM'}
                   </Badge>
+                  {provider.rate_limited && (
+                    <Badge variant="outline" className="text-xs">
+                      Rate Limited
+                    </Badge>
+                  )}
                   {provider.has_api_key && (
                     <Badge variant="outline" className="text-xs">
                       API Key
