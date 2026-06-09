@@ -5,6 +5,7 @@ vi.mock('@/services/api', () => ({
   api: {
     createSession: vi.fn(),
     endSession: vi.fn(),
+    scoreSession: vi.fn(),
   },
 }));
 
@@ -105,6 +106,7 @@ describe('sessionStore', () => {
     expect(state.scores).toEqual([]);
     expect(state.isConnected).toBe(false);
     expect(state.isProcessing).toBe(false);
+    expect(state.isScoring).toBe(false);
     expect(state.error).toBeNull();
   });
 
@@ -153,6 +155,99 @@ describe('sessionStore', () => {
       const state = useSessionStore.getState();
       expect(state.currentSession).toBeNull();
       expect(state.error).toBe('Network error');
+    });
+  });
+
+  describe('scoreSession', () => {
+    it('calls api.scoreSession and updates session and scores on success', async () => {
+      const scoredSession = {
+        id: 'sess-1',
+        evaluation_id: 'eval-1',
+        mode: 'live' as const,
+        status: 'completed' as const,
+        agent_config: null,
+        judge_config_snapshot: { provider_id: 'judge-provider-1' },
+        transcript: [],
+        name: null,
+        scores: {
+          overall: 0.85,
+          passed: true,
+          reasoning: 'Good answers',
+          breakdown: { accuracy: 0.9, relevance: 0.8 },
+        },
+        error: null,
+        started_at: '2026-01-01T00:00:00Z',
+        ended_at: '2026-01-01T00:10:00Z',
+        created_at: '2026-01-01T00:00:00Z',
+      };
+
+      mockedApi.scoreSession.mockResolvedValue(scoredSession);
+
+      useSessionStore.setState({
+        currentSession: {
+          id: 'sess-1',
+          evaluation_id: 'eval-1',
+          mode: 'live',
+          status: 'ended',
+          agent_config: null,
+          judge_config_snapshot: { provider_id: 'judge-provider-1' },
+          transcript: [],
+          name: null,
+          scores: null,
+          error: null,
+          started_at: '2026-01-01T00:00:00Z',
+          ended_at: '2026-01-01T00:10:00Z',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      });
+
+      await useSessionStore.getState().scoreSession({ provider_id: 'judge-provider-1' });
+
+      const state = useSessionStore.getState();
+      expect(state.currentSession?.status).toBe('completed');
+      expect(state.scores).toHaveLength(1);
+      expect(state.scores[0]!.overall).toBe(0.85);
+      expect(state.scores[0]!.dimensions).toEqual({ accuracy: 0.9, relevance: 0.8 });
+      expect(state.isScoring).toBe(false);
+      expect(state.error).toBeNull();
+      expect(mockedApi.scoreSession).toHaveBeenCalledWith('sess-1', {
+        provider_id: 'judge-provider-1',
+      });
+    });
+
+    it('sets error and keeps isScoring false on failure', async () => {
+      mockedApi.scoreSession.mockRejectedValue(new Error('Judge unavailable'));
+
+      useSessionStore.setState({
+        currentSession: {
+          id: 'sess-1',
+          evaluation_id: 'eval-1',
+          mode: 'live',
+          status: 'ended',
+          agent_config: null,
+          judge_config_snapshot: null,
+          transcript: [],
+          name: null,
+          scores: null,
+          error: null,
+          started_at: '2026-01-01T00:00:00Z',
+          ended_at: '2026-01-01T00:10:00Z',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      });
+
+      await expect(
+        useSessionStore.getState().scoreSession({ provider_id: 'judge-provider-1' }),
+      ).rejects.toThrow('Judge unavailable');
+
+      const state = useSessionStore.getState();
+      expect(state.isScoring).toBe(false);
+      expect(state.error).toBe('Judge unavailable');
+    });
+
+    it('does nothing when no current session', async () => {
+      await useSessionStore.getState().scoreSession({ provider_id: 'judge-provider-1' });
+      expect(mockedApi.scoreSession).not.toHaveBeenCalled();
     });
   });
 
@@ -262,6 +357,7 @@ describe('sessionStore', () => {
       expect(state.scores).toEqual([]);
       expect(state.isConnected).toBe(false);
       expect(state.isProcessing).toBe(false);
+      expect(state.isScoring).toBe(false);
       expect(state.error).toBeNull();
     });
   });
