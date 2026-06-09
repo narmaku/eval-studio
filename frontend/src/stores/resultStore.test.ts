@@ -99,7 +99,7 @@ describe('resultStore', () => {
 
       await useResultStore.getState().fetchResults('eval-123');
 
-      expect(mockedApi.listResults).toHaveBeenCalledWith({ evaluation_id: 'eval-123' });
+      expect(mockedApi.listResults).toHaveBeenCalledWith({ evaluation_id: 'eval-123', page_size: 10000 });
     });
 
     it('handles API error: sets error string', async () => {

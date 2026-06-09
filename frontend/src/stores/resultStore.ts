@@ -47,9 +47,10 @@ export const useResultStore = create<ResultStore>((set, get) => ({
   fetchResults: async (evaluationId?: string) => {
     set({ isLoading: true, error: null });
     try {
-      const params: { evaluation_id?: string } = {};
+      const params: { evaluation_id?: string; page_size?: number } = {};
       if (evaluationId) {
         params.evaluation_id = evaluationId;
+        params.page_size = 10000;
       }
       const response = await api.listResults(params);
       set({ results: response.items, isLoading: false });
