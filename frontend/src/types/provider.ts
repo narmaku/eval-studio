@@ -1,3 +1,5 @@
+import type { RateLimit } from './evaluation';
+
 export interface CreateProviderRequest {
   name: string;
   default_model?: string;
@@ -12,6 +14,8 @@ export interface CreateProviderRequest {
   endpoint_url?: string | null;
   request_body_template?: string;
   response_json_path?: string;
+  rate_limited?: boolean;
+  rate_limits?: RateLimit[] | null;
 }
 
 export type UpdateProviderRequest = Partial<CreateProviderRequest>;

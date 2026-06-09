@@ -30,6 +30,8 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   endpoint_url: null,
   request_body_template: null,
   response_json_path: 'choices.0.message.content',
+  rate_limited: false,
+  rate_limits: null,
   ...overrides,
 });
 

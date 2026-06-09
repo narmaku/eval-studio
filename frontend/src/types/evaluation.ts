@@ -70,6 +70,12 @@ export interface ModelEndpoint {
   tags?: string[];
 }
 
+export interface RateLimit {
+  value: number;
+  unit: 'tokens' | 'requests';
+  per: 'second' | 'minute' | 'hour' | 'day';
+}
+
 export interface Provider {
   id: string;
   name: string;
@@ -85,6 +91,8 @@ export interface Provider {
   endpoint_url: string | null;
   request_body_template: string;
   response_json_path: string;
+  rate_limited: boolean;
+  rate_limits: RateLimit[] | null;
 }
 
 export interface ProviderModel {

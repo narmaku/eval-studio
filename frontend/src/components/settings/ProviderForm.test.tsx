@@ -53,6 +53,8 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   endpoint_url: null,
   request_body_template: 'openai',
   response_json_path: 'choices.0.message.content',
+  rate_limited: false,
+  rate_limits: null,
   ...overrides,
 });
 
@@ -306,6 +308,103 @@ describe('ProviderForm', () => {
         'https://example.com/api/v1/infer',
       );
       expect(screen.getByLabelText(/response json path/i)).toHaveValue('data.text');
+    });
+  });
+
+  describe('rate limit configuration', () => {
+    it('renders rate limit checkbox', () => {
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+      expect(screen.getByLabelText(/this provider is rate-limited/i)).toBeInTheDocument();
+    });
+
+    it('toggles rate limit section when checkbox is clicked', async () => {
+      const user = userEvent.setup();
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+
+      // Rate limit rules should not be visible initially
+      expect(screen.queryByLabelText(/rate limit value/i)).not.toBeInTheDocument();
+
+      // Check the checkbox
+      await user.click(screen.getByLabelText(/this provider is rate-limited/i));
+
+      // A default rate limit rule should appear
+      expect(screen.getByLabelText(/rate limit value 1/i)).toBeInTheDocument();
+    });
+
+    it('adds a new rate limit rule when Add Limit is clicked', async () => {
+      const user = userEvent.setup();
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+
+      await user.click(screen.getByLabelText(/this provider is rate-limited/i));
+      expect(screen.getAllByLabelText(/rate limit value/i)).toHaveLength(1);
+
+      await user.click(screen.getByRole('button', { name: /add limit/i }));
+      expect(screen.getAllByLabelText(/rate limit value/i)).toHaveLength(2);
+    });
+
+    it('removes a rate limit rule when remove button is clicked', async () => {
+      const user = userEvent.setup();
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+
+      await user.click(screen.getByLabelText(/this provider is rate-limited/i));
+      await user.click(screen.getByRole('button', { name: /add limit/i }));
+      expect(screen.getAllByLabelText(/rate limit value/i)).toHaveLength(2);
+
+      await user.click(screen.getByRole('button', { name: /remove rate limit 1/i }));
+      expect(screen.getAllByLabelText(/rate limit value/i)).toHaveLength(1);
+    });
+
+    it('includes rate limit data in save payload', async () => {
+      const user = userEvent.setup();
+      mockCreateProvider.mockResolvedValue(makeProvider({ rate_limited: true }));
+
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+
+      await user.type(screen.getByLabelText(/name/i), 'Rate Limited Provider');
+      await user.click(screen.getByLabelText(/this provider is rate-limited/i));
+      await user.click(screen.getByRole('button', { name: /save/i }));
+
+      expect(mockCreateProvider).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rate_limited: true,
+          rate_limits: [{ value: 10, unit: 'requests', per: 'minute' }],
+        }),
+      );
+    });
+
+    it('sends null rate_limits when rate limited is unchecked', async () => {
+      const user = userEvent.setup();
+      mockCreateProvider.mockResolvedValue(makeProvider());
+
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} />);
+
+      await user.type(screen.getByLabelText(/name/i), 'Normal Provider');
+      await user.click(screen.getByRole('button', { name: /save/i }));
+
+      expect(mockCreateProvider).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rate_limited: false,
+          rate_limits: null,
+        }),
+      );
+    });
+
+    it('populates rate limit fields in edit mode', () => {
+      const rateLimitedProvider = makeProvider({
+        rate_limited: true,
+        rate_limits: [{ value: 100, unit: 'tokens', per: 'hour' }],
+      });
+
+      render(
+        <ProviderForm open={true} onOpenChange={vi.fn()} provider={rateLimitedProvider} />,
+      );
+
+      // Checkbox should be checked
+      const checkbox = screen.getByLabelText(/this provider is rate-limited/i);
+      expect(checkbox).toHaveAttribute('data-state', 'checked');
+
+      // Rate limit value should be populated
+      expect(screen.getByLabelText(/rate limit value 1/i)).toHaveValue(100);
     });
   });
 
