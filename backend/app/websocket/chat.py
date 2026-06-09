@@ -25,7 +25,7 @@ from app.core.exceptions import sanitize_error_for_client
 from app.mcp.manager import cleanup_manager
 from app.models.evaluation import Evaluation
 from app.models.session import Session
-from app.services.agent_chat_service import end_and_score_session, process_user_message
+from app.services.agent_chat_service import end_session, process_user_message
 
 logger = structlog.get_logger()
 
@@ -189,7 +189,7 @@ async def _handle_end_session(ws: WebSocket, session_id: str) -> None:
     """Handle an 'end_session' type WebSocket frame."""
     try:
         async with async_session_factory() as db:
-            result = await end_and_score_session(session_id, db)
+            result = await end_session(session_id, db)
 
         await ws.send_json(
             {

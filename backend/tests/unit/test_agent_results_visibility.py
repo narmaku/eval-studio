@@ -2,12 +2,11 @@
 
 Verifies that:
 1. Creating a live session auto-creates a linked Evaluation record (mode=agent)
-2. Ending and scoring a session creates a Result record linked to the evaluation
-3. Evaluation status updates to "completed" on session end
+2. Ending a session sets evaluation to "completed" (no scoring or Result creation)
+3. Scoring is a separate step via POST /sessions/{id}/score
 """
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -16,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.models.session import Session
-from app.services.agent_chat_service import end_and_score_session
+from app.services.agent_chat_service import end_session
 
 # ---------------------------------------------------------------------------
 # Step 1: Creating a live session auto-creates an Evaluation
@@ -83,7 +82,7 @@ async def test_create_live_session_default_name(client):
 
 
 # ---------------------------------------------------------------------------
-# Step 2: Ending + scoring a session creates a Result and updates Evaluation
+# Step 2: Ending a session updates Evaluation to "completed" (no Result)
 # ---------------------------------------------------------------------------
 
 
@@ -116,45 +115,11 @@ async def session_with_auto_eval(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_end_and_score_creates_result_record(db_session: AsyncSession, session_with_auto_eval):
-    """end_and_score_session should create a Result record when session has an evaluation_id."""
-    session = session_with_auto_eval
-    session.judge_config_snapshot = {"model": "judge-model", "pass_threshold": 0.7}
-    await db_session.commit()
-
-    mock_score = MagicMock()
-    mock_score.value = 0.85
-    mock_score.passed = True
-    mock_score.reasoning = "Good agent conversation"
-    mock_score.breakdown = {"helpfulness": 0.9, "accuracy": 0.8}
-
-    with patch(
-        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
-        new_callable=AsyncMock,
-        return_value=mock_score,
-    ):
-        result = await end_and_score_session(session.id, db_session)
-
-    assert result["scores"]["overall"] == 0.85
-    assert result["scores"]["passed"] is True
-
-    # Verify Result record was created
-    result_query = await db_session.execute(select(Result).where(Result.evaluation_id == session.evaluation_id))
-    result_record = result_query.scalar_one_or_none()
-    assert result_record is not None
-    assert result_record.score == 0.85
-    assert result_record.passed is True
-    assert result_record.judge_reasoning == "Good agent conversation"
-    assert result_record.scores_breakdown == {"helpfulness": 0.9, "accuracy": 0.8}
-    assert result_record.session_id == session.id
-
-
-@pytest.mark.asyncio
-async def test_end_and_score_updates_evaluation_completed(db_session: AsyncSession, session_with_auto_eval):
-    """end_and_score_session should mark the linked evaluation as 'completed'."""
+async def test_end_session_updates_evaluation_completed(db_session: AsyncSession, session_with_auto_eval):
+    """end_session should mark the linked evaluation as 'completed'."""
     session = session_with_auto_eval
 
-    await end_and_score_session(session.id, db_session)
+    await end_session(session.id, db_session)
 
     # Verify evaluation status was updated
     eval_result = await db_session.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
@@ -163,44 +128,21 @@ async def test_end_and_score_updates_evaluation_completed(db_session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_end_and_score_updates_evaluation_failed_on_error(db_session: AsyncSession, session_with_auto_eval):
-    """end_and_score_session should mark evaluation as 'failed' when judge errors."""
-    session = session_with_auto_eval
-    session.judge_config_snapshot = {"model": "judge-model"}
-    await db_session.commit()
-
-    with patch(
-        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
-        new_callable=AsyncMock,
-        side_effect=RuntimeError("Judge API down"),
-    ):
-        await end_and_score_session(session.id, db_session)
-
-    # Verify evaluation status was updated to failed
-    eval_result = await db_session.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
-    evaluation = eval_result.scalar_one()
-    assert evaluation.status == "failed"
-
-
-@pytest.mark.asyncio
-async def test_end_without_judge_still_creates_result(db_session: AsyncSession, session_with_auto_eval):
-    """end_and_score_session without judge should still create a Result (with no score)."""
+async def test_end_session_does_not_create_result(db_session: AsyncSession, session_with_auto_eval):
+    """end_session should NOT create a Result record — that happens during scoring."""
     session = session_with_auto_eval
 
-    await end_and_score_session(session.id, db_session)
+    await end_session(session.id, db_session)
 
-    # Verify Result was created (with no score since no judge)
+    # Verify no Result was created
     result_query = await db_session.execute(select(Result).where(Result.evaluation_id == session.evaluation_id))
-    result_record = result_query.scalar_one_or_none()
-    assert result_record is not None
-    assert result_record.session_id == session.id
-    assert result_record.score is None
-    assert result_record.passed is None
+    results = result_query.scalars().all()
+    assert len(results) == 0
 
 
 @pytest.mark.asyncio
-async def test_end_session_without_evaluation_no_result(db_session: AsyncSession):
-    """end_and_score_session for a session without evaluation_id should not create a Result."""
+async def test_end_session_without_evaluation_no_error(db_session: AsyncSession):
+    """end_session for a session without evaluation_id should work without errors."""
     session = Session(
         evaluation_id=None,
         status="active",
@@ -212,7 +154,8 @@ async def test_end_session_without_evaluation_no_result(db_session: AsyncSession
     await db_session.commit()
     await db_session.refresh(session)
 
-    await end_and_score_session(session.id, db_session)
+    result = await end_session(session.id, db_session)
+    assert result["status"] == "ended"
 
     # No Result should exist
     result_query = await db_session.execute(select(Result))
@@ -221,18 +164,12 @@ async def test_end_session_without_evaluation_no_result(db_session: AsyncSession
 
 
 @pytest.mark.asyncio
-async def test_end_and_score_idempotent_no_duplicate_result(db_session: AsyncSession, session_with_auto_eval):
-    """Calling end_and_score_session twice should not create a duplicate Result."""
+async def test_end_session_idempotent_returns_current_state(db_session: AsyncSession, session_with_auto_eval):
+    """Calling end_session twice should be idempotent."""
     session = session_with_auto_eval
 
-    # First call: creates Result and updates evaluation
-    await end_and_score_session(session.id, db_session)
+    result1 = await end_session(session.id, db_session)
+    assert result1["status"] == "ended"
 
-    # Second call: should be a no-op (idempotent)
-    result2 = await end_and_score_session(session.id, db_session)
+    result2 = await end_session(session.id, db_session)
     assert result2["status"] == "ended"
-
-    # Verify only one Result exists
-    result_query = await db_session.execute(select(Result).where(Result.evaluation_id == session.evaluation_id))
-    results = result_query.scalars().all()
-    assert len(results) == 1
