@@ -115,7 +115,7 @@ export default function QAEvaluation() {
         message: `"${evaluation.name}" finished successfully`,
         evaluationId: evaluation.id,
       });
-      void fetchResults(evaluation.id, 1, 100);
+      void fetchResults(evaluation.id);
       void fetchAggregateMetrics(evaluation.id);
       if (selectedDatasetId) {
         api.getDataset(selectedDatasetId)

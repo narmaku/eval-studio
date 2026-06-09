@@ -78,7 +78,7 @@ describe('resultStore', () => {
         items: mockResults,
         total: 1,
         page: 1,
-        page_size: 100,
+        page_size: 20,
         pages: 1,
       });
 
@@ -93,13 +93,13 @@ describe('resultStore', () => {
       expect(useResultStore.getState().pagination).toEqual({
         total: 1,
         page: 1,
-        page_size: 100,
+        page_size: 20,
         pages: 1,
       });
       expect(mockedApi.listResults).toHaveBeenCalledWith({
         evaluation_id: 'e1',
         page: 1,
-        page_size: 100,
+        page_size: 20,
       });
     });
 

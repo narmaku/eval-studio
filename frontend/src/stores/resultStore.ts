@@ -57,7 +57,7 @@ export const useResultStore = create<ResultStore>((set, get) => ({
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),
 
-  fetchResults: async (evaluationId: string, page = 1, pageSize = 100) => {
+  fetchResults: async (evaluationId: string, page = 1, pageSize = 20) => {
     set({ isLoading: true, error: null });
     try {
       const response = await api.listResults({

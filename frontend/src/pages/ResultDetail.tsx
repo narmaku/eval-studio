@@ -24,7 +24,7 @@ export default function ResultDetail() {
 
   useEffect(() => {
     if (resultId) {
-      void fetchResults(resultId, 1, 100);
+      void fetchResults(resultId);
       void fetchAggregateMetrics(resultId);
       void fetchEvaluations();
     }
@@ -53,7 +53,7 @@ export default function ResultDetail() {
   const handlePageChange = useCallback(
     (page: number) => {
       if (resultId) {
-        void fetchResults(resultId, page, pagination?.page_size ?? 100);
+        void fetchResults(resultId, page, pagination?.page_size ?? 20);
       }
     },
     [resultId, pagination?.page_size, fetchResults],
