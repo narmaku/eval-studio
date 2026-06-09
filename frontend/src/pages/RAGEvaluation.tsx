@@ -62,7 +62,7 @@ export default function RAGEvaluation() {
   const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
     useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
-  const { results, fetchResults } = useResultStore();
+  const { results, fetchResults, fetchAggregateMetrics } = useResultStore();
 
   const itemMap = useMemo(() => {
     const map = new Map<string, DatasetItem>();
@@ -142,7 +142,8 @@ export default function RAGEvaluation() {
         message: `"${evaluation.name}" finished successfully`,
         evaluationId: evaluation.id,
       });
-      void fetchResults(evaluation.id);
+      void fetchResults(evaluation.id, 1, 100);
+      void fetchAggregateMetrics(evaluation.id);
       if (selectedDatasetId) {
         api.getDataset(selectedDatasetId)
           .then((detail) => setDatasetItems(detail.items))
@@ -169,7 +170,7 @@ export default function RAGEvaluation() {
       });
       setPhase('configure');
     }
-  }, [fetchResults, selectedDatasetId]);
+  }, [fetchResults, fetchAggregateMetrics, selectedDatasetId]);
 
   const handleRowClick = (result: Result) => {
     setSelectedResult(result);
