@@ -9,6 +9,7 @@ import { ToolInspector } from '@/components/chat/ToolInspector';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { api } from '@/services/api';
+import { Loader2 } from 'lucide-react';
 import type { Session, Message, ToolCall, SessionScore, JudgeReference } from '@/types';
 
 export default function SessionDetail() {
@@ -114,6 +115,7 @@ export default function SessionDetail() {
 
   const isEnded = session.status !== 'active';
   const hasScores = scores.length > 0;
+  const isSessionScoring = session.status === 'scoring';
 
   return (
     <div className="space-y-6">
@@ -130,8 +132,27 @@ export default function SessionDetail() {
             <span className="text-muted-foreground text-sm">{messages.length} messages</span>
           </div>
         </div>
-        {isEnded && !hasScores && !showScoreConfig && (
-          <Button onClick={() => setShowScoreConfig(true)}>Score with Judge</Button>
+        {isSessionScoring && (
+          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            Scoring...
+          </Badge>
+        )}
+        {isEnded && !hasScores && !showScoreConfig && !isSessionScoring && (
+          <Button
+            onClick={() => {
+              // Pre-populate judge config from session snapshot
+              if (session.judge_config_snapshot) {
+                const snapshot = session.judge_config_snapshot;
+                if (typeof snapshot.provider_id === 'string') {
+                  setJudgeConfig({ provider_id: snapshot.provider_id });
+                }
+              }
+              setShowScoreConfig(true);
+            }}
+          >
+            Score with Judge
+          </Button>
         )}
       </div>
       <Separator />

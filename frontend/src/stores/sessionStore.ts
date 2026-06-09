@@ -39,6 +39,7 @@ interface SessionStore {
   scores: SessionScore[];
   isConnected: boolean;
   isProcessing: boolean;
+  isScoring: boolean;
   error: string | null;
 
   // Actions
@@ -46,6 +47,7 @@ interface SessionStore {
   createSession: (config: CreateSessionRequest) => Promise<void>;
   sendMessage: (content: string) => void;
   endSession: () => Promise<void>;
+  scoreSession: (judgeConfig: { provider_id: string }) => Promise<void>;
   connectWebSocket: (sessionId: string) => void;
   disconnectWebSocket: () => void;
   resetSession: () => void;
@@ -61,6 +63,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   scores: [],
   isConnected: false,
   isProcessing: false,
+  isScoring: false,
   error: null,
 
   clearError: () => set({ error: null }),
@@ -114,6 +117,35 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to end session';
       set({ error: message });
+      throw err;
+    }
+  },
+
+  scoreSession: async (judgeConfig: { provider_id: string }) => {
+    const { currentSession } = get();
+    if (!currentSession) return;
+
+    set({ isScoring: true, error: null });
+    try {
+      const updatedSession = await api.scoreSession(currentSession.id, judgeConfig);
+      const sessionScores: SessionScore[] = updatedSession.scores
+        ? [
+            {
+              turn_number: null,
+              dimensions: updatedSession.scores.breakdown ?? {},
+              overall: updatedSession.scores.overall ?? 0,
+              judge_reasoning: updatedSession.scores.reasoning ?? '',
+            },
+          ]
+        : [];
+      set({
+        currentSession: updatedSession,
+        scores: sessionScores,
+        isScoring: false,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to score session';
+      set({ error: message, isScoring: false });
       throw err;
     }
   },
@@ -175,6 +207,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       scores: [],
       isConnected: false,
       isProcessing: false,
+      isScoring: false,
       error: null,
     });
   },

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -11,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
+import { BarChart3 } from 'lucide-react';
 
 function formatDuration(startedAt: string | null, endedAt: string | null): string {
   if (!startedAt || !endedAt) return '--';
@@ -35,6 +37,12 @@ function statusBadge(status: string) {
       );
     case 'ended':
       return <Badge variant="secondary">Ended</Badge>;
+    case 'scoring':
+      return (
+        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+          Scoring...
+        </Badge>
+      );
     case 'completed':
       return (
         <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
@@ -127,9 +135,24 @@ export default function Sessions() {
                   {formatDuration(session.started_at, session.ended_at)}
                 </TableCell>
                 <TableCell className="tabular-nums">
-                  {session.scores?.overall != null
-                    ? `${(session.scores.overall * 100).toFixed(0)}%`
-                    : '--'}
+                  {session.scores?.overall != null ? (
+                    `${(session.scores.overall * 100).toFixed(0)}%`
+                  ) : session.status === 'ended' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/sessions/${session.id}`);
+                      }}
+                    >
+                      <BarChart3 className="mr-1 h-3 w-3" />
+                      Score
+                    </Button>
+                  ) : (
+                    '--'
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {formatDate(session.started_at ?? session.id)}

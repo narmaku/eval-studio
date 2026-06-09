@@ -30,10 +30,13 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Loader2,
+  SkipForward,
+  BarChart3,
 } from 'lucide-react';
 import type { ModelEndpoint, JudgeReference, ToolServer } from '@/types';
 
-type PagePhase = 'configure' | 'active' | 'review';
+type PagePhase = 'configure' | 'active' | 'scoring' | 'review';
 
 function SessionErrorBanner({ error }: { error: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -94,10 +97,12 @@ export default function AgentEvaluation() {
     scores,
     isConnected,
     isProcessing,
+    isScoring,
     error,
     createSession,
     sendMessage,
     endSession,
+    scoreSession,
     connectWebSocket,
     disconnectWebSocket,
     resetSession,
@@ -234,12 +239,27 @@ export default function AgentEvaluation() {
   const handleEndSession = useCallback(async () => {
     try {
       await endSession();
-      setPhase('review');
+      setPhase('scoring');
       toast.success('Session ended');
     } catch {
       toast.error('Failed to end session');
     }
   }, [endSession]);
+
+  const handleScoreSession = useCallback(async () => {
+    if (!judgeConfig) return;
+    try {
+      await scoreSession({ provider_id: judgeConfig.provider_id });
+      setPhase('review');
+      toast.success('Session scored successfully');
+    } catch {
+      toast.error('Failed to score session');
+    }
+  }, [judgeConfig, scoreSession]);
+
+  const handleSkipScoring = useCallback(() => {
+    setPhase('review');
+  }, []);
 
   const handleReconnect = useCallback(() => {
     if (currentSession) {
@@ -402,6 +422,62 @@ export default function AgentEvaluation() {
               />
             </div>
             <ToolSidePanel toolCalls={toolCalls} />
+          </div>
+        </>
+      )}
+
+      {/* Scoring Phase */}
+      {phase === 'scoring' && (
+        <>
+          <div className="flex items-center gap-3">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Session Ended — Score Your Evaluation</h2>
+          </div>
+
+          <div className="flex flex-1 gap-4" style={{ minHeight: '400px' }}>
+            <div className="flex-1 min-w-0">
+              <ConversationPanel
+                messages={messages}
+                isProcessing={false}
+                onSend={() => {}}
+                disabled={true}
+              />
+            </div>
+            <div className="w-[400px] shrink-0 flex flex-col gap-4">
+              <JudgeConfigPanel
+                value={judgeConfig}
+                onChange={setJudgeConfig}
+                disabled={isScoring}
+              />
+              <div className="flex flex-col gap-2">
+                <Button
+                  className="w-full"
+                  onClick={() => void handleScoreSession()}
+                  disabled={!judgeConfig || isScoring}
+                >
+                  {isScoring ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Scoring...
+                    </>
+                  ) : (
+                    <>
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Score Session
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleSkipScoring}
+                  disabled={isScoring}
+                >
+                  <SkipForward className="mr-2 h-4 w-4" />
+                  Skip Scoring
+                </Button>
+              </div>
+            </div>
           </div>
         </>
       )}
