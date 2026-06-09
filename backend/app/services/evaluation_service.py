@@ -6,10 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import Score
 from app.adapters.factory import create_evaluation_adapter
+from app.core.config import settings
 from app.core.exceptions import sanitize_error_for_client
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
+from app.services.artifact_generation import generate_evaluation_artifacts
 from app.services.judge_utils import to_judge_params
 from app.services.provider_utils import (
     call_model,
@@ -284,6 +286,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             level="info",
             message=f"Evaluation completed: {passed_count}/{total} passed, avg score: {avg_score:.2f}",
         )
+
+        # Generate downloadable artifacts (errors are caught internally)
+        await generate_evaluation_artifacts(evaluation_id, db, settings.artifacts_dir)
 
     except Exception as exc:
         logger.exception("evaluation.unhandled_error", evaluation_id=evaluation_id)
