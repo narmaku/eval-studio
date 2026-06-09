@@ -264,6 +264,107 @@ class TestImportEndpoint:
 
 
 @pytest.mark.asyncio
+class TestImportAllRows:
+    """Tests verifying that import preserves ALL rows, not just the sample preview."""
+
+    async def test_import_yaml_30_items(self, client):
+        """Importing a YAML file with 30 items creates a dataset with 30 items (not 20)."""
+        data = [{"question": f"Q{i}", "answer": f"A{i}"} for i in range(30)]
+        content = yaml.dump(data).encode()
+
+        resp = await client.post(
+            "/api/v1/datasets/analyze",
+            files=[("files", ("big.yaml", content, "application/x-yaml"))],
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total_items"] == 30
+        # Preview should be truncated to sample_rows
+        assert len(body["files"][0]["sample_rows"]) == 20
+
+        analysis_id = body["analysis_id"]
+        resp = await client.post(
+            "/api/v1/datasets/import",
+            json={
+                "analysis_id": analysis_id,
+                "name": "Full YAML Import",
+                "mapping": {"question_field": "question", "answer_field": "answer"},
+            },
+        )
+        assert resp.status_code == 201
+        result = resp.json()
+        assert result["item_count"] == 30
+        assert len(result["items"]) == 30
+
+    async def test_import_jsonl_25_items(self, client):
+        """Importing a JSONL file with 25 items creates a dataset with 25 items."""
+        lines = [json.dumps({"question": f"Q{i}", "answer": f"A{i}"}) for i in range(25)]
+        content = "\n".join(lines).encode()
+
+        resp = await client.post(
+            "/api/v1/datasets/analyze",
+            files=[("files", ("big.jsonl", content, "application/x-jsonlines"))],
+        )
+        assert resp.status_code == 200
+        analysis_id = resp.json()["analysis_id"]
+
+        resp = await client.post(
+            "/api/v1/datasets/import",
+            json={
+                "analysis_id": analysis_id,
+                "name": "Full JSONL Import",
+                "mapping": {"question_field": "question", "answer_field": "answer"},
+            },
+        )
+        assert resp.status_code == 201
+        result = resp.json()
+        assert result["item_count"] == 25
+        assert len(result["items"]) == 25
+
+    async def test_import_csv_50_items(self, client):
+        """Importing a CSV file with 50 items creates a dataset with 50 items."""
+        header = "question,answer"
+        rows = [f"Q{i},A{i}" for i in range(50)]
+        content = (header + "\n" + "\n".join(rows) + "\n").encode()
+
+        resp = await client.post(
+            "/api/v1/datasets/analyze",
+            files=[("files", ("big.csv", content, "text/csv"))],
+        )
+        assert resp.status_code == 200
+        analysis_id = resp.json()["analysis_id"]
+
+        resp = await client.post(
+            "/api/v1/datasets/import",
+            json={
+                "analysis_id": analysis_id,
+                "name": "Full CSV Import",
+                "mapping": {"question_field": "question", "answer_field": "answer"},
+            },
+        )
+        assert resp.status_code == 201
+        result = resp.json()
+        assert result["item_count"] == 50
+        assert len(result["items"]) == 50
+
+    async def test_analyze_preview_still_truncated(self, client):
+        """The analyze response's sample_rows should still be truncated to preview limit."""
+        data = [{"question": f"Q{i}", "answer": f"A{i}"} for i in range(30)]
+        content = yaml.dump(data).encode()
+
+        resp = await client.post(
+            "/api/v1/datasets/analyze",
+            files=[("files", ("big.yaml", content, "application/x-yaml"))],
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        # Preview is truncated
+        assert len(body["files"][0]["sample_rows"]) == 20
+        # But total_items reflects the real count
+        assert body["total_items"] == 30
+
+
+@pytest.mark.asyncio
 class TestDeleteAnalysisEndpoint:
     """Tests for DELETE /api/v1/datasets/analyze/{analysis_id}."""
 

@@ -106,7 +106,7 @@ async def analyze_files(files: list[UploadFile]) -> AnalyzeResponse:
                     filename=filename,
                     format=fmt,
                     schema=schema,
-                    rows=schema.sample_rows,
+                    rows=schema.all_rows,
                 )
             )
 
