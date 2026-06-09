@@ -91,28 +91,63 @@ export function ToolServerList() {
         </div>
       )}
 
-      {filtered.map((server) => (
-        <Card key={server.id}>
-          <CardContent className="flex items-start justify-between py-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium">{server.name}</h3>
-                <Badge variant="secondary">{server.type === 'mcp_stdio' ? 'MCP' : 'Standalone'}</Badge>
-                <Badge variant={server.enabled ? 'default' : 'outline'}>
-                  {server.enabled ? 'Enabled' : 'Disabled'}
-                </Badge>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map((server) => (
+          <Card key={server.id} className="flex flex-col">
+            <CardContent className="flex flex-col gap-2 py-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium truncate">{server.name}</h3>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleEdit(server)}
+                    aria-label="Edit"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setDeleteTarget(server)}
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-              {server.description && (
-                <p className="text-xs text-muted-foreground">{server.description}</p>
-              )}
-              {server.command && (
-                <p className="text-xs text-muted-foreground font-mono">{server.command} {server.args.join(' ')}</p>
-              )}
-              {server.tool_count !== null && (
-                <p className="text-xs text-muted-foreground">{server.tool_count} tool(s) defined</p>
-              )}
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {server.type === 'mcp_stdio' ? 'MCP' : 'Standalone'}
+                  </Badge>
+                  <Badge variant={server.enabled ? 'default' : 'outline'} className="text-xs">
+                    {server.enabled ? 'Enabled' : 'Disabled'}
+                  </Badge>
+                </div>
+                {server.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2">{server.description}</p>
+                )}
+                {server.command && (
+                  <p
+                    className="text-xs text-muted-foreground font-mono truncate"
+                    title={`${server.command} ${server.args.join(' ')}`}
+                  >
+                    {server.command} {server.args.join(' ')}
+                  </p>
+                )}
+                {server.tool_count !== null && (
+                  <p className="text-xs text-muted-foreground">{server.tool_count} tool(s)</p>
+                )}
+              </div>
+
               {server.tags.length > 0 && (
-                <div className="flex gap-1 pt-1">
+                <div className="flex flex-wrap gap-1 mt-auto pt-1">
                   {server.tags.map((tag) => (
                     <Badge key={tag} variant="outline" className="text-xs">
                       {tag}
@@ -120,18 +155,10 @@ export function ToolServerList() {
                   ))}
                 </div>
               )}
-            </div>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="sm" onClick={() => handleEdit(server)} aria-label="Edit">
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(server)} aria-label="Delete">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       <ToolServerForm
         open={formOpen}
@@ -145,7 +172,8 @@ export function ToolServerList() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Tool Server</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? This action cannot be undone.
+              Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

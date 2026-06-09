@@ -59,40 +59,51 @@ export function EvaluatorList() {
 
   return (
     <div className="space-y-4">
-      {evaluators.map((evaluator) => (
-        <Card key={evaluator.id}>
-          <CardContent className="py-4">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium">{evaluator.name}</h3>
-                  {evaluator.builtin && <Badge variant="outline">Built-in</Badge>}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {evaluators.map((evaluator) => (
+          <Card key={evaluator.id} className="flex flex-col">
+            <CardContent className="flex flex-col gap-2 py-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium truncate">{evaluator.name}</h3>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {evaluator.builtin && (
+                    <Badge variant="outline" className="text-xs">
+                      Built-in
+                    </Badge>
+                  )}
                   <StatusIndicator available={evaluator.available} />
                 </div>
-                <p className="text-xs text-muted-foreground">{evaluator.description}</p>
-                <div className="flex gap-1 pt-1">
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {evaluator.description}
+                </p>
+                <div className="flex flex-wrap gap-1">
                   {evaluator.modes.map((mode) => (
                     <Badge key={mode} variant="secondary" className="text-xs">
                       {mode}
                     </Badge>
                   ))}
                 </div>
-                {Object.keys(evaluator.defaults).length > 0 && (
-                  <p className="text-xs text-muted-foreground pt-1">
-                    Defaults:{' '}
-                    {Object.entries(evaluator.defaults)
-                      .map(([k, v]) => `${k}=${String(v)}`)
-                      .join(', ')}
-                  </p>
-                )}
               </div>
-              <Button variant="outline" size="sm" onClick={() => handleConfigure(evaluator)}>
-                Configure
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+
+              <div className="mt-auto pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => handleConfigure(evaluator)}
+                >
+                  Configure
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {selectedEvaluator && (
         <EvaluatorDetail
