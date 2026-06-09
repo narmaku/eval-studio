@@ -21,6 +21,8 @@ const makeProvider = (overrides: Partial<Provider> = {}): Provider => ({
   endpoint_url: null,
   request_body_template: null,
   response_json_path: 'choices.0.message.content',
+  rate_limited: false,
+  rate_limits: null,
   ...overrides,
 });
 
@@ -215,5 +217,23 @@ describe('ProviderList', () => {
     };
     render(<ProviderList />);
     expect(screen.getByText('https://api.example.com/v1/infer')).toBeInTheDocument();
+  });
+
+  it('shows Rate Limited badge when provider is rate limited', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ rate_limited: true })],
+    };
+    render(<ProviderList />);
+    expect(screen.getByText('Rate Limited')).toBeInTheDocument();
+  });
+
+  it('does not show Rate Limited badge when provider is not rate limited', () => {
+    storeState = {
+      ...defaultStore,
+      providers: [makeProvider({ rate_limited: false })],
+    };
+    render(<ProviderList />);
+    expect(screen.queryByText('Rate Limited')).not.toBeInTheDocument();
   });
 });
