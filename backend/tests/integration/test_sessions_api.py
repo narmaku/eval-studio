@@ -1,4 +1,10 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.result import Result
 
 
 @pytest.mark.asyncio
@@ -205,3 +211,181 @@ async def test_send_empty_message(client):
 
     response = await client.post(f"/api/v1/sessions/{session_id}/message", json={"content": ""})
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Score endpoint tests (POST /sessions/{id}/score)
+# ---------------------------------------------------------------------------
+
+
+async def _create_ended_session_with_transcript(client):
+    """Helper: create an evaluation, session, add transcript, and end it."""
+    eval_resp = await client.post("/api/v1/evaluations", json={"name": "Score Test Eval", "mode": "agent"})
+    eval_id = eval_resp.json()["id"]
+
+    create_resp = await client.post("/api/v1/sessions", json={"evaluation_id": eval_id})
+    session_id = create_resp.json()["id"]
+
+    # Add a message to the transcript
+    await client.post(f"/api/v1/sessions/{session_id}/message", json={"content": "Hello, test message"})
+
+    # End the session
+    await client.post(f"/api/v1/sessions/{session_id}/end")
+
+    return eval_id, session_id
+
+
+@pytest.mark.asyncio
+async def test_score_session_transitions_to_completed(client):
+    """POST /sessions/{id}/score should set status to 'completed' on success."""
+    eval_id, session_id = await _create_ended_session_with_transcript(client)
+
+    mock_score = MagicMock()
+    mock_score.value = 0.85
+    mock_score.passed = True
+    mock_score.reasoning = "Good conversation"
+    mock_score.breakdown = {"helpfulness": 0.9}
+
+    with patch(
+        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
+        new_callable=AsyncMock,
+        return_value=mock_score,
+    ):
+        response = await client.post(
+            f"/api/v1/sessions/{session_id}/score",
+            json={"judge_config": {"model": "test-judge"}},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "completed"
+    assert data["scores"]["overall"] == 0.85
+    assert data["scores"]["passed"] is True
+    assert data["scores"]["reasoning"] == "Good conversation"
+
+
+@pytest.mark.asyncio
+async def test_score_session_creates_result_record(client, db_session: AsyncSession):
+    """POST /sessions/{id}/score should create a Result record."""
+    eval_id, session_id = await _create_ended_session_with_transcript(client)
+
+    mock_score = MagicMock()
+    mock_score.value = 0.75
+    mock_score.passed = True
+    mock_score.reasoning = "Decent conversation"
+    mock_score.breakdown = {"accuracy": 0.8}
+
+    with patch(
+        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
+        new_callable=AsyncMock,
+        return_value=mock_score,
+    ):
+        response = await client.post(
+            f"/api/v1/sessions/{session_id}/score",
+            json={"judge_config": {"model": "test-judge"}},
+        )
+
+    assert response.status_code == 200
+
+    # Verify Result record was created
+    result_query = await db_session.execute(select(Result).where(Result.session_id == session_id))
+    result_record = result_query.scalar_one_or_none()
+    assert result_record is not None
+    assert result_record.score == 0.75
+    assert result_record.passed is True
+    assert result_record.judge_reasoning == "Decent conversation"
+    assert result_record.scores_breakdown == {"accuracy": 0.8}
+    assert result_record.evaluation_id == eval_id
+
+
+@pytest.mark.asyncio
+async def test_score_session_failure_reverts_to_ended(client):
+    """POST /sessions/{id}/score should revert to 'ended' on scoring failure."""
+    _eval_id, session_id = await _create_ended_session_with_transcript(client)
+
+    with patch(
+        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("Judge API down"),
+    ):
+        response = await client.post(
+            f"/api/v1/sessions/{session_id}/score",
+            json={"judge_config": {"model": "test-judge"}},
+        )
+
+    # Should return 500 or similar error
+    assert response.status_code == 500
+
+    # Verify session reverted to "ended"
+    get_resp = await client.get(f"/api/v1/sessions/{session_id}")
+    assert get_resp.json()["status"] == "ended"
+
+
+@pytest.mark.asyncio
+async def test_score_session_rescore_upserts_result(client, db_session: AsyncSession):
+    """Calling POST /sessions/{id}/score twice should upsert the Result, not duplicate."""
+    eval_id, session_id = await _create_ended_session_with_transcript(client)
+
+    # First score
+    mock_score1 = MagicMock()
+    mock_score1.value = 0.6
+    mock_score1.passed = False
+    mock_score1.reasoning = "Needs improvement"
+    mock_score1.breakdown = {"accuracy": 0.5}
+
+    with patch(
+        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
+        new_callable=AsyncMock,
+        return_value=mock_score1,
+    ):
+        resp1 = await client.post(
+            f"/api/v1/sessions/{session_id}/score",
+            json={"judge_config": {"model": "test-judge"}},
+        )
+
+    assert resp1.status_code == 200
+    assert resp1.json()["scores"]["overall"] == 0.6
+
+    # Second score (re-scoring) — session should be back to "ended" or "completed"
+    # After first score, status is "completed". We need to test re-scoring from "completed" too.
+    mock_score2 = MagicMock()
+    mock_score2.value = 0.9
+    mock_score2.passed = True
+    mock_score2.reasoning = "Much better"
+    mock_score2.breakdown = {"accuracy": 0.95}
+
+    with patch(
+        "app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_conversation",
+        new_callable=AsyncMock,
+        return_value=mock_score2,
+    ):
+        resp2 = await client.post(
+            f"/api/v1/sessions/{session_id}/score",
+            json={"judge_config": {"model": "test-judge-v2"}},
+        )
+
+    assert resp2.status_code == 200
+    assert resp2.json()["scores"]["overall"] == 0.9
+
+    # Verify only one Result exists (upserted, not duplicated)
+    result_query = await db_session.execute(select(Result).where(Result.session_id == session_id))
+    results = result_query.scalars().all()
+    assert len(results) == 1
+    assert results[0].score == 0.9
+    assert results[0].judge_reasoning == "Much better"
+
+
+@pytest.mark.asyncio
+async def test_score_active_session_returns_409(client):
+    """POST /sessions/{id}/score on an active session should return 409."""
+    eval_resp = await client.post("/api/v1/evaluations", json={"name": "Active Score Eval", "mode": "agent"})
+    eval_id = eval_resp.json()["id"]
+
+    create_resp = await client.post("/api/v1/sessions", json={"evaluation_id": eval_id})
+    session_id = create_resp.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/sessions/{session_id}/score",
+        json={"judge_config": {"model": "test-judge"}},
+    )
+    assert response.status_code == 409

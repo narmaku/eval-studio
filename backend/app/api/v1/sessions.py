@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import ConflictException, NotFoundException
+from app.core.exceptions import AppException, ConflictException, NotFoundException, sanitize_error_for_client
 from app.core.security import require_auth
 from app.models.evaluation import Evaluation
 from app.models.session import Session
@@ -166,9 +166,14 @@ async def end_session(session_id: str, db: AsyncSession = Depends(get_db)) -> Se
 async def score_session(
     session_id: str, payload: ScoreSessionRequest, db: AsyncSession = Depends(get_db)
 ) -> SessionResponse:
-    """Score an ended session with a judge configuration."""
+    """Score a session with a judge configuration.
+
+    Transitions: ended/completed -> scoring -> completed (or ended on failure).
+    Creates or upserts a Result record linked to the session's evaluation.
+    """
     from app.adapters.base import JudgeConfigParams, Message, ToolCall
     from app.adapters.litellm_judge import LiteLLMJudgeAdapter
+    from app.models.result import Result
     from app.services.provider_utils import resolve_model_config
 
     result = await db.execute(select(Session).where(Session.id == session_id))
@@ -179,57 +184,95 @@ async def score_session(
     if session.status == "active":
         raise ConflictException("Cannot score an active session. End it first.")
 
-    judge_config = payload.judge_config
-    judge_resolved = resolve_model_config(judge_config)
+    # Remember the previous status so we can revert on failure
+    previous_status = session.status
 
-    judge_params = JudgeConfigParams(
-        model=judge_resolved.model,
-        temperature=judge_config.get("temperature", 0.0),
-        prompt_template=judge_config.get("prompt_template"),
-        pass_threshold=judge_config.get("pass_threshold", 0.7),
-        dimensions=judge_config.get("dimensions"),
-        aggregation=judge_config.get("aggregation"),
-    )
+    # Transition to "scoring"
+    session.status = "scoring"
+    await db.flush()
 
-    adapter = LiteLLMJudgeAdapter(
-        model=judge_resolved.model,
-        api_key=judge_resolved.api_key,
-        api_base=judge_resolved.api_base,
-    )
+    try:
+        judge_config = payload.judge_config
+        judge_resolved = resolve_model_config(judge_config)
 
-    transcript = session.transcript or []
-    messages = [
-        Message(role=msg["role"], content=msg.get("content", ""))
-        for msg in transcript
-        if msg.get("role") in ("user", "assistant", "system")
-    ]
-    tool_calls = []
-    for msg in transcript:
-        for tc in msg.get("tool_calls", []):
-            tool_calls.append(
-                ToolCall(
-                    tool_name=tc.get("tool_name", ""),
-                    arguments=tc.get("arguments", {}),
-                    result=tc.get("result"),
-                    duration_ms=tc.get("duration_ms"),
+        judge_params = JudgeConfigParams(
+            model=judge_resolved.model,
+            temperature=judge_config.get("temperature", 0.0),
+            prompt_template=judge_config.get("prompt_template"),
+            pass_threshold=judge_config.get("pass_threshold", 0.7),
+            dimensions=judge_config.get("dimensions"),
+            aggregation=judge_config.get("aggregation"),
+        )
+
+        adapter = LiteLLMJudgeAdapter(
+            model=judge_resolved.model,
+            api_key=judge_resolved.api_key,
+            api_base=judge_resolved.api_base,
+        )
+
+        transcript = session.transcript or []
+        messages = [
+            Message(role=msg["role"], content=msg.get("content", ""))
+            for msg in transcript
+            if msg.get("role") in ("user", "assistant", "system")
+        ]
+        tool_calls = []
+        for msg in transcript:
+            for tc in msg.get("tool_calls", []):
+                tool_calls.append(
+                    ToolCall(
+                        tool_name=tc.get("tool_name", ""),
+                        arguments=tc.get("arguments", {}),
+                        result=tc.get("result"),
+                        duration_ms=tc.get("duration_ms"),
+                    )
                 )
-            )
 
-    score = await adapter.evaluate_conversation(messages, tool_calls, judge_params)
+        score = await adapter.evaluate_conversation(messages, tool_calls, judge_params)
 
-    session.scores = {
-        "overall": score.value,
-        "passed": score.passed,
-        "reasoning": score.reasoning,
-        "breakdown": score.breakdown,
-    }
-    session.status = "completed"
+        session.scores = {
+            "overall": score.value,
+            "passed": score.passed,
+            "reasoning": score.reasoning,
+            "breakdown": score.breakdown,
+        }
+        session.status = "completed"
+        session.error = None
 
-    await db.commit()
-    await db.refresh(session)
+        # Upsert Result record if session is linked to an evaluation
+        if session.evaluation_id:
+            result_query = await db.execute(select(Result).where(Result.session_id == session.id))
+            existing_result = result_query.scalar_one_or_none()
+            if existing_result:
+                existing_result.score = score.value
+                existing_result.passed = score.passed
+                existing_result.judge_reasoning = score.reasoning
+                existing_result.scores_breakdown = score.breakdown
+            else:
+                new_result = Result(
+                    evaluation_id=session.evaluation_id,
+                    session_id=session.id,
+                    score=score.value,
+                    passed=score.passed,
+                    judge_reasoning=score.reasoning,
+                    scores_breakdown=score.breakdown,
+                    actual_answer=None,
+                )
+                db.add(new_result)
 
-    logger.info("session.scored", session_id=session_id, score=score.value, passed=score.passed)
-    return SessionResponse.model_validate(session)
+        await db.commit()
+        await db.refresh(session)
+
+        logger.info("session.scored", session_id=session_id, score=score.value, passed=score.passed)
+        return SessionResponse.model_validate(session)
+
+    except Exception as exc:
+        logger.exception("session.score_error", session_id=session_id)
+        # Revert to "ended" on failure
+        session.status = "ended"
+        session.error = f"Scoring failed: {sanitize_error_for_client(exc)}"
+        await db.commit()
+        raise AppException(500, "Scoring Failed", f"Scoring failed: {sanitize_error_for_client(exc)}") from exc
 
 
 @router.get("/{session_id}/replay", response_model=SessionReplayResponse)
