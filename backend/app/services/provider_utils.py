@@ -33,6 +33,8 @@ class ResolvedModel:
     endpoint_url: str | None = None
     request_body_template: str | None = None
     response_json_path: str = "choices.0.message.content"
+    rate_limited: bool = False
+    rate_limits: list[dict] | None = None
 
 
 def resolve_model_config(
@@ -69,6 +71,8 @@ def resolve_model_config(
     endpoint_url: str | None = None
     request_body_template: str | None = None
     response_json_path: str = "choices.0.message.content"
+    rate_limited: bool = False
+    rate_limits: list[dict] | None = None
 
     # 1. Try provider profile
     provider_id = config.get("provider_id")
@@ -89,6 +93,8 @@ def resolve_model_config(
         endpoint_url = provider.endpoint_url
         request_body_template = provider.request_body_template
         response_json_path = provider.response_json_path
+        rate_limited = provider.rate_limited
+        rate_limits = provider.rate_limits
     else:
         # 2. Direct config fields
         model = config.get("default_model") or config.get("model")
@@ -126,6 +132,8 @@ def resolve_model_config(
         endpoint_url=endpoint_url,
         request_body_template=request_body_template,
         response_json_path=response_json_path,
+        rate_limited=rate_limited,
+        rate_limits=rate_limits,
     )
 
 
@@ -361,6 +369,8 @@ async def resolve_provider(
             endpoint_url=getattr(db_provider, "endpoint_url", None),
             request_body_template=getattr(db_provider, "request_body_template", None),
             response_json_path=getattr(db_provider, "response_json_path", "choices.0.message.content"),
+            rate_limited=getattr(db_provider, "rate_limited", False),
+            rate_limits=getattr(db_provider, "rate_limits", None),
         )
 
     return None

@@ -36,3 +36,19 @@ class TestProviderModel:
         assert cols["api_key_env"].nullable is True
         assert cols["proxy"].nullable is True
         assert cols["source"].nullable is False
+
+    def test_rate_limit_columns_exist(self):
+        """Verify rate limit columns are defined on the Provider model."""
+        cols = Provider.__table__.columns
+        assert "rate_limited" in cols
+        assert "rate_limits" in cols
+
+    def test_rate_limited_default(self):
+        """rate_limited defaults to False."""
+        cols = Provider.__table__.columns
+        assert cols["rate_limited"].default.arg is False
+
+    def test_rate_limits_nullable(self):
+        """rate_limits column is nullable (no rate limits by default)."""
+        cols = Provider.__table__.columns
+        assert cols["rate_limits"].nullable is True

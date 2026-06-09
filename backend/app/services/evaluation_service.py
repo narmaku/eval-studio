@@ -8,6 +8,7 @@ from app.adapters.base import Score
 from app.adapters.factory import create_evaluation_adapter
 from app.core.config import settings
 from app.core.exceptions import sanitize_error_for_client
+from app.core.rate_limiter import AsyncRateLimiter
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
@@ -155,6 +156,21 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             extra_params=judge_llm_params if judge_llm_params else None,
         )
 
+        # 6b. Create rate limiter if provider has rate limits enabled
+        rate_limiter: AsyncRateLimiter | None = None
+        if resolved.rate_limited and resolved.rate_limits:
+            rate_limiter = AsyncRateLimiter(resolved.rate_limits)
+            logger.info(
+                "evaluation.rate_limiter_enabled",
+                evaluation_id=evaluation_id,
+                rules=len(resolved.rate_limits),
+            )
+            await broadcast_log(
+                evaluation_id=evaluation_id,
+                level="info",
+                message=f"Rate limiting enabled: {len(resolved.rate_limits)} rule(s)",
+            )
+
         # 7. Process each dataset item
         items = sorted(dataset.items, key=lambda i: i.order_index)
         total = len(items)
@@ -176,7 +192,9 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 message=f"Processing item {idx + 1}/{total}: {item.question[:80]}",
             )
 
-            # Step A: Call the model under test (supports both litellm and custom providers)
+            # Step A: Acquire rate limiter slot (if configured), then call the model
+            if rate_limiter:
+                await rate_limiter.acquire()
             actual_answer = await call_model(resolved, item.question, extra_params=model_params)
 
             await broadcast_log(

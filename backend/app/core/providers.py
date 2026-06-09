@@ -25,6 +25,8 @@ class ProviderProfile:
     endpoint_url: str | None = None  # Full URL for custom providers (e.g. "https://host/api/v1/infer")
     request_body_template: str | None = None
     response_json_path: str = "choices.0.message.content"
+    rate_limited: bool = False
+    rate_limits: list[dict] | None = None
 
     @property
     def api_key(self) -> str | None:
@@ -56,6 +58,8 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
             endpoint_url=raw.get("endpoint_url"),
             request_body_template=raw.get("request_body_template"),
             response_json_path=raw.get("response_json_path", "choices.0.message.content"),
+            rate_limited=raw.get("rate_limited", False),
+            rate_limits=raw.get("rate_limits"),
         )
 
     def _serialize_item(self, item: ProviderProfile) -> dict:
@@ -78,6 +82,8 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
                 if item.response_json_path != "choices.0.message.content"
                 else {}
             ),
+            **({"rate_limited": item.rate_limited} if item.rate_limited else {}),
+            **({"rate_limits": item.rate_limits} if item.rate_limits else {}),
         }
 
     def _get_item_id(self, item: ProviderProfile) -> str:

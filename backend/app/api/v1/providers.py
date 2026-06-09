@@ -74,6 +74,8 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
         endpoint_url=p.endpoint_url,
         request_body_template=p.request_body_template,
         response_json_path=p.response_json_path,
+        rate_limited=p.rate_limited,
+        rate_limits=p.rate_limits,
     )
 
 
@@ -213,6 +215,8 @@ async def create_provider(payload: ProviderCreate) -> ProviderResponse:
         endpoint_url=payload.endpoint_url,
         request_body_template=payload.request_body_template,
         response_json_path=payload.response_json_path,
+        rate_limited=payload.rate_limited,
+        rate_limits=[rl.model_dump() for rl in payload.rate_limits] if payload.rate_limits else None,
     )
     provider_registry.add_provider(profile)
     logger.info("provider.created", id=profile.id, name=profile.name)

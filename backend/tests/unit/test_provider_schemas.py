@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.provider import ProviderCreate, ProviderResponse, ProviderUpdate
+from app.schemas.provider import ProviderCreate, ProviderResponse, ProviderUpdate, RateLimit
 
 
 class TestProviderCreate:
@@ -92,6 +92,8 @@ class TestProviderUpdate:
             "endpoint_url",
             "request_body_template",
             "response_json_path",
+            "rate_limited",
+            "rate_limits",
         ]
 
         for field_name in expected_fields:
@@ -114,3 +116,103 @@ class TestProviderResponse:
         resp = ProviderResponse(id="p-1", name="Test", default_model="m")
         assert resp.has_api_key is False
         assert resp.tags == []
+        assert resp.rate_limited is False
+        assert resp.rate_limits is None
+
+    def test_response_with_rate_limits(self):
+        resp = ProviderResponse(
+            id="p-1",
+            name="Test",
+            default_model="m",
+            rate_limited=True,
+            rate_limits=[{"value": 10, "unit": "requests", "per": "minute"}],
+        )
+        assert resp.rate_limited is True
+        assert resp.rate_limits == [{"value": 10, "unit": "requests", "per": "minute"}]
+
+
+class TestRateLimit:
+    def test_valid_request_limit(self):
+        rl = RateLimit(value=10, unit="requests", per="minute")
+        assert rl.value == 10
+        assert rl.unit == "requests"
+        assert rl.per == "minute"
+
+    def test_valid_token_limit(self):
+        rl = RateLimit(value=1000, unit="tokens", per="hour")
+        assert rl.value == 1000
+        assert rl.unit == "tokens"
+        assert rl.per == "hour"
+
+    def test_all_time_windows(self):
+        for per in ("second", "minute", "hour", "day"):
+            rl = RateLimit(value=5, unit="requests", per=per)
+            assert rl.per == per
+
+    def test_invalid_unit_rejected(self):
+        with pytest.raises(ValidationError):
+            RateLimit(value=10, unit="words", per="minute")
+
+    def test_invalid_per_rejected(self):
+        with pytest.raises(ValidationError):
+            RateLimit(value=10, unit="requests", per="week")
+
+    def test_zero_value_rejected(self):
+        with pytest.raises(ValidationError):
+            RateLimit(value=0, unit="requests", per="minute")
+
+    def test_negative_value_rejected(self):
+        with pytest.raises(ValidationError):
+            RateLimit(value=-1, unit="requests", per="minute")
+
+
+class TestProviderCreateRateLimits:
+    def test_create_with_rate_limits(self):
+        provider = ProviderCreate(
+            name="My LLM",
+            default_model="openai/gpt-4",
+            rate_limited=True,
+            rate_limits=[RateLimit(value=10, unit="requests", per="minute")],
+        )
+        assert provider.rate_limited is True
+        assert len(provider.rate_limits) == 1
+        assert provider.rate_limits[0].value == 10
+
+    def test_create_defaults_no_rate_limits(self):
+        provider = ProviderCreate(name="My LLM")
+        assert provider.rate_limited is False
+        assert provider.rate_limits is None
+
+    def test_create_with_multiple_rate_limits(self):
+        provider = ProviderCreate(
+            name="My LLM",
+            rate_limited=True,
+            rate_limits=[
+                RateLimit(value=10, unit="requests", per="minute"),
+                RateLimit(value=1000, unit="tokens", per="minute"),
+            ],
+        )
+        assert len(provider.rate_limits) == 2
+
+    def test_create_rate_limits_with_invalid_rule(self):
+        """Invalid rate limit rules are rejected during create."""
+        with pytest.raises(ValidationError):
+            ProviderCreate(
+                name="My LLM",
+                rate_limits=[{"value": 10, "unit": "invalid", "per": "minute"}],
+            )
+
+
+class TestProviderUpdateRateLimits:
+    def test_update_with_rate_limits(self):
+        update = ProviderUpdate(
+            rate_limited=True,
+            rate_limits=[RateLimit(value=5, unit="requests", per="second")],
+        )
+        assert update.rate_limited is True
+        assert len(update.rate_limits) == 1
+
+    def test_update_defaults_none(self):
+        update = ProviderUpdate()
+        assert update.rate_limited is None
+        assert update.rate_limits is None

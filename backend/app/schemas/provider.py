@@ -5,6 +5,17 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class RateLimit(BaseModel):
+    """A single rate limit rule for throttling provider requests."""
+
+    value: int = Field(ge=1, description="Rate limit value (e.g., 10 for '10 requests per minute')")
+    unit: str = Field(pattern="^(tokens|requests)$", description="Rate limit unit: 'requests' or 'tokens'")
+    per: str = Field(
+        pattern="^(second|minute|hour|day)$",
+        description="Time window for the rate limit: 'second', 'minute', 'hour', or 'day'",
+    )
+
+
 class ProviderCreate(BaseModel):
     """Schema for creating a new user-managed provider."""
 
@@ -92,6 +103,17 @@ class ProviderCreate(BaseModel):
             " (e.g., 'data.text', 'output.content', 'choices.0.message.content')."
         ),
     )
+    rate_limited: bool = Field(
+        default=False,
+        description="Whether rate limiting is enabled for this provider.",
+    )
+    rate_limits: list[RateLimit] | None = Field(
+        default=None,
+        description=(
+            "Rate limit rules for throttling requests to this provider."
+            ' Example: [{"value": 10, "unit": "requests", "per": "minute"}]'
+        ),
+    )
 
 
 class ProviderUpdate(BaseModel):
@@ -110,6 +132,8 @@ class ProviderUpdate(BaseModel):
     endpoint_url: str | None = None
     request_body_template: str | None = None
     response_json_path: str | None = None
+    rate_limited: bool | None = None
+    rate_limits: list[RateLimit] | None = None
 
 
 class ProviderResponse(BaseModel):
@@ -129,6 +153,8 @@ class ProviderResponse(BaseModel):
     endpoint_url: str | None = None
     request_body_template: str | None = None
     response_json_path: str = "choices.0.message.content"
+    rate_limited: bool = False
+    rate_limits: list[dict] | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
