@@ -88,7 +88,7 @@ describe('exportResultsPdf', () => {
     );
   });
 
-  it('handles multi-page content by calling addPage', async () => {
+  it('handles multi-page content by calling addPage with correct offsets', async () => {
     // Make canvas very tall relative to page height to trigger pagination
     const tallCanvas = {
       ...mockCanvas,
@@ -100,5 +100,19 @@ describe('exportResultsPdf', () => {
 
     await exportResultsPdf(container, 'tall-eval');
     expect(mockAddPage).toHaveBeenCalled();
+
+    // Verify each page shifts the image further up (negative y position)
+    // Page 1 is at y=10 (margin), subsequent pages must have decreasing y
+    const addImageCalls = mockAddImage.mock.calls;
+    expect(addImageCalls.length).toBeGreaterThan(1);
+
+    const firstPageY = addImageCalls[0][3] as number;
+    expect(firstPageY).toBe(10); // margin
+
+    for (let i = 1; i < addImageCalls.length; i++) {
+      const pageY = addImageCalls[i][3] as number;
+      const prevPageY = addImageCalls[i - 1][3] as number;
+      expect(pageY).toBeLessThan(prevPageY);
+    }
   });
 });

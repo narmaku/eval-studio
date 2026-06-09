@@ -41,7 +41,7 @@ export async function exportResultsPdf(
 
     // Additional pages if content overflows
     while (heightLeft > 0) {
-      position = -(pageHeight - margin * 2 - (imgHeight - heightLeft)) + margin;
+      position = margin - (imgHeight - heightLeft);
       pdf.addPage();
       pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
       heightLeft -= pageHeight - margin * 2;
