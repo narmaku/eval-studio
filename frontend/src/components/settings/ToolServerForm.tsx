@@ -62,7 +62,7 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
   const [name, setName] = useState(toolServer?.name ?? '');
   const [type, setType] = useState<'mcp_stdio' | 'standalone'>(toolServer?.type ?? 'mcp_stdio');
   const [command, setCommand] = useState(toolServer?.command ?? '');
-  const [argsInput, setArgsInput] = useState(toolServer?.args?.join(', ') ?? '');
+  const [argsInput, setArgsInput] = useState(toolServer?.args?.join(' ') ?? '');
   const [envInput, setEnvInput] = useState('');
   const [toolsJson, setToolsJson] = useState(
     toolServer?.tools?.length ? JSON.stringify(toolServer.tools, null, 2) : '[]',
@@ -96,9 +96,8 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
     setIsSaving(true);
     try {
       const args = argsInput
-        .split(',')
-        .map((a) => a.trim())
-        .filter((a) => a.length > 0);
+        .match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)
+        ?.map((a) => a.replace(/^["']|["']$/g, '')) ?? [];
       const tags = tagsInput
         .split(',')
         .map((t) => t.trim())
@@ -186,7 +185,7 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
             <Input id="ts-command" value={command} onChange={(e) => setCommand(e.target.value)} placeholder="e.g., npx" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ts-args">Arguments (comma-separated)</Label>
+            <Label htmlFor="ts-args">Arguments (space-separated, use quotes for values with spaces)</Label>
             <Input
               id="ts-args"
               value={argsInput}
