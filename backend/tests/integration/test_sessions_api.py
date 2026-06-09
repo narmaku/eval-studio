@@ -238,7 +238,7 @@ async def _create_ended_session_with_transcript(client):
 @pytest.mark.asyncio
 async def test_score_session_transitions_to_completed(client):
     """POST /sessions/{id}/score should set status to 'completed' on success."""
-    eval_id, session_id = await _create_ended_session_with_transcript(client)
+    _eval_id, session_id = await _create_ended_session_with_transcript(client)
 
     mock_score = MagicMock()
     mock_score.value = 0.85
@@ -324,7 +324,7 @@ async def test_score_session_failure_reverts_to_ended(client):
 @pytest.mark.asyncio
 async def test_score_session_rescore_upserts_result(client, db_session: AsyncSession):
     """Calling POST /sessions/{id}/score twice should upsert the Result, not duplicate."""
-    eval_id, session_id = await _create_ended_session_with_transcript(client)
+    _eval_id, session_id = await _create_ended_session_with_transcript(client)
 
     # First score
     mock_score1 = MagicMock()

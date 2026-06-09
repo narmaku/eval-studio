@@ -184,9 +184,6 @@ async def score_session(
     if session.status == "active":
         raise ConflictException("Cannot score an active session. End it first.")
 
-    # Remember the previous status so we can revert on failure
-    previous_status = session.status
-
     # Transition to "scoring"
     session.status = "scoring"
     await db.flush()
