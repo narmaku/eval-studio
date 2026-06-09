@@ -37,6 +37,7 @@ class FileSchema:
     fields: list[str]
     sample_rows: list[dict[str, Any]]
     total_rows: int
+    all_rows: list[dict[str, Any]] = field(default_factory=list)
     has_header: bool = True
     nested_paths: list[str] = field(default_factory=list)
 
@@ -298,6 +299,7 @@ def _extract_yaml_schema(text: str, sample_size: int) -> FileSchema:
         fields=fields,
         sample_rows=rows[:sample_size],
         total_rows=len(rows),
+        all_rows=rows,
         has_header=True,
         nested_paths=nested_paths,
     )
@@ -324,6 +326,7 @@ def _extract_jsonl_schema(text: str, sample_size: int) -> FileSchema:
         fields=fields,
         sample_rows=rows[:sample_size],
         total_rows=len(rows),
+        all_rows=rows,
         has_header=True,
         nested_paths=nested_paths,
     )
@@ -353,6 +356,7 @@ def _extract_json_schema(text: str, sample_size: int) -> FileSchema:
         fields=fields,
         sample_rows=rows[:sample_size],
         total_rows=len(rows),
+        all_rows=rows,
         has_header=True,
         nested_paths=nested_paths,
     )
@@ -372,6 +376,7 @@ def _extract_csv_schema(text: str, sample_size: int, delimiter: str = ",") -> Fi
         fields=sorted(fields),
         sample_rows=rows[:sample_size],
         total_rows=len(rows),
+        all_rows=rows,
         has_header=has_header,
         nested_paths=[],
     )
