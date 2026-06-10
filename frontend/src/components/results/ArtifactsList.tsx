@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Eye, Loader2, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,16 +52,12 @@ export function ArtifactsList({ evaluationId }: ArtifactsListProps) {
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [previewArtifact, setPreviewArtifact] = useState<Artifact | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
-  const prevEvaluationId = useRef<string | null>(null);
 
   useEffect(() => {
-    // Only fetch if evaluationId actually changed
-    if (prevEvaluationId.current === evaluationId) return;
-    prevEvaluationId.current = evaluationId;
-
     let cancelled = false;
 
     async function load() {
+      setIsLoading(true);
       try {
         const data = await api.listArtifacts(evaluationId);
         if (!cancelled) {
