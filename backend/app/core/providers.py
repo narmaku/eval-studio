@@ -59,7 +59,7 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
             endpoint_url=raw.get("endpoint_url"),
             request_body_template=raw.get("request_body_template"),
             response_json_path=raw.get("response_json_path", "choices.0.message.content"),
-            single_model=raw.get("single_model", False),
+            single_model=raw.get("single_model", not raw.get("default_model", "")),
             rate_limited=raw.get("rate_limited", False),
             rate_limits=raw.get("rate_limits"),
         )
