@@ -68,6 +68,7 @@ export interface ModelEndpoint {
   api_base?: string;
   api_key_env?: string;
   tags?: string[];
+  single_model?: boolean;
 }
 
 export interface RateLimit {
@@ -91,6 +92,7 @@ export interface Provider {
   endpoint_url: string | null;
   request_body_template: string;
   response_json_path: string;
+  single_model: boolean;
   rate_limited: boolean;
   rate_limits: RateLimit[] | null;
 }

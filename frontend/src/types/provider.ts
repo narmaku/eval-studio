@@ -14,6 +14,7 @@ export interface CreateProviderRequest {
   endpoint_url?: string | null;
   request_body_template?: string;
   response_json_path?: string;
+  single_model?: boolean;
   rate_limited?: boolean;
   rate_limits?: RateLimit[] | null;
 }

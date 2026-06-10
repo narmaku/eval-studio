@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
+import { AlertTriangle } from 'lucide-react';
 import type { ModelEndpoint } from '@/types';
 
 const MIN_CONTESTANTS = 2;
-const MAX_CONTESTANTS = 8;
+const WARN_THRESHOLD = 10;
 
 interface ContestantSelectorProps {
   value: ModelEndpoint[];
@@ -20,13 +21,11 @@ export function ContestantSelector({ value, onChange, disabled }: ContestantSele
   const [slotCount, setSlotCount] = useState(Math.max(value.length, MIN_CONTESTANTS));
 
   const effectiveSlotCount = Math.max(slotCount, value.length, MIN_CONTESTANTS);
-  const canAdd = effectiveSlotCount < MAX_CONTESTANTS && !disabled;
+  const canAdd = !disabled;
   const canRemove = effectiveSlotCount > MIN_CONTESTANTS && !disabled;
 
   const handleAdd = () => {
-    if (effectiveSlotCount < MAX_CONTESTANTS) {
-      setSlotCount(effectiveSlotCount + 1);
-    }
+    setSlotCount(effectiveSlotCount + 1);
   };
 
   const handleRemove = (index: number) => {
@@ -80,6 +79,16 @@ export function ContestantSelector({ value, onChange, disabled }: ContestantSele
             </div>
           );
         })}
+
+        {effectiveSlotCount > WARN_THRESHOLD && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-950/30">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p className="text-xs text-amber-800 dark:text-amber-300">
+              You have more than 10 contestants. Large arenas may produce cluttered results and
+              increase evaluation time. Consider keeping it under 10 for best results.
+            </p>
+          </div>
+        )}
 
         <Button variant="outline" className="w-full" disabled={!canAdd} onClick={handleAdd}>
           Add Contestant

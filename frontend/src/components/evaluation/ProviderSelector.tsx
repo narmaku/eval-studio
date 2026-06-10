@@ -95,10 +95,12 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
         name: provider.name,
         default_model: provider.default_model,
         api_base: provider.api_base ?? undefined,
+        single_model: provider.single_model ?? false,
       });
 
-      // Fetch available models for this provider
-      fetchModels(provider.id);
+      if (!provider.single_model) {
+        fetchModels(provider.id);
+      }
     }
   };
 
@@ -116,6 +118,7 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
       name: provider.name,
       default_model: modelValue,
       api_base: provider.api_base ?? undefined,
+      single_model: provider.single_model ?? false,
     });
   };
 

@@ -67,8 +67,8 @@ export default function ArenaComparison() {
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults } = useResultStore();
 
-  // Need at least 2 contestants with valid model config
-  const validContestants = contestants.filter((c) => c.name && c.default_model);
+  // Need at least 2 contestants with valid config (single-model providers don't need default_model)
+  const validContestants = contestants.filter((c) => c.name && (c.default_model || c.single_model));
   const isConfigValid = Boolean(
     validContestants.length >= 2 && selectedDatasetId && judgeConfig && selectedEvaluatorId,
   );

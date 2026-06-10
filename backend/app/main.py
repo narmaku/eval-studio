@@ -13,6 +13,25 @@ from app.core.logging import configure_logging, get_logger
 from app.schemas.common import ProblemDetail
 
 
+async def _migrate_single_model_providers() -> None:
+    """Mark providers with empty default_model as single_model=true."""
+    from sqlalchemy import text
+
+    from app.core.database import async_session_factory
+
+    async with async_session_factory() as db:
+        result = await db.execute(
+            text(
+                "UPDATE providers SET single_model = 1 "
+                "WHERE (default_model IS NULL OR default_model = '') AND single_model = 0"
+            )
+        )
+        if result.rowcount:
+            logger = get_logger("app.main")
+            logger.info("Migrated single-model providers", count=result.rowcount)
+        await db.commit()
+
+
 async def _migrate_scored_sessions() -> None:
     """Fix legacy sessions that were auto-scored but left with status 'ended'."""
     from sqlalchemy import text
@@ -45,6 +64,7 @@ async def lifespan(app: FastAPI):
     if settings.auth_disabled:
         logger.warning("Authentication is DISABLED (AUTH_DISABLED=true). All endpoints are publicly accessible.")
     await _migrate_scored_sessions()
+    await _migrate_single_model_providers()
     yield
     logger = get_logger("app.main")
     logger.info("Shutting down eval-studio backend")

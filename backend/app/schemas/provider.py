@@ -103,6 +103,13 @@ class ProviderCreate(BaseModel):
             " (e.g., 'data.text', 'output.content', 'choices.0.message.content')."
         ),
     )
+    single_model: bool = Field(
+        default=False,
+        description=(
+            "Whether this provider serves a single model implicitly."
+            " When true, no model selection is needed — the endpoint itself is the model."
+        ),
+    )
     rate_limited: bool = Field(
         default=False,
         description="Whether rate limiting is enabled for this provider.",
@@ -132,6 +139,7 @@ class ProviderUpdate(BaseModel):
     endpoint_url: str | None = None
     request_body_template: str | None = None
     response_json_path: str | None = None
+    single_model: bool | None = None
     rate_limited: bool | None = None
     rate_limits: list[RateLimit] | None = None
 
@@ -153,6 +161,7 @@ class ProviderResponse(BaseModel):
     endpoint_url: str | None = None
     request_body_template: str | None = None
     response_json_path: str = "choices.0.message.content"
+    single_model: bool = False
     rate_limited: bool = False
     rate_limits: list[dict] | None = None
     model_config = ConfigDict(from_attributes=True)

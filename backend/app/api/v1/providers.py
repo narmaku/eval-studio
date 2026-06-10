@@ -74,6 +74,7 @@ def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
         endpoint_url=p.endpoint_url,
         request_body_template=p.request_body_template,
         response_json_path=p.response_json_path,
+        single_model=p.single_model,
         rate_limited=p.rate_limited,
         rate_limits=p.rate_limits,
     )

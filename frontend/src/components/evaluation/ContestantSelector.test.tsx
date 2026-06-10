@@ -89,8 +89,8 @@ describe('ContestantSelector', () => {
     expect(screen.getByText('#3')).toBeInTheDocument();
   });
 
-  it('disables add button at max 8 contestants', () => {
-    const contestants: ModelEndpoint[] = Array.from({ length: 8 }, (_, i) => ({
+  it('allows adding beyond 10 contestants but shows warning', () => {
+    const contestants: ModelEndpoint[] = Array.from({ length: 11 }, (_, i) => ({
       name: `Model ${i + 1}`,
       default_model: `openai/model-${i + 1}`,
     }));
@@ -98,7 +98,8 @@ describe('ContestantSelector', () => {
     render(<ContestantSelector value={contestants} onChange={onChange} />);
 
     const addButton = screen.getByRole('button', { name: /add contestant/i });
-    expect(addButton).toBeDisabled();
+    expect(addButton).not.toBeDisabled();
+    expect(screen.getByText(/more than 10 contestants/i)).toBeInTheDocument();
   });
 
   it('has remove buttons for each contestant', () => {
@@ -214,23 +215,21 @@ describe('ContestantSelector', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('does not add past MAX_CONTESTANTS (8) via repeated clicks', async () => {
+  it('shows no warning at 10 contestants but shows warning at 11', async () => {
     const user = userEvent.setup();
-    const contestants: ModelEndpoint[] = Array.from({ length: 7 }, (_, i) => ({
+    const contestants: ModelEndpoint[] = Array.from({ length: 10 }, (_, i) => ({
       name: `Model ${i + 1}`,
       default_model: `openai/model-${i + 1}`,
     }));
     const onChange = vi.fn();
     render(<ContestantSelector value={contestants} onChange={onChange} />);
 
-    const addButton = screen.getByRole('button', { name: /add contestant/i });
-    // Should be able to add one more (7 -> 8)
-    expect(addButton).not.toBeDisabled();
-    await user.click(addButton);
-    expect(screen.getByText('#8')).toBeInTheDocument();
+    expect(screen.queryByText(/more than 10 contestants/i)).not.toBeInTheDocument();
 
-    // Now should be disabled at max
-    expect(addButton).toBeDisabled();
+    const addButton = screen.getByRole('button', { name: /add contestant/i });
+    await user.click(addButton);
+    expect(screen.getByText('#11')).toBeInTheDocument();
+    expect(screen.getByText(/more than 10 contestants/i)).toBeInTheDocument();
   });
 
   it('does not remove below MIN_CONTESTANTS (2) when only 2 remain', async () => {

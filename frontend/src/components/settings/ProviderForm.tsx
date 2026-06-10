@@ -116,6 +116,9 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
     (provider?.default_params as LLMParams) ?? {},
   );
 
+  // Single-model provider
+  const [singleModel, setSingleModel] = useState(provider?.single_model ?? false);
+
   // Rate limit fields
   const [rateLimited, setRateLimited] = useState(provider?.rate_limited ?? false);
   const [rateLimits, setRateLimits] = useState<RateLimit[]>(provider?.rate_limits ?? []);
@@ -210,7 +213,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
 
       const data: CreateProviderRequest = {
         name: name.trim(),
-        default_model: isCustom ? '' : defaultModel.trim(),
+        default_model: isCustom || singleModel ? '' : defaultModel.trim(),
         api_base: apiBase.trim() || null,
         api_key_env: apiKeyEnv.trim() || null,
         proxy: proxy.trim() || null,
@@ -223,6 +226,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
         endpoint_url: isCustom ? endpointUrl.trim() || null : null,
         request_body_template: isCustom ? requestBodyTemplate.trim() || null : null,
         response_json_path: isCustom ? responseJsonPath.trim() : 'choices.0.message.content',
+        single_model: singleModel,
         rate_limited: rateLimited,
         rate_limits: rateLimited && rateLimits.length > 0 ? rateLimits : null,
       };
@@ -287,6 +291,22 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
       </div>
 
       {!isCustom && (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="single-model"
+            checked={singleModel}
+            onCheckedChange={(checked) => setSingleModel(checked === true)}
+          />
+          <Label htmlFor="single-model" className="text-sm font-normal cursor-pointer">
+            Single-model provider
+          </Label>
+          {fieldDescriptions.single_model && (
+            <FieldTooltip description={fieldDescriptions.single_model} />
+          )}
+        </div>
+      )}
+
+      {!isCustom && !singleModel && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Label htmlFor="provider-model">Default Model</Label>
