@@ -22,6 +22,7 @@ from sqlalchemy import select
 
 from app.core.database import async_session_factory
 from app.core.exceptions import sanitize_error_for_client
+from app.core.security import verify_ws_auth
 from app.mcp.manager import cleanup_manager
 from app.models.evaluation import Evaluation
 from app.models.session import Session
@@ -61,6 +62,11 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
     Receives JSON messages with type "message" or "end_session".
     Streams agent responses back as typed JSON envelopes.
     """
+    # 0. Authenticate before accepting — reject unauthenticated clients early.
+    if not await verify_ws_auth(websocket):
+        await websocket.close(code=4001, reason="Authentication required")
+        return
+
     # 1. Validate session exists and is active before accepting.
     # WebSocket protocol requires accept() before close(), so we accept first
     # and then close with an application-level error code if validation fails.

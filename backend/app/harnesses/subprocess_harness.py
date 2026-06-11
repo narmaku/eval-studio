@@ -9,7 +9,7 @@ import structlog
 
 from app.core.config import settings
 from app.core.exceptions import sanitize_error_for_client
-from app.core.subprocess_validation import load_allowed_commands, validate_command
+from app.core.subprocess_validation import load_allowed_commands, sanitize_env, validate_command
 from app.harnesses.base import AgentHarness, HarnessEvent
 from app.harnesses.factory import get_parser
 from app.harnesses.registry import HarnessProfile
@@ -68,8 +68,13 @@ class SubprocessHarness(AgentHarness):
         # Build prompt from history summary + current message
         prompt = self._build_prompt(content, history)
 
-        # Merge environment
-        env = {**self._profile.env} if self._profile.env else None
+        import os
+
+        # Merge parent env with profile overrides, then strip dangerous vars.
+        # Always sanitize — even when no custom env is set — to prevent the
+        # parent process's LD_PRELOAD etc. from leaking into the child.
+        raw_env = {**os.environ, **(self._profile.env or {})}
+        env = sanitize_env(raw_env, context="harness env")
 
         parser = get_parser(self._profile.output_format)
         timeout = self._config.get("timeout", DEFAULT_TIMEOUT_SECONDS)
@@ -80,7 +85,7 @@ class SubprocessHarness(AgentHarness):
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=env if env else None,
+                env=env,
             )
 
             # Write prompt to stdin and close
