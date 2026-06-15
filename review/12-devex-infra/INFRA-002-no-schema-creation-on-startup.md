@@ -6,7 +6,7 @@ severity: high
 effort: S
 confidence: high
 breaking: false
-status: open
+status: done
 depends_on: []
 blocks: [TEST-003, DOC-002]
 supersedes: [BUG-006]

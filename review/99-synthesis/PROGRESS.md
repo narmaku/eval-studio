@@ -4,7 +4,7 @@ Tracks session-by-session progress implementing the deep-quality review.
 Review at commit `ffc4b27` (branch `main`), 94 issues across 13 categories.
 
 ## Status board
-- Done: INFRA-007, INFRA-008, BUG-004, BUG-003, BUG-005, BUG-017, BUG-007, BUG-010, BUG-009
+- Done: INFRA-007, INFRA-008, BUG-004, BUG-003, BUG-005, BUG-017, BUG-007, BUG-010, BUG-009, INFRA-002, BUG-006 (superseded)
 - In progress / partial: —
 - Next recommended (ready, priority order): BUG-012, BUG-014, BUG-015+PERF-004, SIMP-003, SIMP-007, INFRA-006, CONS-001, DUP-001, DUP-005, API-001
 - Toolchain baseline as of 2026-06-15: backend pytest 915 passed, ruff 0 errors, format 0 files, frontend 606 passed, lint 6 warnings (not errors), build succeeds
@@ -102,6 +102,16 @@ Branch: `fix/review-phase0-bugs-batch1`
 
 ### New issues discovered
 None.
+
+### Addendum: INFRA-002 (fresh-DB startup crash)
+
+CI Container Smoke Test was failing on main (pre-existing). Root cause: app lifespan never
+ran Alembic migrations, so fresh databases had no tables. Fixed by adding `_run_alembic_migrations()`
+to the lifespan (runs via `asyncio.to_thread` to avoid nested event loop conflict with alembic's
+`asyncio.run`). Guarded for tests (`sqlite+aiosqlite://` in-memory URL skipped). Verified with
+fresh temp DB + health check. BUG-006 auto-closes (superseded by INFRA-002).
+
+Files modified: `backend/app/main.py`
 
 ### Breaking changes
 None. All fixes are internal behavioral corrections — no API or schema changes.
@@ -209,6 +219,8 @@ removing spurious function arguments — no API or behavioral changes.
 | BUG-007 | 2 | (pending) | single_model passed through + always serialized |
 | BUG-010 | 2 | (pending) | sanitize_error_for_client in all 3 services |
 | BUG-009 | 2 | (pending) | RAG adapter close() in finally |
+| INFRA-002 | 2 | (pending) | Alembic migrations at startup |
+| BUG-006 | 2 | — | Superseded by INFRA-002 |
 
 ---
 

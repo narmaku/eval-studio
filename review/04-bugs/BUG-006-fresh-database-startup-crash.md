@@ -6,7 +6,7 @@ severity: high
 effort: S
 confidence: high
 breaking: false
-status: open
+status: done (superseded by INFRA-002)
 depends_on: []
 blocks: []
 supersedes: []
