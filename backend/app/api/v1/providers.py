@@ -287,5 +287,5 @@ async def list_provider_models(provider_id: str) -> list[ProviderModelResponse]:
             models = data.get("data", [])
             return [ProviderModelResponse(id=m.get("id", ""), owned_by=m.get("owned_by", "")) for m in models]
     except Exception as exc:
-        logger.warning("failed to fetch models from provider", provider_id=provider_id, error=str(exc))
+        logger.warning("provider.models_fetch_failed", provider_id=provider_id, error=str(exc))
         return [ProviderModelResponse(id=default_model_name, owned_by="configured")]

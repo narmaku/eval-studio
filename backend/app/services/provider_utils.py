@@ -47,7 +47,7 @@ def resolve_model_config(
     Resolution order:
     1. Provider profile (if provider_id is present and found in registry)
     2. Direct config fields (default_model, api_base)
-    3. Settings fallback (LITELLM_MODEL, LITELLM_API_KEY env vars)
+    3. Settings fallback (DEFAULT_MODEL, LITELLM_API_KEY env vars)
 
     Args:
         config: Dictionary with optional keys: provider_id, default_model, api_base.

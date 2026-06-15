@@ -48,7 +48,7 @@ class EvaluatorRegistry(YAMLBackedRegistry[EvaluatorInfo]):
         # Validate required fields
         missing = [f for f in self._REQUIRED_FIELDS if f not in raw]
         if missing:
-            logger.warning("skipping_evaluator_missing_fields", missing=missing, entry=raw)
+            logger.warning("evaluator.entry_missing_fields", missing=missing, entry=raw)
             return None
 
         # Check if adapter class is importable
@@ -85,7 +85,7 @@ class EvaluatorRegistry(YAMLBackedRegistry[EvaluatorInfo]):
         """
         if not self._validate_adapter_namespace(adapter_class):
             logger.warning(
-                "adapter_outside_allowed_namespaces",
+                "evaluator.adapter_outside_namespace",
                 adapter_class=adapter_class,
                 allowed=_ALLOWED_ADAPTER_PREFIXES,
             )
@@ -95,7 +95,7 @@ class EvaluatorRegistry(YAMLBackedRegistry[EvaluatorInfo]):
             module = importlib.import_module(module_path)
             return hasattr(module, _class_name)
         except (ImportError, ValueError, AttributeError) as exc:
-            logger.warning("adapter_not_importable", adapter_class=adapter_class, error=str(exc))
+            logger.warning("evaluator.adapter_not_importable", adapter_class=adapter_class, error=str(exc))
             return False
 
     def list_evaluators(self, mode: str | None = None) -> list[EvaluatorInfo]:

@@ -151,7 +151,7 @@ async def upload_config_file(evaluator_id: str, file: UploadFile) -> ConfigFileI
         raise AppException(400, "Bad Request", f"File too large. Maximum size is {max_mb} MB")
     target_path.write_bytes(content)
 
-    logger.info("config_file_uploaded", evaluator_id=evaluator_id, filename=filename, size=len(content))
+    logger.info("evaluator_config.uploaded", evaluator_id=evaluator_id, filename=filename, size=len(content))
     return ConfigFileInfo(filename=filename, size=len(content))
 
 
@@ -207,4 +207,4 @@ async def delete_config_file(evaluator_id: str, filename: str) -> None:
         raise NotFoundException("Config file", sanitized)
 
     target_path.unlink()
-    logger.info("config_file_deleted", evaluator_id=evaluator_id, filename=sanitized)
+    logger.info("evaluator_config.deleted", evaluator_id=evaluator_id, filename=sanitized)
