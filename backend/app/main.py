@@ -31,25 +31,6 @@ def _run_alembic_migrations() -> None:
     command.upgrade(cfg, "head")
 
 
-async def _migrate_single_model_providers() -> None:
-    """Mark providers with empty default_model as single_model=true."""
-    from sqlalchemy import text
-
-    from app.core.database import async_session_factory
-
-    async with async_session_factory() as db:
-        result = await db.execute(
-            text(
-                "UPDATE providers SET single_model = 1 "
-                "WHERE (default_model IS NULL OR default_model = '') AND single_model = 0"
-            )
-        )
-        if result.rowcount:
-            logger = get_logger("app.main")
-            logger.info("startup.migrated_single_model_providers", count=result.rowcount)
-        await db.commit()
-
-
 async def _migrate_scored_sessions() -> None:
     """Fix legacy sessions that were auto-scored but left with status 'ended'."""
     from sqlalchemy import text
@@ -84,7 +65,6 @@ async def lifespan(app: FastAPI):
     if not settings.database_url.endswith("://"):
         await asyncio.to_thread(_run_alembic_migrations)
     await _migrate_scored_sessions()
-    await _migrate_single_model_providers()
     yield
     logger = get_logger("app.main")
     logger.info("app.shutdown")
@@ -184,3 +164,21 @@ app.include_router(tool_servers_router, prefix="/api/v1")
 app.include_router(harnesses_router, prefix="/api/v1")
 app.include_router(ws_chat_router)
 app.include_router(ws_progress_router)
+
+# --- Production SPA serving ---
+# In production (Containerfile), the frontend build is copied to /app/static/.
+# Mount /assets for hashed static assets and add a catch-all SPA fallback.
+# Guarded by is_dir() so dev runs without a frontend build are unaffected.
+_static = Path(__file__).resolve().parents[1] / "static"
+if _static.is_dir():
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa(full_path: str):
+        candidate = _static / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_static / "index.html")
