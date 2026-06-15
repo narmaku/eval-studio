@@ -65,3 +65,6 @@ site/
 # OS
 Thumbs.db
 .claude/worktrees/
+
+# Code review (local-only)
+review/
