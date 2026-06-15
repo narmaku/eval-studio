@@ -9,13 +9,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 import litellm
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import JudgeConfigParams
 from app.core.config import settings
-from app.core.providers import ProviderProfile, ProviderRegistry, provider_registry
-from app.models.provider import Provider
+from app.core.providers import ProviderRegistry, provider_registry
 
 
 @dataclass
@@ -321,56 +318,3 @@ async def call_model(
     with proxy_env(resolved.proxy, resolved.ssl_cert_path, resolved.ssl_client_key):
         response = await litellm.acompletion(**litellm_kwargs)
     return response.choices[0].message.content or ""
-
-
-async def resolve_provider(
-    provider_id: str,
-    db: AsyncSession,
-    *,
-    registry: ProviderRegistry | None = None,
-) -> ProviderProfile | None:
-    """Resolve a provider by ID from YAML registry first, then DB.
-
-    Converts DB providers to ProviderProfile for compatibility with
-    existing code that expects the dataclass interface.
-
-    Args:
-        provider_id: The provider ID to look up.
-        db: Async database session.
-        registry: Provider registry to check first. Defaults to global singleton.
-
-    Returns:
-        ProviderProfile if found, None otherwise.
-    """
-    if registry is None:
-        registry = provider_registry
-
-    # Check YAML registry first
-    yaml_provider = registry.get_provider(provider_id)
-    if yaml_provider:
-        return yaml_provider
-
-    # Check DB
-    result = await db.execute(select(Provider).where(Provider.id == provider_id))
-    db_provider = result.scalar_one_or_none()
-    if db_provider:
-        return ProviderProfile(
-            id=db_provider.id,
-            name=db_provider.name,
-            default_model=db_provider.default_model,
-            api_base=db_provider.api_base,
-            api_key_env=db_provider.api_key_env,
-            proxy=db_provider.proxy,
-            ssl_cert_path=getattr(db_provider, "ssl_cert_path", None),
-            ssl_client_key=getattr(db_provider, "ssl_client_key", None),
-            tags=db_provider.tags or [],
-            default_params=getattr(db_provider, "default_params", None),
-            provider_type=getattr(db_provider, "provider_type", "litellm"),
-            endpoint_url=getattr(db_provider, "endpoint_url", None),
-            request_body_template=getattr(db_provider, "request_body_template", None),
-            response_json_path=getattr(db_provider, "response_json_path", "choices.0.message.content"),
-            rate_limited=getattr(db_provider, "rate_limited", False),
-            rate_limits=getattr(db_provider, "rate_limits", None),
-        )
-
-    return None

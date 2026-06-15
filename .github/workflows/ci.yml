@@ -104,14 +104,34 @@ jobs:
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; then
               echo "Health check passed"
-              exit 0
+              break
             fi
             echo "Waiting for health check... ($i/30)"
             sleep 2
+            if [ "$i" = "30" ]; then
+              echo "Health check failed"
+              docker logs eval-studio-smoke
+              exit 1
+            fi
           done
-          echo "Health check failed"
-          docker logs eval-studio-smoke
-          exit 1
+
+          # Verify frontend is served (INFRA-001)
+          echo "Checking frontend at /"
+          curl -sf http://localhost:8000/ | grep -qi "<!doctype html" || {
+            echo "Frontend check failed: / did not return HTML"
+            docker logs eval-studio-smoke
+            exit 1
+          }
+          echo "Frontend root check passed"
+
+          # Verify SPA deep link works
+          echo "Checking SPA fallback at /results"
+          curl -sf http://localhost:8000/results | grep -qi "<!doctype html" || {
+            echo "SPA fallback check failed: /results did not return HTML"
+            docker logs eval-studio-smoke
+            exit 1
+          }
+          echo "SPA fallback check passed"
 
       - name: Cleanup
         if: always()
