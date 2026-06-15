@@ -77,7 +77,7 @@ class YAMLBackedRegistry(ABC, Generic[T]):
         yaml_key = self._get_yaml_key()
         for raw in data.get(yaml_key, []):
             if not isinstance(raw, dict):
-                logger.warning("skipping_non_dict_entry", entry=raw, yaml_key=yaml_key)
+                logger.warning("registry.entry_skipped", entry=raw, yaml_key=yaml_key)
                 continue
 
             try:
@@ -97,13 +97,13 @@ class YAMLBackedRegistry(ABC, Generic[T]):
             return
         if not self._config_path.exists():
             if self._items:
-                logger.info("config_file_deleted", path=str(self._config_path))
+                logger.info("registry.config_deleted", path=str(self._config_path))
                 self._items = {}
                 self._last_mtime = 0.0
             return
         current_mtime = os.path.getmtime(self._config_path)
         if current_mtime != self._last_mtime:
-            logger.info("config_file_changed", path=str(self._config_path))
+            logger.info("registry.config_changed", path=str(self._config_path))
             self.load_from_yaml(self._config_path)
 
     def get_item(self, item_id: str) -> T | None:
@@ -183,5 +183,5 @@ class YAMLBackedRegistry(ABC, Generic[T]):
                 yaml.dump(data, f, default_flow_style=False, sort_keys=False)
             self._last_mtime = os.path.getmtime(self._config_path)
         except OSError as exc:
-            logger.error("config_write_failed", path=str(self._config_path), error=str(exc))
+            logger.error("registry.write_failed", path=str(self._config_path), error=str(exc))
             raise RuntimeError(f"Failed to save configuration to {self._config_path}: {exc}") from exc

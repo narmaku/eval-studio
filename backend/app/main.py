@@ -46,7 +46,7 @@ async def _migrate_single_model_providers() -> None:
         )
         if result.rowcount:
             logger = get_logger("app.main")
-            logger.info("Migrated single-model providers", count=result.rowcount)
+            logger.info("startup.migrated_single_model_providers", count=result.rowcount)
         await db.commit()
 
 
@@ -65,7 +65,7 @@ async def _migrate_scored_sessions() -> None:
         )
         if result.rowcount:
             logger = get_logger("app.main")
-            logger.info("Migrated legacy scored sessions", count=result.rowcount)
+            logger.info("startup.migrated_scored_sessions", count=result.rowcount)
         await db.commit()
 
 
@@ -75,19 +75,19 @@ async def lifespan(app: FastAPI):
     configure_logging()
     logger = get_logger("app.main")
     logger.info(
-        "Starting eval-studio backend",
+        "app.startup",
         version=settings.app_version,
         debug=settings.debug,
     )
     if settings.auth_disabled:
-        logger.warning("Authentication is DISABLED (AUTH_DISABLED=true). All endpoints are publicly accessible.")
+        logger.warning("app.auth_disabled")
     if not settings.database_url.endswith("://"):
         await asyncio.to_thread(_run_alembic_migrations)
     await _migrate_scored_sessions()
     await _migrate_single_model_providers()
     yield
     logger = get_logger("app.main")
-    logger.info("Shutting down eval-studio backend")
+    logger.info("app.shutdown")
 
 
 app = FastAPI(
