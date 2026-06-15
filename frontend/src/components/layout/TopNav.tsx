@@ -10,7 +10,6 @@ const navItems = [
   { to: '/datasets', label: 'Datasets' },
   { to: '/results', label: 'Results' },
   { to: '/sessions', label: 'Sessions' },
-  { to: '/environments', label: 'Environments' },
 ];
 
 export function TopNav() {

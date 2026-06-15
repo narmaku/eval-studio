@@ -1,18 +1,7 @@
 # Environments
 
-Environments are the target machines where AI agents perform tasks during
-interactive evaluation. eval-studio supports multiple environment providers
-to give you flexibility in how evaluation environments are provisioned
-and managed.
+Environment provisioning (Docker Compose, SSH/BYOE, Testing Farm) is planned
+but not yet implemented. It is tracked as future work.
 
-Supported providers include Docker Compose (local containers), BYOE (Bring
-Your Own Environment via SSH), and TMT (Testing Farm API for real RHEL
-virtual machines). Each provider implements the `EnvironmentProvider`
-interface for consistent lifecycle management.
-
-!!! note "Coming soon"
-    Detailed documentation for each environment provider -- including setup
-    instructions, scenario definitions, and troubleshooting guides -- will be
-    added as the environment subsystem is implemented. See the
-    `environments/` directory in the repository for scenario templates and
-    Docker Compose examples.
+When the feature lands, this page will document setup, provider configuration,
+and scenario definitions.

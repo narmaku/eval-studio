@@ -15,7 +15,6 @@ const ResultDetail = lazy(() => import('@/pages/ResultDetail'));
 const ResultComparison = lazy(() => import('@/pages/ResultComparison'));
 const Sessions = lazy(() => import('@/pages/Sessions'));
 const SessionDetail = lazy(() => import('@/pages/SessionDetail'));
-const Environments = lazy(() => import('@/pages/Environments'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
@@ -135,14 +134,6 @@ export default function App() {
                 }
               />
             </Route>
-            <Route
-              path="environments"
-              element={
-                <Suspense fallback={<Loading />}>
-                  <Environments />
-                </Suspense>
-              }
-            />
             <Route
               path="settings"
               element={

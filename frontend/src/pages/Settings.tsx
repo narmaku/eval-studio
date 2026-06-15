@@ -1,6 +1,5 @@
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { EvaluatorList } from '@/components/settings/EvaluatorList';
 import { RubricList } from '@/components/settings/RubricList';
 import { ProviderList } from '@/components/settings/ProviderList';
 import { ToolServerList } from '@/components/settings/ToolServerList';
@@ -11,20 +10,16 @@ export default function Settings() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
-          Manage evaluators, scoring rubrics, and LLM provider configuration.
+          Manage scoring rubrics, LLM providers, and tool server configuration.
         </p>
       </div>
       <Separator />
-      <Tabs defaultValue="evaluators">
+      <Tabs defaultValue="rubrics">
         <TabsList>
-          <TabsTrigger value="evaluators">Evaluators</TabsTrigger>
           <TabsTrigger value="rubrics">Rubrics</TabsTrigger>
           <TabsTrigger value="providers">Providers</TabsTrigger>
           <TabsTrigger value="tool-servers">Tool Servers</TabsTrigger>
         </TabsList>
-        <TabsContent value="evaluators" className="mt-4">
-          <EvaluatorList />
-        </TabsContent>
         <TabsContent value="rubrics" className="mt-4">
           <RubricList />
         </TabsContent>

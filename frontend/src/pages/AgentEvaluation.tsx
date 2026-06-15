@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
 import { HarnessSelector } from '@/components/evaluation/HarnessSelector';
 import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
@@ -14,7 +13,6 @@ import { ToolSidePanel } from '@/components/chat/ToolSidePanel';
 import { ToolInspector } from '@/components/chat/ToolInspector';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { useEvaluationStore } from '@/stores/evaluationStore';
-import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { api } from '@/services/api';
@@ -88,8 +86,6 @@ export default function AgentEvaluation() {
   const [selectedHarnessType, setSelectedHarnessType] = useState<string>('builtin');
 
   const { isLoading: evalLoading, setLoading: setEvalLoading } = useEvaluationStore();
-  const { selectedEvaluatorId } = useEvaluatorStore();
-
   const {
     currentSession,
     messages,
@@ -110,7 +106,7 @@ export default function AgentEvaluation() {
 
   const isSubprocessHarness = selectedHarnessType === 'subprocess';
   const isConfigValid = Boolean(
-    (isSubprocessHarness || modelEndpoint) && judgeConfig && selectedEvaluatorId,
+    (isSubprocessHarness || modelEndpoint) && judgeConfig,
   );
 
   // Load available tool servers
@@ -191,7 +187,6 @@ export default function AgentEvaluation() {
             api_base: modelEndpoint.api_base,
           }),
           ...(systemPrompt.trim() && { system_prompt: systemPrompt.trim() }),
-          ...(selectedEvaluatorId && { evaluator_id: selectedEvaluatorId }),
           ...(selectedToolServerIds.length > 0 && {
             tool_server_ids: selectedToolServerIds,
           }),
@@ -227,7 +222,6 @@ export default function AgentEvaluation() {
     modelEndpoint,
     judgeConfig,
     systemPrompt,
-    selectedEvaluatorId,
     selectedToolServerIds,
     selectedHarnessId,
     isSubprocessHarness,
@@ -277,7 +271,6 @@ export default function AgentEvaluation() {
     setSelectedToolServerIds([]);
     setSelectedHarnessId(undefined);
     setSelectedHarnessType('builtin');
-    useEvaluatorStore.getState().resetSelection();
   }, [resetSession]);
 
   const formatElapsed = (seconds: number): string => {
@@ -299,7 +292,6 @@ export default function AgentEvaluation() {
       {/* Configure Phase */}
       {phase === 'configure' && (
         <>
-          <EvaluatorSelector mode="agent" />
           <HarnessSelector
             value={selectedHarnessId}
             onChange={handleHarnessChange}

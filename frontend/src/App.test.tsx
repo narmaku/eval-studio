@@ -20,7 +20,6 @@ describe('App', () => {
     expect(screen.getByText('Evaluate')).toBeInTheDocument();
     expect(screen.getByText('Datasets')).toBeInTheDocument();
     expect(screen.getByText('Results')).toBeInTheDocument();
-    expect(screen.getByText('Environments')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 });

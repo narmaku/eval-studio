@@ -18,7 +18,6 @@ class TestRunRequest:
         assert req.pass_threshold == 0.7
         assert req.config == {}
         assert req.judge_config_id is None
-        assert req.environment_id is None
 
     def test_create_full(self):
         req = RunRequest(
@@ -27,7 +26,6 @@ class TestRunRequest:
             dataset_id="ds-456",
             judge_config_id="jc-1",
             config={"model": "gpt-4"},
-            environment_id="env-1",
             pass_threshold=0.8,
         )
         assert req.mode == EvaluationMode.RAG

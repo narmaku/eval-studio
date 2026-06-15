@@ -31,25 +31,6 @@ def _run_alembic_migrations() -> None:
     command.upgrade(cfg, "head")
 
 
-async def _migrate_scored_sessions() -> None:
-    """Fix legacy sessions that were auto-scored but left with status 'ended'."""
-    from sqlalchemy import text
-
-    from app.core.database import async_session_factory
-
-    async with async_session_factory() as db:
-        result = await db.execute(
-            text(
-                "UPDATE sessions SET status = 'completed' "
-                "WHERE status = 'ended' AND scores IS NOT NULL AND scores != 'null' AND length(scores) > 4"
-            )
-        )
-        if result.rowcount:
-            logger = get_logger("app.main")
-            logger.info("startup.migrated_scored_sessions", count=result.rowcount)
-        await db.commit()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown events."""
@@ -64,7 +45,6 @@ async def lifespan(app: FastAPI):
         logger.warning("app.auth_disabled")
     if not settings.database_url.endswith("://"):
         await asyncio.to_thread(_run_alembic_migrations)
-    await _migrate_scored_sessions()
     yield
     logger = get_logger("app.main")
     logger.info("app.shutdown")
@@ -133,9 +113,7 @@ from app.api.v1.api_keys import router as api_keys_router  # noqa: E402
 from app.api.v1.artifacts import router as artifacts_router  # noqa: E402
 from app.api.v1.dataset_import import router as dataset_import_router  # noqa: E402
 from app.api.v1.datasets import router as datasets_router  # noqa: E402
-from app.api.v1.environments import router as environments_router  # noqa: E402
 from app.api.v1.evaluations import router as evaluations_router  # noqa: E402
-from app.api.v1.evaluators import router as evaluators_router  # noqa: E402
 from app.api.v1.harnesses import router as harnesses_router  # noqa: E402
 from app.api.v1.health import router as health_router  # noqa: E402
 from app.api.v1.judges import router as judges_router  # noqa: E402
@@ -153,9 +131,7 @@ app.include_router(artifacts_router, prefix="/api/v1")
 app.include_router(dataset_import_router, prefix="/api/v1")
 app.include_router(datasets_router, prefix="/api/v1")
 app.include_router(evaluations_router, prefix="/api/v1")
-app.include_router(evaluators_router, prefix="/api/v1")
 app.include_router(sessions_router, prefix="/api/v1")
-app.include_router(environments_router, prefix="/api/v1")
 app.include_router(judges_router, prefix="/api/v1")
 app.include_router(providers_router, prefix="/api/v1")
 app.include_router(rubrics_router, prefix="/api/v1")

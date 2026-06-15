@@ -4,10 +4,6 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { act } from 'react';
 
 // Stub child components to isolate the AgentEvaluation page
-vi.mock('@/components/evaluation/EvaluatorSelector', () => ({
-  EvaluatorSelector: () => <div data-testid="evaluator-selector" />,
-}));
-
 vi.mock('@/components/evaluation/HarnessSelector', () => ({
   HarnessSelector: () => <div data-testid="harness-selector" />,
 }));
@@ -60,15 +56,6 @@ vi.mock('@/stores/evaluationStore', () => ({
     isLoading: false,
     setLoading: vi.fn(),
   }),
-}));
-
-vi.mock('@/stores/evaluatorStore', () => ({
-  useEvaluatorStore: Object.assign(
-    () => ({ selectedEvaluatorId: 'eval-1' }),
-    {
-      getState: () => ({ resetSelection: vi.fn() }),
-    },
-  ),
 }));
 
 // Mock WebSocket

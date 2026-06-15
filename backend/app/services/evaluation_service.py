@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import Score
-from app.adapters.factory import create_evaluation_adapter
+from app.adapters.litellm_judge import LiteLLMJudgeAdapter
 from app.core.config import settings
 from app.core.exceptions import sanitize_error_for_client
 from app.core.rate_limiter import AsyncRateLimiter
@@ -148,7 +148,7 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             details={"model": judge_resolved.model, "api_base": judge_resolved.api_base},
         )
 
-        adapter = create_evaluation_adapter(
+        adapter = LiteLLMJudgeAdapter(
             model=judge_resolved.model,
             api_key=judge_resolved.api_key,
             api_base=judge_resolved.api_base,
