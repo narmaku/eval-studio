@@ -1,6 +1,6 @@
 """Unit tests for HarnessRegistry."""
 
-from app.harnesses.registry import HarnessProfile, HarnessRegistry
+from app.harnesses.registry import HarnessProfile, HarnessRegistry, _resolve_config_path
 
 
 def test_add_and_get(tmp_path):
@@ -130,3 +130,12 @@ def test_default_harness(tmp_path):
     defaults = [h for h in registry.list_harnesses() if h.default]
     assert len(defaults) == 1
     assert defaults[0].id == "h-1"
+
+
+def test_resolve_config_path_reaches_repo_root(monkeypatch):
+    """BUG-004: _resolve_config_path resolves to repo_root/config/, not backend/config/."""
+    monkeypatch.delenv("HARNESS_CONFIG_PATH", raising=False)
+    path = _resolve_config_path()
+    assert path.parts[-2] == "config"
+    assert path.parts[-1] == "harnesses.yaml"
+    assert path.parts[-3] != "backend", "Path should be repo_root/config/, not backend/config/"

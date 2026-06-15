@@ -19,6 +19,7 @@ from app.core.exceptions import sanitize_error_for_client
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
+from app.rag_backends.base import RAGBackendAdapter
 from app.rag_backends.factory import create_rag_adapter
 from app.services.artifact_generation import generate_evaluation_artifacts
 from app.services.judge_utils import to_judge_params
@@ -64,6 +65,7 @@ def _build_rag_adapter_config(rag_endpoint: dict[str, Any]) -> dict[str, Any]:
 
 async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
     """Orchestrate a full RAG evaluation run."""
+    rag_adapter: RAGBackendAdapter | None = None
     try:
         # 1. Load evaluation
         eval_result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
@@ -303,7 +305,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                     score=None,
                     passed=False,
                     actual_answer=None,
-                    judge_reasoning=str(r),
+                    judge_reasoning=sanitize_error_for_client(r),
                 )
                 db.add(error_result)
             else:
@@ -345,3 +347,6 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 await broadcast_status(evaluation_id, "failed", error=evaluation.error)
         except Exception:
             logger.exception("rag_evaluation.status_update_failed", evaluation_id=evaluation_id)
+    finally:
+        if rag_adapter is not None:
+            await rag_adapter.close()

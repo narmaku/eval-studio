@@ -64,6 +64,7 @@ def _mock_rag_adapter(answer: str = "Red Hat Enterprise Linux", chunks: list | N
 
     adapter = AsyncMock()
     adapter.retrieve_and_generate = AsyncMock(return_value=RAGResponse(answer=answer, chunks=chunks))
+    adapter.close = AsyncMock()
     return adapter
 
 
@@ -414,3 +415,43 @@ async def test_rag_evaluation_with_endpoint_url(db_session: AsyncSession):
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_rag_adapter_closed_on_success(db_session: AsyncSession, rag_evaluation_with_dataset):
+    """BUG-009: RAG adapter close() is called after a successful run."""
+    evaluation, _dataset, _items = rag_evaluation_with_dataset
+
+    mock_adapter = _mock_rag_adapter()
+    mock_evaluate_rag = AsyncMock(
+        return_value={
+            "faithfulness": Score(value=0.9, passed=True, reasoning="Good"),
+            "relevancy": Score(value=0.8, passed=True, reasoning="Good"),
+        }
+    )
+
+    with (
+        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
+        patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
+        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+    ):
+        await run_rag_evaluation(evaluation.id, db_session)
+
+    mock_adapter.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_rag_adapter_closed_on_failure(db_session: AsyncSession, rag_evaluation_with_dataset):
+    """BUG-009: RAG adapter close() is called even when items raise."""
+    evaluation, _dataset, _items = rag_evaluation_with_dataset
+
+    mock_adapter = _mock_rag_adapter()
+    mock_adapter.retrieve_and_generate = AsyncMock(side_effect=RuntimeError("RAG endpoint down"))
+
+    with (
+        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
+        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+    ):
+        await run_rag_evaluation(evaluation.id, db_session)
+
+    mock_adapter.close.assert_awaited_once()

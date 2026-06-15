@@ -27,7 +27,12 @@ def extract_json_path(data: Any, path: str) -> Any:
     """
     current = data
     for segment in path.split("."):
-        current = current[int(segment)] if isinstance(current, list) else current[segment]
+        try:
+            current = current[int(segment)] if isinstance(current, list) else current[segment]
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"response_json_path '{path}' failed at segment '{segment}': {exc.__class__.__name__}"
+            ) from exc
     return current
 
 
@@ -81,8 +86,12 @@ class CustomHttpxAdapter(AgentBackendAdapter):
                 last_user_msg = msg["content"]
                 break
 
-        rendered = self.request_body_template.replace("{{message}}", last_user_msg)
-        return json.loads(rendered)
+        escaped = json.dumps(last_user_msg)[1:-1]
+        rendered = self.request_body_template.replace("{{message}}", escaped)
+        try:
+            return json.loads(rendered)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"request_body_template does not produce valid JSON: {exc}") from exc
 
     async def send_message(
         self,

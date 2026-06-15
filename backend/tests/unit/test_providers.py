@@ -245,6 +245,42 @@ class TestProviderRegistry:
         assert p.rate_limited is False
         assert p.rate_limits is None
 
+    def test_single_model_always_serialized(self, tmp_path):
+        """BUG-007: single_model is always written to YAML, not conditionally."""
+        config_file = tmp_path / "providers.yaml"
+        registry = ProviderRegistry()
+        registry._config_path = config_file
+
+        profile = ProviderProfile(id="sm-true", name="SM True", default_model="model-a", single_model=True)
+        registry.add_item(profile)
+
+        profile_false = ProviderProfile(id="sm-false", name="SM False", default_model="model-b", single_model=False)
+        registry.add_item(profile_false)
+
+        reg2 = ProviderRegistry()
+        reg2.load_from_yaml(config_file)
+
+        assert reg2.get_provider("sm-true").single_model is True
+        assert reg2.get_provider("sm-false").single_model is False
+
+    def test_single_model_survives_reload(self, tmp_path):
+        """BUG-007: single_model=True with a default_model persists after reload."""
+        import time
+
+        config_file = tmp_path / "providers.yaml"
+        registry = ProviderRegistry()
+        registry._config_path = config_file
+
+        profile = ProviderProfile(id="test", name="Test", default_model="gpt-4", single_model=True)
+        registry.add_item(profile)
+
+        assert registry.get_provider("test").single_model is True
+
+        time.sleep(0.05)
+        config_file.write_bytes(config_file.read_bytes())
+
+        assert registry.get_provider("test").single_model is True
+
 
 class TestProxyEnv:
     def test_proxy_env_sets_and_restores(self):

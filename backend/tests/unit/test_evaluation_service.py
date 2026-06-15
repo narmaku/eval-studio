@@ -212,6 +212,28 @@ async def test_run_qa_evaluation_all_items_fail(db_session: AsyncSession, evalua
 
 
 @pytest.mark.asyncio
+async def test_run_qa_evaluation_error_result_sanitized(db_session: AsyncSession, evaluation_with_dataset):
+    """BUG-010: Error results store sanitized text, not raw exception details."""
+    evaluation, _dataset, _items = evaluation_with_dataset
+
+    async def mock_call_fail(*args, **kwargs):
+        raise RuntimeError("secret-path /home/user/.ssh/id_rsa connection failed")
+
+    with (
+        patch("app.services.evaluation_service.call_model", side_effect=mock_call_fail),
+        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+    ):
+        await run_qa_evaluation(evaluation.id, db_session)
+
+    results_result = await db_session.execute(select(Result).where(Result.evaluation_id == evaluation.id))
+    results = results_result.scalars().all()
+    for r in results:
+        assert r.judge_reasoning is not None
+        assert "secret-path" not in r.judge_reasoning
+        assert "/home/user" not in r.judge_reasoning
+
+
+@pytest.mark.asyncio
 async def test_run_qa_evaluation_already_running(db_session: AsyncSession, evaluation_with_dataset):
     """If evaluation is already running, it should return early without changing status."""
     evaluation, _dataset, _items = evaluation_with_dataset

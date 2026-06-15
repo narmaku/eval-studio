@@ -49,6 +49,22 @@ class FakeRegistry(YAMLBackedRegistry[FakeItem]):
         return item.id
 
 
+class StrictRegistry(YAMLBackedRegistry[FakeItem]):
+    """Registry that raises KeyError on missing fields (like real registries)."""
+
+    def _get_yaml_key(self) -> str:
+        return "items"
+
+    def _parse_item(self, raw: dict) -> FakeItem:
+        return FakeItem(id=raw["id"], name=raw["name"])
+
+    def _serialize_item(self, item: FakeItem) -> dict:
+        return {"id": item.id, "name": item.name}
+
+    def _get_item_id(self, item: FakeItem) -> str:
+        return item.id
+
+
 class TestLoadFromYAML:
     """Tests for load_from_yaml behavior."""
 
@@ -119,6 +135,44 @@ class TestLoadFromYAML:
         items = registry.list_items()
         assert len(items) == 1
         assert items[0].id == "good"
+
+    def test_parse_item_keyerror_skips_entry(self, tmp_path):
+        """BUG-003: KeyError in _parse_item skips the entry instead of crashing."""
+        data = {
+            "items": [
+                {"id": "good", "name": "Good Item"},
+                {"name": "Missing ID field"},
+            ]
+        }
+        config = tmp_path / "config.yaml"
+        config.write_text(yaml.dump(data))
+
+        registry = StrictRegistry()
+        registry.load_from_yaml(config)
+
+        items = registry.list_items()
+        assert len(items) == 1
+        assert items[0].id == "good"
+
+    def test_parse_item_keyerror_during_reload(self, tmp_path):
+        """BUG-003: KeyError in _parse_item during reload skips the entry."""
+        import time
+
+        config = tmp_path / "config.yaml"
+        data = {"items": [{"id": "a", "name": "Alpha"}]}
+        config.write_text(yaml.dump(data))
+
+        registry = StrictRegistry()
+        registry.load_from_yaml(config)
+        assert len(registry.list_items()) == 1
+
+        time.sleep(0.05)
+        data = {"items": [{"id": "a", "name": "Alpha"}, {"name": "Bad entry"}]}
+        config.write_text(yaml.dump(data))
+
+        items = registry.list_items()
+        assert len(items) == 1
+        assert items[0].id == "a"
 
 
 class TestCheckReload:

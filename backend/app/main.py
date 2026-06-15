@@ -1,5 +1,7 @@
+import asyncio
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI, Request
@@ -11,6 +13,22 @@ from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.logging import configure_logging, get_logger
 from app.schemas.common import ProblemDetail
+
+
+def _run_alembic_migrations() -> None:
+    """Run Alembic migrations to head (creates tables on fresh DB, applies pending migrations).
+
+    Runs synchronously — call via asyncio.to_thread from the async lifespan
+    because alembic's env.py uses asyncio.run internally.
+    """
+    from alembic.config import Config
+
+    from alembic import command
+
+    backend_dir = Path(__file__).resolve().parents[1]
+    cfg = Config(str(backend_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend_dir / "alembic"))
+    command.upgrade(cfg, "head")
 
 
 async def _migrate_single_model_providers() -> None:
@@ -63,6 +81,8 @@ async def lifespan(app: FastAPI):
     )
     if settings.auth_disabled:
         logger.warning("Authentication is DISABLED (AUTH_DISABLED=true). All endpoints are publicly accessible.")
+    if not settings.database_url.endswith("://"):
+        await asyncio.to_thread(_run_alembic_migrations)
     await _migrate_scored_sessions()
     await _migrate_single_model_providers()
     yield

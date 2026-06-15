@@ -80,7 +80,11 @@ class YAMLBackedRegistry(ABC, Generic[T]):
                 logger.warning("skipping_non_dict_entry", entry=raw, yaml_key=yaml_key)
                 continue
 
-            item = self._parse_item(raw)
+            try:
+                item = self._parse_item(raw)
+            except (KeyError, TypeError, ValueError) as exc:
+                logger.warning("registry.entry_invalid", entry=raw, error=str(exc), yaml_key=yaml_key)
+                continue
             if item is None:
                 continue
 
