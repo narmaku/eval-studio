@@ -224,7 +224,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
           Object.keys(defaultParams).length > 0 ? (defaultParams as Record<string, unknown>) : null,
         provider_type: providerType,
         endpoint_url: isCustom ? endpointUrl.trim() || null : null,
-        request_body_template: isCustom ? requestBodyTemplate.trim() || null : null,
+        request_body_template: isCustom ? requestBodyTemplate.trim() || undefined : undefined,
         response_json_path: isCustom ? responseJsonPath.trim() : 'choices.0.message.content',
         single_model: singleModel,
         rate_limited: rateLimited,

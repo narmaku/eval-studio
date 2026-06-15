@@ -13,7 +13,14 @@ class ResizeObserverMock {
 globalThis.ResizeObserver = ResizeObserverMock;
 
 const { mockExportResultsPdf, mockToastError, mockToastInfo } = vi.hoisted(() => ({
-  mockExportResultsPdf: vi.fn(() => Promise.resolve()),
+  mockExportResultsPdf: vi.fn(
+    (_data: {
+      evaluationName: string;
+      evaluationMode: string;
+      results: unknown[];
+      metrics: Record<string, unknown>;
+    }) => Promise.resolve(),
+  ),
   mockToastError: vi.fn(),
   mockToastInfo: vi.fn(),
 }));
@@ -98,7 +105,7 @@ describe('ResultDetailView — PDF export', () => {
       expect(mockExportResultsPdf).toHaveBeenCalledTimes(1);
     });
 
-    const call = mockExportResultsPdf.mock.calls[0][0];
+    const call = mockExportResultsPdf.mock.calls[0]![0];
     expect(call.evaluationName).toBe('Test Evaluation');
     expect(call.evaluationMode).toBe('qa');
     expect(call.results).toHaveLength(2);
@@ -188,7 +195,7 @@ describe('ResultDetailView — PDF export', () => {
     await vi.waitFor(() => {
       expect(mockExportResultsPdf).toHaveBeenCalledTimes(1);
     });
-    expect(mockExportResultsPdf.mock.calls[0][0].evaluationName).toBe('Evaluation');
+    expect(mockExportResultsPdf.mock.calls[0]![0].evaluationName).toBe('Evaluation');
   });
 
   it('renders export button even with empty results', () => {
@@ -232,7 +239,7 @@ describe('ResultDetailView — PDF export', () => {
     });
 
     expect(mockToastInfo).toHaveBeenCalledWith('Fetching all results for export...');
-    expect(mockExportResultsPdf.mock.calls[0][0].results).toHaveLength(3);
+    expect(mockExportResultsPdf.mock.calls[0]![0].results).toHaveLength(3);
   });
 });
 

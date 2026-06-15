@@ -278,8 +278,8 @@ describe('resultStore', () => {
       const allResults = await useResultStore.getState().fetchAllResultsForExport('e1');
 
       expect(allResults).toHaveLength(3);
-      expect(allResults[0].id).toBe('r1');
-      expect(allResults[2].id).toBe('r3');
+      expect(allResults[0]!.id).toBe('r1');
+      expect(allResults[2]!.id).toBe('r3');
       expect(mockedApi.listResults).toHaveBeenCalledTimes(2);
       expect(mockedApi.listResults).toHaveBeenCalledWith({
         evaluation_id: 'e1',

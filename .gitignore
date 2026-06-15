@@ -21,6 +21,9 @@ frontend/dist/
 backend/dist/
 *.js.map
 
+# Data artifacts
+backend/data/
+
 # IDE
 .vscode/
 .idea/

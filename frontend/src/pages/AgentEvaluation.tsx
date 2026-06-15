@@ -247,7 +247,7 @@ export default function AgentEvaluation() {
   }, [endSession]);
 
   const handleScoreSession = useCallback(async () => {
-    if (!judgeConfig) return;
+    if (!judgeConfig?.provider_id) return;
     try {
       await scoreSession({ provider_id: judgeConfig.provider_id });
       setPhase('review');
