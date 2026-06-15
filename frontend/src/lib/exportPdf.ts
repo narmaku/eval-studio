@@ -131,7 +131,7 @@ export async function exportResultsPdf(data: PdfExportData): Promise<void> {
 
     for (let i = 0; i < chartImages.length; i++) {
       const img = new Image();
-      img.src = chartImages[i];
+      img.src = chartImages[i]!;
       await new Promise<void>((resolve) => {
         img.onload = () => resolve();
         img.onerror = () => resolve();
@@ -141,13 +141,13 @@ export async function exportResultsPdf(data: PdfExportData): Promise<void> {
       const imgW = chartW - 4;
       const imgH = imgW * aspectRatio;
       const chartY = ensureSpace(pdf, y, imgH + 4);
-      pdf.addImage(chartImages[i], 'PNG', M + i * chartW + 2, chartY, imgW, imgH);
+      pdf.addImage(chartImages[i]!, 'PNG', M + i * chartW + 2, chartY, imgW, imgH);
     }
 
     // Estimate chart height from first image
     if (chartImages.length > 0) {
       const img = new Image();
-      img.src = chartImages[0];
+      img.src = chartImages[0]!;
       await new Promise<void>((resolve) => {
         img.onload = () => resolve();
         img.onerror = () => resolve();
@@ -227,7 +227,7 @@ export async function exportResultsPdf(data: PdfExportData): Promise<void> {
   const showExpected = isQA || isRAG;
 
   for (let i = 0; i < data.results.length; i++) {
-    const r = data.results[i];
+    const r = data.results[i]!;
     const score = r.score != null ? `${(r.score * 100).toFixed(0)}%` : '--';
     const passLabel = r.passed === true ? 'PASS' : r.passed === false ? 'FAIL' : '--';
 

@@ -41,7 +41,7 @@ export function ProviderSelector({ value, onChange, disabled }: ProviderSelector
 
   useEffect(() => {
     api
-      .listProviders('test')
+      .listProviders()
       .then((data) => {
         setProviders(data);
         setError(false);

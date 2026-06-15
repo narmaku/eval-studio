@@ -38,7 +38,7 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
 
   useEffect(() => {
     api
-      .listProviders('judge')
+      .listProviders()
       .then(setJudgeProviders)
       .catch(() => {});
   }, []);

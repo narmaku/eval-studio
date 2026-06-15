@@ -91,7 +91,7 @@ describe('exportResultsPdf', () => {
   it('renders the summary table via autoTable', async () => {
     await exportResultsPdf(makeData());
     expect(mockAutoTable).toHaveBeenCalledTimes(1);
-    const call = mockAutoTable.mock.calls[0];
+    const call = mockAutoTable.mock.calls[0]!;
     expect(call[1].head[0]).toContain('Question');
     expect(call[1].body.length).toBe(1);
   });
@@ -134,7 +134,7 @@ describe('exportResultsPdf', () => {
         ],
       }),
     );
-    const call = mockAutoTable.mock.calls[0];
+    const call = mockAutoTable.mock.calls[0]!;
     expect(call[1].head[0]).toContain('Contestant');
   });
 

@@ -16,7 +16,7 @@ const mockResults: Result[] = [
     actual_answer: 'RHEL 9 supports Secure Boot on Nitro instances.',
     judge_reasoning: 'Accurate and well-sourced answer.',
     scores_breakdown: { faithfulness: 0.9, context_precision: 0.8, answer_relevance: 0.85 },
-    retrieved_chunks: [{ content: 'Secure Boot is supported on Nitro.', score: 0.95 }],
+    retrieved_chunks: [{ content: 'Secure Boot is supported on Nitro.', relevance_score: 0.95 }],
     created_at: '2026-01-01T00:00:00Z',
   },
   {
