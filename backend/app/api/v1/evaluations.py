@@ -67,7 +67,6 @@ async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depend
         mode=payload.mode.value,
         status="pending",
         dataset_id=payload.dataset_id,
-        environment_id=payload.environment_id,
         judge_config_id=payload.judge_config_id,
         config=payload.config,
     )
@@ -192,7 +191,6 @@ async def run_and_wait(
         mode=payload.mode.value,
         status="pending",
         dataset_id=payload.dataset_id,
-        environment_id=payload.environment_id,
         judge_config_id=payload.judge_config_id,
         config=payload.config,
     )

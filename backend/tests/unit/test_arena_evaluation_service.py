@@ -538,10 +538,10 @@ async def test_arena_unhandled_exception_sets_failed(db_session: AsyncSession, a
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
-    # Make resolve_judge_config succeed, but create_evaluation_adapter raise
+    # Make resolve_judge_config succeed, but LiteLLMJudgeAdapter raise
     with (
         patch(
-            "app.services.arena_evaluation_service.create_evaluation_adapter",
+            "app.services.arena_evaluation_service.LiteLLMJudgeAdapter",
             side_effect=RuntimeError("unexpected crash"),
         ),
         patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),

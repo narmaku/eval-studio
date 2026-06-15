@@ -127,7 +127,6 @@ describe('evaluationStore', () => {
           mode: 'qa' as const,
           status: 'completed' as const,
           dataset_id: 'd1',
-          environment_id: null,
           judge_config_id: 'j1',
           config: {
             model_endpoint: { name: 'test', default_model: 'gpt-4' },
@@ -238,7 +237,6 @@ describe('evaluationStore', () => {
           mode: 'qa',
           status: 'running',
           dataset_id: 'd1',
-          environment_id: null,
           judge_config_id: null,
           config: {
             model_endpoint: { name: 'test', default_model: 'gpt-4' },
@@ -273,7 +271,6 @@ describe('evaluationStore', () => {
           mode: 'qa',
           status: 'running',
           dataset_id: 'd1',
-          environment_id: null,
           judge_config_id: null,
           config: {
             model_endpoint: { name: 'test', default_model: 'gpt-4' },

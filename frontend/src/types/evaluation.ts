@@ -11,7 +11,6 @@ export interface Evaluation {
   status: EvaluationStatus;
   error?: string | null;
   dataset_id: string | null;
-  environment_id: string | null;
   judge_config_id: string | null;
   config: EvaluationConfig;
   result_count: number | null;
@@ -50,10 +49,8 @@ export interface LLMParams {
 export interface EvaluationConfig {
   model_endpoint: ModelEndpoint;
   judge_config: JudgeReference;
-  evaluator_id?: string;
   max_turns?: number;
   scenario_id?: string;
-  environment_id?: string;
   contestants?: ModelEndpoint[]; // arena mode
   rag_endpoint?: RAGEndpointSettings; // rag mode
   rag_metrics?: string[]; // rag mode
@@ -115,7 +112,6 @@ export interface CreateEvaluationRequest {
   name: string;
   mode: EvaluationMode;
   dataset_id?: string;
-  environment_id?: string;
   judge_config_id?: string;
   config: EvaluationConfig;
 }

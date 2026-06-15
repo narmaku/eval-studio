@@ -16,7 +16,6 @@ class Evaluation(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     config: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     dataset_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    environment_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     judge_config_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 

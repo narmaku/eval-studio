@@ -29,8 +29,6 @@ class Settings(BaseSettings):
     ssl_cert_file: str | None = None
     ssl_client_key: str | None = None
 
-    evaluator_config_dir: str = "config/evaluators"
-
     # Security: comma-separated list of allowed harness binary paths.
     # Leave empty to block all harness subprocess execution (secure default).
     harness_allowed_binaries: str = ""

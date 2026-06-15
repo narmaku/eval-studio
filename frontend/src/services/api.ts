@@ -16,9 +16,6 @@ import type {
   Session,
   CreateSessionRequest,
   SendMessageRequest,
-  Environment,
-  CreateEnvironmentRequest,
-  HealthCheckResult,
   Judge,
   CreateJudgeRequest,
   JudgePreset,
@@ -31,7 +28,6 @@ import type {
   ImportRubricRequest,
   GenerateRubricRequest,
   RefineRubricRequest,
-  EvaluatorInfo,
   ToolServer,
   CreateToolServerRequest,
   UpdateToolServerRequest,
@@ -175,18 +171,6 @@ export const api = {
   importDataset: (data: ImportRequest) =>
     request<Dataset>('/api/v1/datasets/import', { method: 'POST', body: JSON.stringify(data) }),
 
-  // --- Environments ---
-  listEnvironments: () => request<Environment[]>('/api/v1/environments'),
-  getEnvironment: (id: string) => request<Environment>(`/api/v1/environments/${id}`),
-  createEnvironment: (data: CreateEnvironmentRequest) =>
-    request<Environment>('/api/v1/environments', { method: 'POST', body: JSON.stringify(data) }),
-  provisionEnvironment: (id: string) =>
-    request<Environment>(`/api/v1/environments/${id}/provision`, { method: 'POST' }),
-  teardownEnvironment: (id: string) =>
-    request<void>(`/api/v1/environments/${id}/teardown`, { method: 'POST' }),
-  getEnvironmentHealth: (id: string) =>
-    request<HealthCheckResult>(`/api/v1/environments/${id}/health`),
-
   // --- Judges ---
   listJudges: () => request<Judge[]>('/api/v1/judges'),
   getJudge: (id: string) => request<Judge>(`/api/v1/judges/${id}`),
@@ -261,57 +245,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-
-  // --- Evaluators ---
-  listEvaluators: (mode?: string) => {
-    const query = new URLSearchParams();
-    if (mode) query.set('mode', mode);
-    const qs = query.toString();
-    return request<EvaluatorInfo[]>(`/api/v1/evaluators${qs ? `?${qs}` : ''}`);
-  },
-  getEvaluator: (id: string) => request<EvaluatorInfo>(`/api/v1/evaluators/${id}`),
-
-  // --- Evaluator Config Files ---
-  listEvaluatorConfigFiles: (evaluatorId: string) =>
-    request<{ filename: string; size: number; modified_at: string }[]>(
-      `/api/v1/evaluators/${evaluatorId}/config-files`,
-    ),
-  uploadEvaluatorConfigFile: async (evaluatorId: string, file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const url = `${BASE_URL}/api/v1/evaluators/${evaluatorId}/config-files`;
-    const response = await fetch(url, { method: 'POST', body: formData });
-    if (!response.ok) {
-      const errorBody = (await response.json().catch(() => ({
-        type: 'about:blank',
-        title: 'Upload failed',
-        status: response.status,
-        detail: response.statusText,
-        instance: url,
-      }))) as ApiError;
-      throw new ApiClientError(response.status, errorBody);
-    }
-    return response.json() as Promise<{ filename: string; size: number }>;
-  },
-  deleteEvaluatorConfigFile: (evaluatorId: string, filename: string) =>
-    request<void>(`/api/v1/evaluators/${evaluatorId}/config-files/${filename}`, {
-      method: 'DELETE',
-    }),
-  getEvaluatorConfigFile: async (evaluatorId: string, filename: string): Promise<string> => {
-    const url = `${BASE_URL}/api/v1/evaluators/${evaluatorId}/config-files/${filename}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      const errorBody = (await response.json().catch(() => ({
-        type: 'about:blank',
-        title: 'Request failed',
-        status: response.status,
-        detail: response.statusText,
-        instance: url,
-      }))) as ApiError;
-      throw new ApiClientError(response.status, errorBody);
-    }
-    return response.text();
-  },
 
   // Tool Servers
   listToolServers: (params?: { type?: string; enabled?: boolean }) => {
