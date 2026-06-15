@@ -8,6 +8,8 @@ import type {
 } from '@/types';
 import { api } from '@/services/api';
 
+const MAX_LOGS = 500;
+
 const POLL_INTERVAL_MS = 2000;
 const RUNNING_EVAL_KEY = 'runningEvaluation';
 
@@ -185,7 +187,7 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
           });
         } else if (data.type === 'log') {
           set((state) => ({
-            logs: [...state.logs, data],
+            logs: [...state.logs.slice(-(MAX_LOGS - 1)), data],
           }));
         } else if (data.type === 'status') {
           const currentEval = get().currentEvaluation;

@@ -21,11 +21,7 @@ def create_harness(harness_id: str) -> AgentHarness:
     if not profile:
         raise ValueError(f"Unknown harness: {harness_id}")
 
-    if profile.type == "builtin":
-        from app.harnesses.builtin import BuiltinHarness
-
-        return BuiltinHarness(profile)
-    elif profile.type == "subprocess":
+    if profile.type == "subprocess":
         from app.harnesses.subprocess_harness import SubprocessHarness
 
         return SubprocessHarness(profile)

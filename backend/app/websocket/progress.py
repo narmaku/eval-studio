@@ -1,9 +1,10 @@
 import asyncio
-from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from app.core.database import iso_now
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -28,6 +29,25 @@ async def _remove_connection(evaluation_id: str, ws: WebSocket) -> None:
                 del _connections[evaluation_id]
 
 
+async def _broadcast(evaluation_id: str, message: dict) -> None:
+    """Send a message to all connected clients and sweep dead connections."""
+    async with _lock:
+        websockets = _connections.get(evaluation_id, set()).copy()
+
+    dead: list[WebSocket] = []
+    for ws in websockets:
+        try:
+            await ws.send_json(message)
+        except Exception:
+            dead.append(ws)
+
+    if dead:
+        async with _lock:
+            conns = _connections.get(evaluation_id, set())
+            for ws in dead:
+                conns.discard(ws)
+
+
 async def broadcast_progress(
     evaluation_id: str,
     completed: int,
@@ -36,9 +56,6 @@ async def broadcast_progress(
     contestant_model: str | None = None,
 ) -> None:
     """Send progress update to all WebSocket clients watching this evaluation."""
-    async with _lock:
-        websockets = _connections.get(evaluation_id, set()).copy()
-
     message: dict = {
         "type": "progress",
         "evaluation_id": evaluation_id,
@@ -48,20 +65,7 @@ async def broadcast_progress(
     }
     if contestant_model is not None:
         message["contestant_model"] = contestant_model
-
-    dead_connections: list[WebSocket] = []
-    for ws in websockets:
-        try:
-            await ws.send_json(message)
-        except Exception:
-            dead_connections.append(ws)
-
-    # Clean up dead connections
-    if dead_connections:
-        async with _lock:
-            conns = _connections.get(evaluation_id, set())
-            for ws in dead_connections:
-                conns.discard(ws)
+    await _broadcast(evaluation_id, message)
 
 
 async def broadcast_log(
@@ -71,39 +75,20 @@ async def broadcast_log(
     details: dict[str, Any] | None = None,
 ) -> None:
     """Send a log entry to all WebSocket clients watching this evaluation."""
-    async with _lock:
-        websockets = _connections.get(evaluation_id, set()).copy()
-
     log_message: dict[str, Any] = {
         "type": "log",
         "evaluation_id": evaluation_id,
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": iso_now(),
         "level": level,
         "message": message,
     }
     if details is not None:
         log_message["details"] = details
-
-    dead_connections: list[WebSocket] = []
-    for ws in websockets:
-        try:
-            await ws.send_json(log_message)
-        except Exception:
-            dead_connections.append(ws)
-
-    # Clean up dead connections
-    if dead_connections:
-        async with _lock:
-            conns = _connections.get(evaluation_id, set())
-            for ws in dead_connections:
-                conns.discard(ws)
+    await _broadcast(evaluation_id, log_message)
 
 
 async def broadcast_status(evaluation_id: str, status: str, error: str | None = None) -> None:
     """Send status update to all WebSocket clients watching this evaluation."""
-    async with _lock:
-        websockets = _connections.get(evaluation_id, set()).copy()
-
     message: dict = {
         "type": "status",
         "evaluation_id": evaluation_id,
@@ -111,20 +96,7 @@ async def broadcast_status(evaluation_id: str, status: str, error: str | None = 
     }
     if error:
         message["error"] = error
-
-    dead_connections: list[WebSocket] = []
-    for ws in websockets:
-        try:
-            await ws.send_json(message)
-        except Exception:
-            dead_connections.append(ws)
-
-    # Clean up dead connections
-    if dead_connections:
-        async with _lock:
-            conns = _connections.get(evaluation_id, set())
-            for ws in dead_connections:
-                conns.discard(ws)
+    await _broadcast(evaluation_id, message)
 
 
 @router.websocket("/ws/progress/{evaluation_id}")

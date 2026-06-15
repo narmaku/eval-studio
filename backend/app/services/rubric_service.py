@@ -4,6 +4,8 @@ Wraps rubric-kit interactions for parsing YAML, generating rubrics from
 descriptions, and refining existing rubrics with feedback.
 """
 
+import contextlib
+import os
 import re
 
 import structlog
@@ -170,11 +172,29 @@ def convert_rubric_kit_to_internal(rubric: Rubric, name: str = "Generated Rubric
     }
 
 
+@contextlib.contextmanager
+def _api_key_env_patch(api_key: str | None):
+    """Temporarily set LITELLM_API_KEY so rubric-kit's litellm calls pick it up."""
+    if not api_key:
+        yield
+        return
+    old = os.environ.get("LITELLM_API_KEY")
+    os.environ["LITELLM_API_KEY"] = api_key
+    try:
+        yield
+    finally:
+        if old is None:
+            os.environ.pop("LITELLM_API_KEY", None)
+        else:
+            os.environ["LITELLM_API_KEY"] = old
+
+
 def generate_rubric(
     description: str,
     sample_data: str | None,
     model: str,
     api_base: str | None,
+    api_key: str | None = None,
 ) -> dict:
     """Generate a rubric from a description using rubric-kit + LLM.
 
@@ -183,6 +203,7 @@ def generate_rubric(
         sample_data: Optional sample Q&A or chat data for context.
         model: LiteLLM model identifier.
         api_base: Optional API base URL.
+        api_key: Optional API key for the LLM provider.
 
     Returns:
         Dict matching internal rubric schema.
@@ -194,13 +215,15 @@ def generate_rubric(
 
     logger.info("rubric.generate.start", model=model, has_sample_data=bool(sample_data))
 
-    result = rubric_kit_generate(
-        input_content=input_content,
-        input_type="qna",
-        model=model,
-        base_url=api_base,
-        track_metrics=False,
-    )
+    env_patch = _api_key_env_patch(api_key)
+    with env_patch:
+        result = rubric_kit_generate(
+            input_content=input_content,
+            input_type="qna",
+            model=model,
+            base_url=api_base,
+            track_metrics=False,
+        )
 
     rubric_dict = convert_rubric_kit_to_internal(result.rubric, name="Generated Rubric")
     rubric_dict["description"] = description
@@ -214,6 +237,7 @@ def refine_rubric(
     feedback: str,
     model: str,
     api_base: str | None,
+    api_key: str | None = None,
 ) -> dict:
     """Refine an existing rubric based on feedback using rubric-kit + LLM.
 
@@ -251,13 +275,15 @@ def refine_rubric(
 
     logger.info("rubric.refine.start", model=model, feedback_length=len(feedback))
 
-    result = rubric_kit_refine(
-        rubric=rk_rubric,
-        model=model,
-        base_url=api_base,
-        feedback=feedback,
-        track_metrics=False,
-    )
+    env_patch = _api_key_env_patch(api_key)
+    with env_patch:
+        result = rubric_kit_refine(
+            rubric=rk_rubric,
+            model=model,
+            base_url=api_base,
+            feedback=feedback,
+            track_metrics=False,
+        )
 
     refined = convert_rubric_kit_to_internal(result.rubric, name=existing_rubric.get("name", "Refined Rubric"))
     # Preserve metadata from existing rubric

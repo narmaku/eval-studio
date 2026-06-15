@@ -8,13 +8,14 @@ for the WebSocket layer.
 
 import json
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent_backends.factory import create_agent_backend
+from app.core.database import iso_now as _iso_now
+from app.core.database import utcnow
 from app.core.exceptions import sanitize_error_for_client
 from app.harnesses.factory import create_harness
 from app.harnesses.registry import harness_registry
@@ -42,11 +43,6 @@ def _serialize_tool_arguments(arguments: object) -> str:
             return '{"_": ""}'
         return arguments
     return "{}"
-
-
-def _iso_now() -> str:
-    """Return current UTC time as ISO 8601 string."""
-    return datetime.now(UTC).isoformat()
 
 
 async def process_user_message(
@@ -565,7 +561,7 @@ async def end_session(session_id: str, db: AsyncSession) -> dict:
         }
 
     session.status = "ended"
-    session.ended_at = datetime.now(UTC)
+    session.ended_at = utcnow()
 
     # Update linked Evaluation status to "completed"
     if session.evaluation_id:

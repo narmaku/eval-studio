@@ -14,13 +14,12 @@ Protocol envelope format:
     }
 """
 
-from datetime import UTC, datetime
-
 import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
-from app.core.database import async_session_factory
+from app.core.database import async_session_factory, utcnow
+from app.core.database import iso_now as _iso_now
 from app.core.exceptions import sanitize_error_for_client
 from app.mcp.manager import cleanup_manager
 from app.models.evaluation import Evaluation
@@ -34,10 +33,6 @@ router = APIRouter()
 # Track active connections and processing state
 _active_connections: dict[str, WebSocket] = {}
 _processing: set[str] = set()
-
-
-def _iso_now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 async def _send_error(ws: WebSocket, session_id: str, message: str) -> None:
@@ -139,7 +134,7 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
                 session = result.scalar_one_or_none()
                 if session and session.status == "active":
                     session.status = "ended"
-                    session.ended_at = datetime.now(UTC)
+                    session.ended_at = utcnow()
                     # Also update linked evaluation status
                     if session.evaluation_id:
                         eval_result = await db.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))

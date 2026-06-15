@@ -101,6 +101,7 @@ class EvaluationAdapter(ABC):
         answer: str,
         expected_answer: str | None,
         metrics: list[str],
+        judge_config: JudgeConfigParams | None = None,
     ) -> dict[str, Score]:
         """Score a RAG response with retrieved context."""
         ...

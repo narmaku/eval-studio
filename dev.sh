@@ -28,6 +28,15 @@ fi
 
 echo "=== eval-studio dev ==="
 
+# Install / sync dependencies (idempotent, fast when up to date)
+echo "Syncing backend dependencies..."
+cd "$SCRIPT_DIR/backend"
+uv sync --quiet
+
+echo "Syncing frontend dependencies..."
+cd "$SCRIPT_DIR/frontend"
+npm install --silent
+
 # Backend
 echo "Starting backend on :8000..."
 cd "$SCRIPT_DIR/backend"

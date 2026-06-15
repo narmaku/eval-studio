@@ -24,8 +24,15 @@ if settings.database_url.startswith("sqlite"):
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-def _utcnow() -> datetime:
+def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def iso_now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+_utcnow = utcnow
 
 
 class Base(DeclarativeBase):

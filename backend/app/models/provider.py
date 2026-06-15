@@ -1,15 +1,12 @@
 """Provider ORM model for storing user-created inference provider profiles."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import JSON, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
+from app.core.database import utcnow as _utcnow
 
 
 class Provider(Base):

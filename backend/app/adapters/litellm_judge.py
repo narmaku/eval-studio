@@ -313,10 +313,12 @@ Respond with ONLY a JSON object:
         answer: str,
         expected_answer: str | None,
         metrics: list[str],
+        judge_config: JudgeConfigParams | None = None,
     ) -> dict[str, Score]:
         """Score a RAG response with retrieved context using RAGAS-style metrics."""
         requested = set(metrics) if metrics else set(self._RAG_DIMENSIONS)
-        threshold = 0.7
+        threshold = (judge_config.pass_threshold if judge_config else None) or 0.7
+        temperature = judge_config.temperature if judge_config else 0.0
 
         # Early exit: no chunks AND no answer -> neutral scores
         if not context_chunks and not answer:
@@ -346,7 +348,7 @@ Respond with ONLY a JSON object:
             kwargs: dict = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.0,
+                "temperature": temperature,
                 "response_format": {"type": "json_object"},
             }
             if self.api_key:
