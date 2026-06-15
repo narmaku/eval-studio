@@ -1,5 +1,6 @@
 """Unit tests for rubric service (import, generate, refine)."""
 
+import os
 import textwrap
 from unittest.mock import patch
 
@@ -235,6 +236,35 @@ class TestConvertRubricKitToInternal:
 
 class TestGenerateRubric:
     """Tests for rubric generation via rubric-kit + LLM."""
+
+    @patch("app.services.rubric_service.rubric_kit_generate")
+    def test_generate_sets_api_key_env(self, mock_generate, monkeypatch):
+        """api_key is set as LITELLM_API_KEY during the rubric-kit call."""
+        from rubric_kit import Criterion, Dimension, GenerationResult, Rubric
+
+        monkeypatch.delenv("LITELLM_API_KEY", raising=False)
+        captured_key = {}
+
+        def _capture_and_return(**kwargs):
+            captured_key["value"] = os.environ.get("LITELLM_API_KEY")
+            return GenerationResult(
+                rubric=Rubric(
+                    dimensions=[
+                        Dimension(name="q", description="q", grading_type="score", scores={1: "1", 5: "5"}),
+                    ],
+                    criteria=[Criterion(name="c", weight=1, dimension="q", criterion="?")],
+                ),
+                model="m",
+                input_type="qna",
+                input_source="<in-memory>",
+            )
+
+        mock_generate.side_effect = _capture_and_return
+
+        generate_rubric(description="Test", sample_data=None, model="m", api_base=None, api_key="sk-test-123")
+
+        assert captured_key["value"] == "sk-test-123"
+        assert os.environ.get("LITELLM_API_KEY") is None
 
     @patch("app.services.rubric_service.rubric_kit_generate")
     def test_generate_calls_rubric_kit(self, mock_generate):

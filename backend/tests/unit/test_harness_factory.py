@@ -2,7 +2,6 @@
 
 import pytest
 
-from app.harnesses.builtin import BuiltinHarness
 from app.harnesses.factory import create_harness, get_parser
 from app.harnesses.parsers.base import DefaultOutputParser
 from app.harnesses.parsers.goose import GooseOutputParser
@@ -17,16 +16,16 @@ def _setup_test_harnesses(tmp_path):
     The root conftest isolates all registries to temp paths automatically.
     """
     harness_registry._config_path = tmp_path / "harnesses.yaml"
-    harness_registry._items["test-builtin"] = HarnessProfile(id="test-builtin", name="Test Builtin", type="builtin")
     harness_registry._items["test-subprocess"] = HarnessProfile(
         id="test-subprocess", name="Test Subprocess", type="subprocess", binary_path="echo"
     )
     harness_registry._persist_yaml()
 
 
-def test_create_builtin_harness():
-    harness = create_harness("test-builtin")
-    assert isinstance(harness, BuiltinHarness)
+def test_create_builtin_type_raises():
+    harness_registry._items["test-builtin"] = HarnessProfile(id="test-builtin", name="Test Builtin", type="builtin")
+    with pytest.raises(ValueError, match="Unknown harness type"):
+        create_harness("test-builtin")
 
 
 def test_create_subprocess_harness():

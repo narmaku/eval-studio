@@ -13,7 +13,7 @@ class HarnessProfile:
 
     id: str
     name: str
-    type: str = "builtin"  # "builtin" or "subprocess"
+    type: str = "subprocess"
     binary_path: str | None = None
     args: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
@@ -35,7 +35,7 @@ class HarnessRegistry(YAMLBackedRegistry[HarnessProfile]):
         return HarnessProfile(
             id=raw["id"],
             name=raw["name"],
-            type=raw.get("type", "builtin"),
+            type=raw.get("type", "subprocess"),
             binary_path=raw.get("binary_path"),
             args=raw.get("args", []),
             env=raw.get("env", {}),

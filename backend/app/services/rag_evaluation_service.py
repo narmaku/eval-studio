@@ -223,6 +223,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                     answer=actual_answer,
                     expected_answer=item.expected_answer,
                     metrics=rag_metrics,
+                    judge_config=judge_params,
                 )
                 # Compute overall score as average of metric scores
                 if metric_scores:

@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.adapters.base import Score
+from app.adapters.base import JudgeConfigParams, Score
 from app.adapters.litellm_judge import LiteLLMJudgeAdapter
 
 
@@ -297,6 +297,40 @@ async def test_evaluate_rag_none_content():
         assert result[metric_name].value == 0.0
         assert result[metric_name].passed is False
         assert "empty response" in result[metric_name].reasoning
+
+
+@pytest.mark.asyncio
+async def test_evaluate_rag_custom_threshold():
+    """judge_config.pass_threshold=0.5 makes score 0.6 pass (would fail with default 0.7)."""
+    adapter = _make_adapter()
+    judge_config = JudgeConfigParams(pass_threshold=0.5, temperature=0.3)
+
+    response_json = (
+        '{"context_precision": 0.6, "context_recall": 0.6, "faithfulness": 0.6, '
+        '"answer_relevance": 0.6, "reasoning": "Moderate scores."}'
+    )
+    mock_response = _mock_llm_response(response_json)
+
+    with patch(
+        "app.adapters.litellm_judge.litellm.acompletion",
+        new_callable=AsyncMock,
+        return_value=mock_response,
+    ) as mock_completion:
+        result = await adapter.evaluate_rag(
+            question="What is RHEL?",
+            context_chunks=_sample_chunks(),
+            answer="RHEL is Red Hat Enterprise Linux.",
+            expected_answer="Red Hat Enterprise Linux",
+            metrics=[],
+            judge_config=judge_config,
+        )
+
+    for metric in ("context_precision", "faithfulness", "answer_relevance"):
+        assert result[metric].passed is True, f"{metric} should pass with threshold 0.5"
+        assert result[metric].value == pytest.approx(0.6)
+
+    call_kwargs = mock_completion.call_args[1]
+    assert call_kwargs["temperature"] == 0.3
 
 
 @pytest.mark.asyncio

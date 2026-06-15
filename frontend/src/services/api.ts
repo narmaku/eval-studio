@@ -238,11 +238,11 @@ export const api = {
     }),
 
   // --- Rubrics ---
-  listRubrics: (params?: { name?: string; offset?: number; limit?: number }) => {
+  listRubrics: (params?: { name?: string; page?: number; page_size?: number }) => {
     const query = new URLSearchParams();
     if (params?.name) query.set('name', params.name);
-    if (params?.offset !== undefined) query.set('offset', String(params.offset));
-    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.page !== undefined) query.set('page', String(params.page));
+    if (params?.page_size !== undefined) query.set('page_size', String(params.page_size));
     const qs = query.toString();
     return request<PaginatedResponse<Rubric>>(`/api/v1/rubrics${qs ? `?${qs}` : ''}`);
   },

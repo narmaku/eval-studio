@@ -13,13 +13,7 @@ check-deps: ## Validate required development tools are installed
 	@echo "All dependencies found."
 
 dev: check-deps ## Start backend + frontend dev servers
-	@echo "Starting eval-studio development servers..."
-	@echo "Backend:  http://localhost:8000"
-	@echo "Frontend: http://localhost:5173"
-	@trap 'kill 0' EXIT; \
-	  (cd backend && uv sync --quiet && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000) & \
-	  (cd frontend && npm install --silent && npm run dev) & \
-	  wait
+	@./dev.sh
 
 test: test-backend test-frontend ## Run all tests
 
@@ -60,7 +54,7 @@ docker-down: ## Stop development environment (docker compose)
 	docker compose down
 
 docs-serve: ## Serve documentation locally (MkDocs)
-	cd docs && uv run mkdocs serve
+	cd backend && uv run mkdocs serve -f ../docs/mkdocs.yml
 
 docs-build: ## Build documentation site
-	cd docs && uv run mkdocs build
+	cd backend && uv run mkdocs build -f ../docs/mkdocs.yml

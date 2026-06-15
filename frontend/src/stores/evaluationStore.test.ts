@@ -438,6 +438,28 @@ describe('evaluationStore', () => {
     });
   });
 
+  describe('log buffer cap', () => {
+    it('caps logs at 500 entries', () => {
+      useEvaluationStore.getState().connectToEvaluation('eval-cap');
+      const ws = MockWebSocket.instances[0]!;
+
+      for (let i = 1; i <= 600; i++) {
+        ws.simulateMessage({
+          type: 'log',
+          evaluation_id: 'eval-cap',
+          timestamp: `2026-06-02T10:00:${String(i).padStart(2, '0')}Z`,
+          level: 'info',
+          message: `Log ${i}`,
+        });
+      }
+
+      const logs = useEvaluationStore.getState().logs;
+      expect(logs).toHaveLength(500);
+      expect(logs[0]!.message).toBe('Log 101');
+      expect(logs[499]!.message).toBe('Log 600');
+    });
+  });
+
   describe('clearLogs', () => {
     it('resets logs array', () => {
       useEvaluationStore.getState().connectToEvaluation('eval-123');

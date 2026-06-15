@@ -4,13 +4,14 @@ import time
 
 import structlog
 from fastapi import APIRouter, Depends, Query, Request, Response
-from sqlalchemy import case, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import async_session_factory, get_db
 from app.core.exceptions import ConflictException, NotFoundException, NotImplementedException, ValidationException
 from app.core.security import require_auth
+from app.models.artifact import Artifact
 from app.models.dataset import Dataset
 from app.models.evaluation import Evaluation
 from app.models.result import Result
@@ -23,6 +24,7 @@ from app.schemas.evaluation import (
 )
 from app.schemas.run import RunAsyncResponse, RunRequest
 from app.services.arena_evaluation_service import run_arena_evaluation
+from app.services.artifact_service import delete_artifact_file
 from app.services.evaluation_service import run_qa_evaluation
 from app.services.rag_evaluation_service import run_rag_evaluation
 from app.services.run_service import compute_run_results, execute_evaluation_sync
@@ -34,6 +36,15 @@ router = APIRouter(prefix="/evaluations", tags=["evaluations"], dependencies=[De
 # Keep strong references to background evaluation tasks so they are
 # not garbage-collected while still running.
 _background_tasks: set[asyncio.Task] = set()
+
+
+async def _cleanup_artifacts(evaluation_id: str, db: AsyncSession) -> None:
+    """Delete artifact files from disk and remove artifact rows for an evaluation."""
+    art_result = await db.execute(select(Artifact).where(Artifact.evaluation_id == evaluation_id))
+    artifacts = art_result.scalars().all()
+    for artifact in artifacts:
+        await delete_artifact_file(artifact, settings.artifacts_dir)
+    await db.execute(delete(Artifact).where(Artifact.evaluation_id == evaluation_id))
 
 
 @router.post("", response_model=EvaluationResponse, status_code=201)
@@ -282,6 +293,7 @@ async def delete_evaluation(evaluation_id: str, db: AsyncSession = Depends(get_d
     if evaluation.status == "running":
         raise ConflictException("Cannot delete a running evaluation.")
 
+    await _cleanup_artifacts(evaluation_id, db)
     await db.delete(evaluation)
     await db.commit()
     logger.info("evaluation.deleted", id=evaluation_id)
@@ -348,10 +360,9 @@ async def rerun_evaluation(
     if evaluation.mode not in ("qa", "rag", "arena"):
         raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
 
-    # Delete existing results for this evaluation
-    existing_results = await db.execute(select(Result).where(Result.evaluation_id == evaluation_id))
-    for r in existing_results.scalars().all():
-        await db.delete(r)
+    # Delete existing results and artifacts for this evaluation
+    await _cleanup_artifacts(evaluation_id, db)
+    await db.execute(delete(Result).where(Result.evaluation_id == evaluation_id))
 
     # Reset status
     evaluation.status = "pending"

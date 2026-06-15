@@ -75,6 +75,7 @@ async def generate_rubric_endpoint(
             sample_data=payload.sample_data,
             model=provider.default_model,
             api_base=provider.api_base,
+            api_key=provider.api_key,
         )
     except Exception as exc:
         logger.error("rubric.generate.failed", error=str(exc))
@@ -219,6 +220,7 @@ async def refine_rubric_endpoint(
             feedback=payload.feedback,
             model=provider.default_model,
             api_base=provider.api_base,
+            api_key=provider.api_key,
         )
     except Exception as exc:
         logger.error("rubric.refine.failed", error=str(exc), rubric_id=rubric_id)

@@ -1,6 +1,5 @@
 """Unit tests for WebSocket progress broadcast with arena contestant_model support and log broadcasting."""
 
-from datetime import UTC
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -222,13 +221,7 @@ async def test_broadcast_log_timestamp_format():
     async with _lock:
         _connections["eval-log-6"] = {ws}
 
-    with patch("app.websocket.progress.datetime") as mock_dt:
-        from datetime import datetime
-
-        fixed_dt = datetime(2026, 6, 2, 10, 0, 0, tzinfo=UTC)
-        mock_dt.now.return_value = fixed_dt
-        mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
-
+    with patch("app.websocket.progress.iso_now", return_value="2026-06-02T10:00:00+00:00"):
         await broadcast_log(
             evaluation_id="eval-log-6",
             level="info",

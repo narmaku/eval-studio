@@ -24,8 +24,7 @@ class AgentHarness(ABC):
     """ABC for agent harnesses that own the complete agent loop.
 
     A harness encapsulates everything needed to run an AI agent: model
-    selection, tool execution, streaming, etc.  The builtin harness wraps
-    the existing LiteLLM-based agentic loop while the subprocess harness
+    selection, tool execution, streaming, etc.  The subprocess harness
     delegates to an external CLI agent.
     """
 
