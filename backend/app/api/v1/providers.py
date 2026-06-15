@@ -164,7 +164,8 @@ async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
             )
 
         template = payload.request_body_template or '{"messages": [{"role": "user", "content": "{{message}}"}]}'
-        body_str = template.replace("{{message}}", "test")
+        escaped = json.dumps("test")[1:-1]
+        body_str = template.replace("{{message}}", escaped)
         try:
             body = json.loads(body_str)
         except json.JSONDecodeError as exc:
@@ -216,6 +217,7 @@ async def create_provider(payload: ProviderCreate) -> ProviderResponse:
         endpoint_url=payload.endpoint_url,
         request_body_template=payload.request_body_template,
         response_json_path=payload.response_json_path,
+        single_model=payload.single_model,
         rate_limited=payload.rate_limited,
         rate_limits=[rl.model_dump() for rl in payload.rate_limits] if payload.rate_limits else None,
     )

@@ -84,7 +84,7 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
                 if item.response_json_path != "choices.0.message.content"
                 else {}
             ),
-            **({"single_model": item.single_model} if item.single_model else {}),
+            "single_model": item.single_model,
             **({"rate_limited": item.rate_limited} if item.rate_limited else {}),
             **({"rate_limits": item.rate_limits} if item.rate_limits else {}),
         }

@@ -51,3 +51,7 @@ class RAGBackendAdapter(ABC):
     async def health_check(self) -> bool:
         """Check if the RAG backend is reachable."""
         ...
+
+    async def close(self) -> None:
+        """Release resources held by the adapter (no-op by default)."""
+        return

@@ -26,12 +26,12 @@ class TestExtractJsonPath:
 
     def test_missing_key_raises(self):
         data = {"data": {"other": "value"}}
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError, match=r"response_json_path.*failed at segment 'text'"):
             extract_json_path(data, "data.text")
 
     def test_out_of_bounds_index_raises(self):
         data = {"choices": []}
-        with pytest.raises(IndexError):
+        with pytest.raises(ValueError, match=r"response_json_path.*failed at segment '0'"):
             extract_json_path(data, "choices.0.message")
 
     def test_deep_nested(self):
@@ -316,6 +316,75 @@ class TestHealthCheck:
 
             result = await adapter.health_check()
             assert result is False
+
+
+class TestJsonEscaping:
+    """Tests for BUG-005: message escaping in template substitution."""
+
+    def test_message_with_double_quotes(self):
+        adapter = CustomHttpxAdapter(
+            endpoint_url="https://example.com/api",
+            request_body_template='{"question": "{{message}}"}',
+            response_json_path="data.text",
+        )
+        messages = [{"role": "user", "content": 'She said "hello"'}]
+        body = adapter._build_request_body(messages)
+        assert body["question"] == 'She said "hello"'
+
+    def test_message_with_newline(self):
+        adapter = CustomHttpxAdapter(
+            endpoint_url="https://example.com/api",
+            request_body_template='{"question": "{{message}}"}',
+            response_json_path="data.text",
+        )
+        messages = [{"role": "user", "content": "line1\nline2"}]
+        body = adapter._build_request_body(messages)
+        assert body["question"] == "line1\nline2"
+
+    def test_message_with_backslash(self):
+        adapter = CustomHttpxAdapter(
+            endpoint_url="https://example.com/api",
+            request_body_template='{"question": "{{message}}"}',
+            response_json_path="data.text",
+        )
+        messages = [{"role": "user", "content": "path\\to\\file"}]
+        body = adapter._build_request_body(messages)
+        assert body["question"] == "path\\to\\file"
+
+    def test_injection_attempt_stays_literal(self):
+        adapter = CustomHttpxAdapter(
+            endpoint_url="https://example.com/api",
+            request_body_template='{"question": "{{message}}"}',
+            response_json_path="data.text",
+        )
+        messages = [{"role": "user", "content": '", "admin": true, "x": "'}]
+        body = adapter._build_request_body(messages)
+        assert body == {"question": '", "admin": true, "x": "'}
+        assert "admin" not in body
+
+    def test_invalid_template_raises_valueerror(self):
+        adapter = CustomHttpxAdapter(
+            endpoint_url="https://example.com/api",
+            request_body_template="{not valid json {{message}}",
+            response_json_path="data.text",
+        )
+        messages = [{"role": "user", "content": "test"}]
+        with pytest.raises(ValueError, match="request_body_template does not produce valid JSON"):
+            adapter._build_request_body(messages)
+
+
+class TestExtractJsonPathErrors:
+    """Tests for BUG-017: error wrapping in extract_json_path."""
+
+    def test_missing_nested_key_names_segment(self):
+        data = {"a": {}}
+        with pytest.raises(ValueError, match="failed at segment 'b'"):
+            extract_json_path(data, "a.b.c")
+
+    def test_type_error_on_none(self):
+        data = {"a": None}
+        with pytest.raises(ValueError, match="failed at segment 'b'"):
+            extract_json_path(data, "a.b")
 
 
 class TestTemplateSubstitution:

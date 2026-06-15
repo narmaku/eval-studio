@@ -99,7 +99,7 @@ def _resolve_config_path() -> Path:
     if env_path:
         return Path(env_path)
 
-    repo_root = Path(__file__).resolve().parent.parent.parent
+    repo_root = Path(__file__).resolve().parents[3]
     candidate = repo_root / "config" / "harnesses.yaml"
     if candidate.exists():
         return candidate

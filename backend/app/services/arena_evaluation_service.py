@@ -307,7 +307,7 @@ async def run_arena_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                     score=None,
                     passed=False,
                     actual_answer=None,
-                    judge_reasoning=str(r),
+                    judge_reasoning=sanitize_error_for_client(r),
                 )
                 db.add(error_result)
             else:
