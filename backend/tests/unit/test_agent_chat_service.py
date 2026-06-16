@@ -156,6 +156,40 @@ async def test_process_user_message_with_tool_calls(db_session: AsyncSession, se
 
 
 @pytest.mark.asyncio
+async def test_message_id_consistent_between_chunks_and_complete(db_session: AsyncSession, session_with_config):
+    """ARCH-003: message_id is the same across all chunks and the complete envelope for one turn."""
+    session = session_with_config
+
+    mock_stream = _make_streaming_chunks("Hi!")
+
+    with patch("app.agent_backends.litellm_agent.litellm.acompletion", new_callable=AsyncMock) as mock_acomp:
+        mock_acomp.return_value = mock_stream
+
+        messages = []
+        async for msg in process_user_message(session.id, "Hello", db_session):
+            messages.append(msg)
+
+    chunks = [m for m in messages if m["type"] == "message_chunk"]
+    completes = [m for m in messages if m["type"] == "message_complete"]
+
+    assert len(chunks) == 3  # "Hi!" = 3 chars
+    assert len(completes) == 1
+
+    # All chunks share the same message_id
+    chunk_ids = {c["data"]["message_id"] for c in chunks}
+    assert len(chunk_ids) == 1
+
+    # Complete has the same message_id
+    complete_id = completes[0]["data"]["message_id"]
+    assert complete_id in chunk_ids
+
+    # message_id is a valid UUID
+    import uuid
+
+    uuid.UUID(complete_id)
+
+
+@pytest.mark.asyncio
 async def test_process_user_message_inactive_session(db_session: AsyncSession, session_with_config):
     """process_user_message raises ValueError for non-active sessions."""
     session = session_with_config

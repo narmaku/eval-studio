@@ -87,15 +87,17 @@ export interface SendMessageRequest {
 }
 
 // --- WebSocket message types ---
+// These types mirror the Pydantic models in backend/app/schemas/ws_chat.py.
+// The backend is the protocol owner; keep these in sync with that file.
 
 export type WsMessageType =
+  | 'connected'
   | 'message_chunk'
   | 'message_complete'
   | 'tool_call'
   | 'tool_executing'
   | 'tool_result'
-  | 'score'
-  | 'status'
+  | 'session_ended'
   | 'error';
 
 export interface WsEnvelope {
@@ -104,6 +106,11 @@ export interface WsEnvelope {
   timestamp: string;
   sender: MessageSender;
   session_id: string;
+}
+
+export interface WsConnectedMessage {
+  type: 'connected';
+  data: { session_id: string };
 }
 
 export interface WsMessageChunk {
@@ -121,16 +128,6 @@ export interface WsToolCallMessage {
   data: ToolCall;
 }
 
-export interface WsScoreMessage {
-  type: 'score';
-  data: SessionScore;
-}
-
-export interface WsStatusMessage {
-  type: 'status';
-  data: { status: SessionStatus };
-}
-
 export interface WsToolExecutingMessage {
   type: 'tool_executing';
   data: { tool_call_id: string; tool_name: string };
@@ -145,6 +142,11 @@ export interface WsToolResultMessage {
     is_error: boolean;
     duration_ms: number;
   };
+}
+
+export interface WsSessionEndedMessage {
+  type: 'session_ended';
+  data: { status: string; ended_at: string | null };
 }
 
 export interface WsErrorMessage {

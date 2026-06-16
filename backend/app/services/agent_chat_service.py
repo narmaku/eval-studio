@@ -22,6 +22,18 @@ from app.harnesses.registry import harness_registry
 from app.mcp.manager import cleanup_manager, get_or_create_manager
 from app.models.evaluation import Evaluation
 from app.models.session import Session
+from app.schemas.ws_chat import (
+    MessageChunk,
+    MessageChunkData,
+    MessageComplete,
+    MessageCompleteData,
+    ToolCallMsg,
+    ToolExecutingData,
+    ToolExecutingMsg,
+    ToolResultData,
+    ToolResultMsg,
+    new_message_id,
+)
 
 logger = structlog.get_logger()
 
@@ -170,6 +182,7 @@ async def process_user_message(
     round_count = 0
     all_tool_calls_for_complete: list[dict] = []
     final_content = ""
+    turn_message_id = new_message_id()
 
     while True:
         # Stream the response via adapter
@@ -183,13 +196,11 @@ async def process_user_message(
             # Content tokens
             if chunk.content:
                 full_content += chunk.content
-                yield {
-                    "type": "message_chunk",
-                    "data": {"content": chunk.content},
-                    "timestamp": _iso_now(),
-                    "sender": "agent",
-                    "session_id": session_id,
-                }
+                yield MessageChunk(
+                    data=MessageChunkData(content=chunk.content, message_id=turn_message_id),
+                    sender="agent",
+                    session_id=session_id,
+                ).model_dump()
 
             # Tool call chunks (accumulated across multiple chunks)
             if chunk.tool_call_chunk:
@@ -234,13 +245,11 @@ async def process_user_message(
         if tool_calls_list and openai_tools and tool_server_ids:
             # Yield tool_call envelopes (status: pending)
             for tc_envelope in tool_calls_list:
-                yield {
-                    "type": "tool_call",
-                    "data": tc_envelope,
-                    "timestamp": _iso_now(),
-                    "sender": "agent",
-                    "session_id": session_id,
-                }
+                yield ToolCallMsg(
+                    data=tc_envelope,
+                    sender="agent",
+                    session_id=session_id,
+                ).model_dump()
 
             # Persist assistant message with tool_calls to transcript
             assistant_msg_for_transcript: dict = {
@@ -280,16 +289,11 @@ async def process_user_message(
                 tool_name = tc_envelope["tool_name"]
 
                 # Yield tool_executing
-                yield {
-                    "type": "tool_executing",
-                    "data": {
-                        "tool_call_id": tool_call_id,
-                        "tool_name": tool_name,
-                    },
-                    "timestamp": _iso_now(),
-                    "sender": "system",
-                    "session_id": session_id,
-                }
+                yield ToolExecutingMsg(
+                    data=ToolExecutingData(tool_call_id=tool_call_id, tool_name=tool_name),
+                    sender="system",
+                    session_id=session_id,
+                ).model_dump()
 
                 # Execute the tool
                 try:
@@ -313,19 +317,17 @@ async def process_user_message(
                 tc_envelope["status"] = "error" if is_error else "completed"
 
                 # Yield tool_result
-                yield {
-                    "type": "tool_result",
-                    "data": {
-                        "tool_call_id": tool_call_id,
-                        "tool_name": tool_name,
-                        "result": result_text,
-                        "is_error": is_error,
-                        "duration_ms": duration_ms,
-                    },
-                    "timestamp": _iso_now(),
-                    "sender": "system",
-                    "session_id": session_id,
-                }
+                yield ToolResultMsg(
+                    data=ToolResultData(
+                        tool_call_id=tool_call_id,
+                        tool_name=tool_name,
+                        result=result_text,
+                        is_error=is_error,
+                        duration_ms=duration_ms,
+                    ),
+                    sender="system",
+                    session_id=session_id,
+                ).model_dump()
 
                 # Add tool result message for LLM context
                 messages_for_llm.append(
@@ -377,28 +379,25 @@ async def process_user_message(
             # Also yield any tool_call envelopes if present but no MCP servers configured
             if tool_calls_list:
                 for tc_envelope in tool_calls_list:
-                    yield {
-                        "type": "tool_call",
-                        "data": tc_envelope,
-                        "timestamp": _iso_now(),
-                        "sender": "agent",
-                        "session_id": session_id,
-                    }
+                    yield ToolCallMsg(
+                        data=tc_envelope,
+                        sender="agent",
+                        session_id=session_id,
+                    ).model_dump()
                 all_tool_calls_for_complete.extend(tool_calls_list)
 
             break
 
     # 8. Yield message_complete
-    yield {
-        "type": "message_complete",
-        "data": {
-            "content": final_content,
-            "tool_calls": all_tool_calls_for_complete,
-        },
-        "timestamp": _iso_now(),
-        "sender": "agent",
-        "session_id": session_id,
-    }
+    yield MessageComplete(
+        data=MessageCompleteData(
+            content=final_content,
+            message_id=turn_message_id,
+            tool_calls=all_tool_calls_for_complete,
+        ),
+        sender="agent",
+        session_id=session_id,
+    ).model_dump()
 
     # 9. Persist final assistant message to transcript (only if we broke out with text)
     if not (tool_calls_list and openai_tools and tool_server_ids):
@@ -461,26 +460,23 @@ async def _subprocess_process(
     harness = create_harness(harness_id)
     await harness.start_session(agent_config)
 
+    sub_message_id = new_message_id()
     try:
         all_tool_calls: list[dict] = []
         async for event in harness.send_message(content, history):
             if event.type == "message_chunk":
-                yield {
-                    "type": "message_chunk",
-                    "data": {"content": event.data.get("content", "")},
-                    "timestamp": _iso_now(),
-                    "sender": "agent",
-                    "session_id": session_id,
-                }
+                yield MessageChunk(
+                    data=MessageChunkData(content=event.data.get("content", ""), message_id=sub_message_id),
+                    sender="agent",
+                    session_id=session_id,
+                ).model_dump()
             elif event.type == "tool_call":
                 all_tool_calls.append(event.data)
-                yield {
-                    "type": "tool_call",
-                    "data": event.data,
-                    "timestamp": _iso_now(),
-                    "sender": "agent",
-                    "session_id": session_id,
-                }
+                yield ToolCallMsg(
+                    data=event.data,
+                    sender="agent",
+                    session_id=session_id,
+                ).model_dump()
             elif event.type == "tool_result":
                 yield {
                     "type": "tool_result",
@@ -491,16 +487,15 @@ async def _subprocess_process(
                 }
             elif event.type == "message_complete":
                 final_content = event.data.get("content", "")
-                yield {
-                    "type": "message_complete",
-                    "data": {
-                        "content": final_content,
-                        "tool_calls": all_tool_calls,
-                    },
-                    "timestamp": _iso_now(),
-                    "sender": "agent",
-                    "session_id": session_id,
-                }
+                yield MessageComplete(
+                    data=MessageCompleteData(
+                        content=final_content,
+                        message_id=sub_message_id,
+                        tool_calls=all_tool_calls,
+                    ),
+                    sender="agent",
+                    session_id=session_id,
+                ).model_dump()
 
                 # Persist assistant message to transcript
                 assistant_message: dict = {
