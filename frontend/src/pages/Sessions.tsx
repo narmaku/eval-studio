@@ -49,8 +49,6 @@ function statusBadge(status: string) {
           Scored
         </Badge>
       );
-    case 'failed':
-      return <Badge variant="destructive">Failed</Badge>;
     default:
       return <Badge variant="outline">{status}</Badge>;
   }

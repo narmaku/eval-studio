@@ -1,0 +1,8 @@
+[project]
+name = "eval-studio-docs"
+version = "0.1.0"
+description = "MkDocs documentation site for eval-studio"
+requires-python = ">=3.11"
+dependencies = [
+    "mkdocs-material>=9.0",
+]

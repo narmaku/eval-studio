@@ -148,18 +148,14 @@ export default function AgentEvaluation() {
       const prevStatus = prevState.currentSession?.status;
       if (status === prevStatus) return;
 
-      if (status === 'completed' || status === 'failed') {
+      if (status === 'completed') {
         setPhase('review');
-        if (status === 'completed') {
-          toast.success('Session completed');
-          useNotificationStore.getState().addNotification({
-            type: 'success',
-            title: 'Session Completed',
-            message: 'Agent evaluation session has ended.',
-          });
-        } else {
-          toast.error('Session failed');
-        }
+        toast.success('Session completed');
+        useNotificationStore.getState().addNotification({
+          type: 'success',
+          title: 'Session Completed',
+          message: 'Agent evaluation session has ended.',
+        });
       }
     });
     return unsubscribe;

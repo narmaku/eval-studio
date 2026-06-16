@@ -114,10 +114,6 @@ describe('Sessions page', () => {
       expect(screen.getByText('Scored')).toBeInTheDocument();
     });
 
-    it('shows Failed badge for failed sessions', async () => {
-      await renderPage([makeSession({ status: 'failed', ended_at: '2026-01-01T00:05:00Z' })]);
-      expect(screen.getByText('Failed')).toBeInTheDocument();
-    });
   });
 
   describe('score column', () => {

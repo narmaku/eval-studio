@@ -2,7 +2,7 @@
 // using openapi-typescript once the backend is implemented.
 
 export type SessionMode = 'live' | 'simulated';
-export type SessionStatus = 'active' | 'ended' | 'scoring' | 'completed' | 'failed';
+export type SessionStatus = 'active' | 'ended' | 'scoring' | 'completed';
 export type MessageSender = 'user' | 'agent' | 'system' | 'judge';
 
 export interface SessionScores {

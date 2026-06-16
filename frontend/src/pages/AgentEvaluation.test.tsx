@@ -191,7 +191,6 @@ describe('AgentEvaluation — scoring phase', () => {
   describe('scoring phase rendering', () => {
     // Since phase is local React state, we test via the status subscription effect.
     // When store status changes to 'completed', it transitions to review.
-    // When store status changes to 'failed', it transitions to review.
     // The scoring phase is reached via handleEndSession (local state change).
 
     it('transitions to review on completed status from store', async () => {
@@ -256,50 +255,5 @@ describe('AgentEvaluation — scoring phase', () => {
       expect(screen.getByText('New Session')).toBeInTheDocument();
     });
 
-    it('transitions to review on failed status from store', async () => {
-      useSessionStore.setState({
-        currentSession: {
-          id: 'sess-1',
-          evaluation_id: 'eval-1',
-          mode: 'live',
-          status: 'active',
-          agent_config: null,
-          judge_config_snapshot: null,
-          transcript: [],
-          name: null,
-          scores: null,
-          error: null,
-          started_at: '2026-01-01T00:00:00Z',
-          ended_at: null,
-          created_at: '2026-01-01T00:00:00Z',
-        },
-      });
-
-      await renderPage();
-
-      act(() => {
-        useSessionStore.setState({
-          currentSession: {
-            id: 'sess-1',
-            evaluation_id: 'eval-1',
-            mode: 'live',
-            status: 'failed',
-            agent_config: null,
-            judge_config_snapshot: null,
-            transcript: [],
-            name: null,
-            scores: null,
-            error: 'Something broke',
-            started_at: '2026-01-01T00:00:00Z',
-            ended_at: '2026-01-01T00:05:00Z',
-            created_at: '2026-01-01T00:00:00Z',
-          },
-        });
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('New Session')).toBeInTheDocument();
-      });
-    });
   });
 });
