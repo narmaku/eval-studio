@@ -24,10 +24,8 @@ from app.schemas.evaluation import (
     EvaluationStatus,
 )
 from app.schemas.run import RunAsyncResponse, RunRequest
-from app.services.arena_evaluation_service import run_arena_evaluation
 from app.services.artifact_service import delete_artifact_file
-from app.services.evaluation_service import run_qa_evaluation
-from app.services.rag_evaluation_service import run_rag_evaluation
+from app.services.eval_runner import run_evaluation as _run_evaluation
 from app.services.run_service import compute_run_results, execute_evaluation_sync
 from app.websocket.progress import broadcast_status
 
@@ -249,12 +247,7 @@ async def run_and_wait(
 
         async def _run_bg() -> None:
             async with async_session_factory() as bg_session:
-                if evaluation.mode == "arena":
-                    await run_arena_evaluation(evaluation_id, bg_session)
-                elif evaluation.mode == "rag":
-                    await run_rag_evaluation(evaluation_id, bg_session)
-                else:
-                    await run_qa_evaluation(evaluation_id, bg_session)
+                await _run_evaluation(evaluation_id, bg_session)
 
         _launch_evaluation(evaluation_id, _run_bg())
 
@@ -397,12 +390,7 @@ async def run_evaluation(
     # Launch background task with its own database session
     async def _run_in_background() -> None:
         async with async_session_factory() as bg_session:
-            if evaluation.mode == "arena":
-                await run_arena_evaluation(evaluation_id, bg_session)
-            elif evaluation.mode == "rag":
-                await run_rag_evaluation(evaluation_id, bg_session)
-            else:
-                await run_qa_evaluation(evaluation_id, bg_session)
+            await _run_evaluation(evaluation_id, bg_session)
 
     _launch_evaluation(evaluation_id, _run_in_background())
 
@@ -439,12 +427,7 @@ async def rerun_evaluation(
     # Launch background task
     async def _rerun_in_background() -> None:
         async with async_session_factory() as bg_session:
-            if evaluation.mode == "arena":
-                await run_arena_evaluation(evaluation_id, bg_session)
-            elif evaluation.mode == "rag":
-                await run_rag_evaluation(evaluation_id, bg_session)
-            else:
-                await run_qa_evaluation(evaluation_id, bg_session)
+            await _run_evaluation(evaluation_id, bg_session)
 
     _launch_evaluation(evaluation_id, _rerun_in_background())
 

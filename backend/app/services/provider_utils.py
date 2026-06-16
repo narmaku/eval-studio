@@ -1,7 +1,7 @@
 """Shared provider resolution utilities.
 
 Extracts the model/key/base/proxy resolution logic that is used by both
-evaluation_service (Q&A mode) and agent_chat_service (interactive mode).
+eval_runner (Q/A mode) and agent_chat_service (interactive mode).
 """
 
 import os

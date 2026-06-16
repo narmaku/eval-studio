@@ -2,7 +2,7 @@
 
 Sends questions to a RAG service over HTTP and extracts answers and context
 chunks from the JSON response. Refactored from inline httpx code that was
-previously in rag_evaluation_service.py.
+previously in eval_runner.py.
 """
 
 from typing import Any

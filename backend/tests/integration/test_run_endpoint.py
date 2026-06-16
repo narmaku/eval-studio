@@ -60,9 +60,9 @@ async def test_run_sync_qa(client, dataset_id, judge_config_id, mock_bg_session_
     )
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_call),
+        patch("app.services.eval_runner.call_model", mock_call),
         patch("app.adapters.litellm_judge.litellm.acompletion", mock_judge),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
         patch("app.services.run_service.async_session_factory", mock_bg_session_factory),
     ):
         resp = await client.post(
@@ -100,13 +100,13 @@ async def test_run_sync_qa(client, dataset_id, judge_config_id, mock_bg_session_
 async def test_run_async_mode(client, dataset_id, mock_bg_session_factory):
     """POST /evaluations/run?async=true returns 202 with RunAsyncResponse."""
     with (
-        patch("app.services.evaluation_service.call_model", new_callable=AsyncMock, return_value="answer"),
+        patch("app.services.eval_runner.call_model", new_callable=AsyncMock, return_value="answer"),
         patch(
             "app.adapters.litellm_judge.litellm.acompletion",
             new_callable=AsyncMock,
             return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"score": 0.9, "reasoning": "OK"}'))]),
         ),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
         patch("app.api.v1.evaluations.async_session_factory", mock_bg_session_factory),
     ):
         resp = await client.post(
@@ -157,9 +157,9 @@ async def test_run_plain_text_response(client, dataset_id, judge_config_id, mock
     )
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_call),
+        patch("app.services.eval_runner.call_model", mock_call),
         patch("app.adapters.litellm_judge.litellm.acompletion", mock_judge),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
         patch("app.services.run_service.async_session_factory", mock_bg_session_factory),
     ):
         resp = await client.post(
