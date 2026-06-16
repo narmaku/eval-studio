@@ -225,23 +225,35 @@ async def test_end_session_does_not_score_even_with_judge_config(db_session: Asy
 
 
 @pytest.mark.asyncio
-async def test_end_session_sets_evaluation_to_completed(db_session: AsyncSession, session_with_config):
-    """end_session sets the linked evaluation status to 'completed'."""
+async def test_end_session_sets_running_evaluation_to_completed(db_session: AsyncSession, session_with_config):
+    """ARCH-006: end_session transitions a 'running' evaluation to 'completed'."""
     session = session_with_config
 
-    # Verify the evaluation starts as non-completed
+    # Set evaluation to running
     eval_result = await db_session.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
     evaluation = eval_result.scalar_one()
-    assert evaluation.status != "completed"
+    evaluation.status = "running"
+    await db_session.flush()
 
     result = await end_session(session.id, db_session)
-
     assert result["status"] == "ended"
 
-    # Verify evaluation is now completed
     eval_result = await db_session.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
     evaluation = eval_result.scalar_one()
     assert evaluation.status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_end_session_does_not_change_pending_evaluation(db_session: AsyncSession, session_with_config):
+    """ARCH-006: end_session does NOT change a 'pending' evaluation status."""
+    session = session_with_config
+
+    result = await end_session(session.id, db_session)
+    assert result["status"] == "ended"
+
+    eval_result = await db_session.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
+    evaluation = eval_result.scalar_one()
+    assert evaluation.status == "pending"
 
 
 @pytest.mark.asyncio

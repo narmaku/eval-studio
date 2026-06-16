@@ -360,6 +360,42 @@ class TestBuildRagAdapterConfig:
         assert config["chunks_field"] == "c"
         assert config["top_k"] == 5
 
+    def test_auth_token_env_resolved(self, monkeypatch):
+        """auth_token_env should resolve to auth_header dict from environment."""
+        monkeypatch.setenv("RAG_AUTH_TOKEN", "my-secret-token")
+        rag_endpoint = {"url": "http://rag.example.com", "auth_token_env": "RAG_AUTH_TOKEN"}
+        config = _build_rag_adapter_config(rag_endpoint)
+        assert config["auth_header"] == {"Authorization": "Bearer my-secret-token"}
+
+    def test_auth_token_env_overrides_raw_auth_header(self, monkeypatch):
+        """auth_token_env takes precedence over raw auth_header."""
+        monkeypatch.setenv("RAG_AUTH_TOKEN", "env-token")
+        rag_endpoint = {
+            "url": "http://rag.example.com",
+            "auth_header": {"Authorization": "Bearer old-raw-token"},
+            "auth_token_env": "RAG_AUTH_TOKEN",
+        }
+        config = _build_rag_adapter_config(rag_endpoint)
+        assert config["auth_header"] == {"Authorization": "Bearer env-token"}
+
+    def test_auth_token_env_missing_warns(self, monkeypatch):
+        """Missing env var should not set auth_header."""
+        monkeypatch.delenv("MISSING_VAR", raising=False)
+        rag_endpoint = {"url": "http://rag.example.com", "auth_token_env": "MISSING_VAR"}
+        config = _build_rag_adapter_config(rag_endpoint)
+        assert "auth_header" not in config
+
+    def test_generator_api_key_env_resolved(self, monkeypatch):
+        """generator_api_key_env should resolve to generator_api_key from environment."""
+        monkeypatch.setenv("GEN_API_KEY", "sk-secret123")
+        rag_endpoint = {
+            "backend_type": "pgvector",
+            "connection_string": "pg://...",
+            "generator_api_key_env": "GEN_API_KEY",
+        }
+        config = _build_rag_adapter_config(rag_endpoint)
+        assert config["generator_api_key"] == "sk-secret123"
+
 
 @pytest.mark.asyncio
 async def test_rag_evaluation_with_endpoint_url(db_session: AsyncSession):

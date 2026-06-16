@@ -16,6 +16,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import redact_config
 from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.services.artifact_service import save_artifact
@@ -201,7 +202,7 @@ async def _generate_config_json(evaluation: Evaluation, db: AsyncSession, artifa
         "status": evaluation.status,
         "dataset_id": evaluation.dataset_id,
         "judge_config_id": evaluation.judge_config_id,
-        "config": evaluation.config or {},
+        "config": redact_config(evaluation.config) if evaluation.config else {},
         "generated_at": datetime.now(UTC).isoformat(),
     }
 

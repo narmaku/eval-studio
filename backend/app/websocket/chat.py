@@ -18,11 +18,9 @@ import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
-from app.core.database import async_session_factory, utcnow
+from app.core.database import async_session_factory
 from app.core.database import iso_now as _iso_now
 from app.core.exceptions import sanitize_error_for_client
-from app.mcp.manager import cleanup_manager
-from app.models.evaluation import Evaluation
 from app.models.session import Session
 from app.services.agent_chat_service import end_session, process_user_message
 
@@ -117,32 +115,14 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
     except Exception:
         logger.exception("ws.error", session_id=session_id)
     finally:
-        # 4. Cleanup on disconnect
+        # 4. Cleanup on disconnect — delegate to the service (single owner)
         _active_connections.pop(session_id, None)
         _processing.discard(session_id)
 
-        # Clean up MCP server managers
-        try:
-            await cleanup_manager(session_id)
-        except Exception:
-            logger.exception("ws.mcp_cleanup_error", session_id=session_id)
-
-        # Mark session as ended if still active
         try:
             async with async_session_factory() as db:
-                result = await db.execute(select(Session).where(Session.id == session_id))
-                session = result.scalar_one_or_none()
-                if session and session.status == "active":
-                    session.status = "ended"
-                    session.ended_at = utcnow()
-                    # Also update linked evaluation status
-                    if session.evaluation_id:
-                        eval_result = await db.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
-                        evaluation = eval_result.scalar_one_or_none()
-                        if evaluation and evaluation.status == "running":
-                            evaluation.status = "completed"
-                    await db.commit()
-                    logger.info("ws.session_auto_ended", session_id=session_id)
+                await end_session(session_id, db)
+                logger.info("ws.session_auto_ended", session_id=session_id)
         except Exception:
             logger.exception("ws.cleanup_error", session_id=session_id)
 

@@ -621,6 +621,37 @@ class TestArtifactGenerationEdgeCases:
         assert data["config"] == {}
 
     @pytest.mark.asyncio
+    async def test_config_json_redacts_secrets(self, db_session, tmp_path):
+        """SEC-001: config.json redacts secret-bearing keys."""
+        secret_config = {
+            "rag_endpoint": {
+                "url": "http://rag.example.com",
+                "auth_header": {"Authorization": "Bearer super-secret"},
+            },
+            "generator_api_key": "sk-abc123",
+            "connection_string": "postgresql://user:pass@host/db",
+            "model": "gpt-4",
+        }
+        evaluation = await self._create_evaluation_with_results(db_session, results_data=[], config=secret_config)
+        artifacts_dir = str(tmp_path / "artifacts")
+
+        await generate_evaluation_artifacts(evaluation.id, db_session, artifacts_dir)
+
+        artifact_row = await db_session.execute(
+            select(Artifact).where(Artifact.evaluation_id == evaluation.id, Artifact.filename == "config.json")
+        )
+        artifact = artifact_row.scalar_one()
+
+        from pathlib import Path
+
+        data = json.loads((Path(artifacts_dir) / artifact.storage_path).read_text())
+        assert data["config"]["generator_api_key"] == "**REDACTED**"
+        assert data["config"]["connection_string"] == "**REDACTED**"
+        assert data["config"]["rag_endpoint"]["auth_header"] == "**REDACTED**"
+        assert data["config"]["rag_endpoint"]["url"] == "http://rag.example.com"
+        assert data["config"]["model"] == "gpt-4"
+
+    @pytest.mark.asyncio
     async def test_broadcast_failure_in_error_handler_does_not_raise(self, db_session, tmp_path):
         """When both artifact generation and broadcast_log fail, nothing is raised."""
         evaluation = await self._create_evaluation_with_results(db_session, results_data=[])

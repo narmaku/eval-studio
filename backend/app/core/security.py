@@ -1,7 +1,9 @@
 import hashlib
 import hmac
+import re
 import secrets
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import Depends, Request
 from sqlalchemy import select
@@ -102,3 +104,23 @@ async def require_auth(
     api_key.last_used_at = datetime.now(UTC)
     await db.commit()
     return api_key
+
+
+_SECRET_KEY_PATTERN = re.compile(r"(auth|token|key|secret|password|connection_string)", re.IGNORECASE)
+
+REDACTED = "**REDACTED**"
+
+
+def redact_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Return a shallow copy of *config* with secret-bearing values masked."""
+    result: dict[str, Any] = {}
+    for k, v in config.items():
+        if v is None:
+            result[k] = None
+        elif _SECRET_KEY_PATTERN.search(k):
+            result[k] = REDACTED
+        elif isinstance(v, dict):
+            result[k] = redact_config(v)
+        else:
+            result[k] = v
+    return result

@@ -24,7 +24,7 @@ export interface RAGEndpointSettings {
   backend_type: 'http' | 'pgvector';
   // HTTP fields
   endpoint_url?: string;
-  auth_header?: string;
+  auth_token_env?: string;
   query_field?: string;
   answer_field?: string;
   chunks_field?: string;
@@ -35,6 +35,7 @@ export interface RAGEndpointSettings {
   content_column?: string;
   top_k?: number;
   generator_provider_id?: string;
+  generator_api_key_env?: string;
   embedding_model?: string;
 }
 

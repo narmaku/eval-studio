@@ -117,6 +117,57 @@ async def test_create_evaluation_valid_evaluator_id(client):
 
 
 @pytest.mark.asyncio
+async def test_config_secrets_redacted_in_response(client):
+    """SEC-001: GET /evaluations/{id} redacts secret-bearing config keys."""
+    payload = {
+        "name": "RAG Secret Test",
+        "mode": "rag",
+        "config": {
+            "rag_endpoint": {
+                "url": "http://rag.example.com",
+                "auth_header": {"Authorization": "Bearer super-secret-token"},
+                "auth_token_env": "RAG_TOKEN_VAR",
+                "query_field": "query",
+            },
+            "generator_api_key": "sk-abc123",
+            "connection_string": "postgresql://user:pass@host/db",
+        },
+    }
+    create_resp = await client.post("/api/v1/evaluations", json=payload)
+    assert create_resp.status_code == 201
+    eval_id = create_resp.json()["id"]
+
+    get_resp = await client.get(f"/api/v1/evaluations/{eval_id}")
+    data = get_resp.json()
+    config = data["config"]
+    assert config["generator_api_key"] == "**REDACTED**"
+    assert config["connection_string"] == "**REDACTED**"
+    rag = config["rag_endpoint"]
+    assert rag["auth_header"] == "**REDACTED**"
+    assert rag["auth_token_env"] == "**REDACTED**"
+    assert rag["url"] == "http://rag.example.com"
+    assert rag["query_field"] == "query"
+
+
+@pytest.mark.asyncio
+async def test_config_secrets_redacted_in_list(client):
+    """SEC-001: list endpoint also redacts secrets."""
+    payload = {
+        "name": "Secret List Test",
+        "mode": "rag",
+        "config": {"auth_header": "Bearer secret"},
+    }
+    await client.post("/api/v1/evaluations", json=payload)
+
+    list_resp = await client.get("/api/v1/evaluations")
+    items = list_resp.json()["items"]
+    for item in items:
+        if item["name"] == "Secret List Test":
+            assert item["config"]["auth_header"] == "**REDACTED**"
+            break
+
+
+@pytest.mark.asyncio
 async def test_run_pending_evaluation_conflict(client, db_session):
     """Run a completed evaluation via /run (not /rerun) returns 409."""
     create_resp = await client.post("/api/v1/evaluations", json={"name": "Completed Eval", "mode": "qa"})

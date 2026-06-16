@@ -111,6 +111,68 @@ async def test_end_session(client):
 
 
 @pytest.mark.asyncio
+async def test_end_session_calls_cleanup_manager(client):
+    """ARCH-006: REST end-session delegates to service which calls cleanup_manager."""
+    eval_resp = await client.post("/api/v1/evaluations", json={"name": "Cleanup Test", "mode": "agent"})
+    eval_id = eval_resp.json()["id"]
+
+    create_resp = await client.post("/api/v1/sessions", json={"evaluation_id": eval_id})
+    session_id = create_resp.json()["id"]
+
+    with patch("app.services.agent_chat_service.cleanup_manager", new_callable=AsyncMock) as mock_cleanup:
+        response = await client.post(f"/api/v1/sessions/{session_id}/end")
+        assert response.status_code == 200
+        mock_cleanup.assert_called_once_with(session_id)
+
+
+@pytest.mark.asyncio
+async def test_end_session_completes_running_evaluation(client, db_session: AsyncSession):
+    """ARCH-006: ending a session transitions its linked 'running' evaluation to 'completed'."""
+    from app.models.evaluation import Evaluation
+
+    eval_resp = await client.post("/api/v1/evaluations", json={"name": "Running Eval Transition", "mode": "agent"})
+    eval_id = eval_resp.json()["id"]
+
+    # Set evaluation to running
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
+    evaluation = result.scalar_one()
+    evaluation.status = "running"
+    await db_session.commit()
+
+    create_resp = await client.post("/api/v1/sessions", json={"evaluation_id": eval_id})
+    session_id = create_resp.json()["id"]
+
+    with patch("app.services.agent_chat_service.cleanup_manager", new_callable=AsyncMock):
+        await client.post(f"/api/v1/sessions/{session_id}/end")
+
+    # Re-fetch evaluation
+    db_session.expire_all()
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
+    evaluation = result.scalar_one()
+    assert evaluation.status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_end_session_does_not_change_non_running_evaluation(client, db_session: AsyncSession):
+    """ARCH-006: ending a session does NOT change a 'pending' evaluation to 'completed'."""
+    from app.models.evaluation import Evaluation
+
+    eval_resp = await client.post("/api/v1/evaluations", json={"name": "Pending Eval", "mode": "agent"})
+    eval_id = eval_resp.json()["id"]
+
+    create_resp = await client.post("/api/v1/sessions", json={"evaluation_id": eval_id})
+    session_id = create_resp.json()["id"]
+
+    with patch("app.services.agent_chat_service.cleanup_manager", new_callable=AsyncMock):
+        await client.post(f"/api/v1/sessions/{session_id}/end")
+
+    db_session.expire_all()
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
+    evaluation = result.scalar_one()
+    assert evaluation.status == "pending"
+
+
+@pytest.mark.asyncio
 async def test_get_session_replay(client):
     """GET /sessions/{id}/replay returns replay-formatted data."""
     eval_resp = await client.post("/api/v1/evaluations", json={"name": "Replay Test Eval", "mode": "agent"})

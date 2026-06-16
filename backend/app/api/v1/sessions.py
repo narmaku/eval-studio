@@ -142,22 +142,20 @@ async def send_message(
 
 
 @router.post("/{session_id}/end", response_model=SessionResponse)
-async def end_session(session_id: str, db: AsyncSession = Depends(get_db)) -> SessionResponse:
+async def end_session_endpoint(session_id: str, db: AsyncSession = Depends(get_db)) -> SessionResponse:
     """End an active session."""
+    from app.services.agent_chat_service import end_session as end_session_svc
+
     result = await db.execute(select(Session).where(Session.id == session_id))
     session = result.scalar_one_or_none()
     if not session:
         raise NotFoundException("Session", session_id)
-
     if session.status != "active":
         raise ConflictException(f"Session '{session_id}' is '{session.status}' and cannot be ended.")
 
-    session.status = "ended"
-    session.ended_at = datetime.now(UTC)
+    await end_session_svc(session_id, db)
 
-    await db.commit()
     await db.refresh(session)
-
     logger.info("session.ended", session_id=session_id)
     return SessionResponse.model_validate(session)
 
