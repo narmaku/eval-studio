@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.factory import create_evaluation_adapter
 from app.core.config import settings
 from app.core.database import async_session_factory, get_db
 from app.core.exceptions import ConflictException, NotFoundException, NotImplementedException, ValidationException
@@ -47,6 +48,16 @@ async def _cleanup_artifacts(evaluation_id: str, db: AsyncSession) -> None:
     await db.execute(delete(Artifact).where(Artifact.evaluation_id == evaluation_id))
 
 
+def _validate_evaluator_id(config: dict) -> None:
+    """Raise ValidationException if config.evaluator_id is present but unknown."""
+    evaluator_id = config.get("evaluator_id")
+    if evaluator_id:
+        try:
+            create_evaluation_adapter(evaluator_id)
+        except ValueError as e:
+            raise ValidationException(f"Evaluator '{evaluator_id}' is not available") from e
+
+
 @router.post("", response_model=EvaluationResponse, status_code=201)
 async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depends(get_db)) -> EvaluationResponse:
     """Create a new evaluation."""
@@ -55,6 +66,8 @@ async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depend
         result = await db.execute(select(Dataset).where(Dataset.id == payload.dataset_id))
         if not result.scalar_one_or_none():
             raise NotFoundException("Dataset", payload.dataset_id)
+
+    _validate_evaluator_id(payload.config)
 
     # Arena-specific validation: must have at least 2 contestants
     if payload.mode == EvaluationMode.ARENA:
@@ -178,6 +191,8 @@ async def run_and_wait(
     ds_result = await db.execute(select(Dataset).where(Dataset.id == payload.dataset_id))
     if not ds_result.scalar_one_or_none():
         raise NotFoundException("Dataset", payload.dataset_id)
+
+    _validate_evaluator_id(payload.config)
 
     # Arena-specific validation: must have at least 2 contestants
     if payload.mode == EvaluationMode.ARENA:

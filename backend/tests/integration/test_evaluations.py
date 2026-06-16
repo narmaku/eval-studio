@@ -92,6 +92,31 @@ async def test_delete_running_evaluation(client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_create_evaluation_unknown_evaluator_id(client):
+    """BUG-018: create evaluation with unknown evaluator_id returns 422."""
+    payload = {
+        "name": "Bad Evaluator",
+        "mode": "qa",
+        "config": {"model": "test-model", "evaluator_id": "nonexistent-evaluator"},
+    }
+    response = await client.post("/api/v1/evaluations", json=payload)
+    assert response.status_code == 422
+    assert "nonexistent-evaluator" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_evaluation_valid_evaluator_id(client):
+    """BUG-018: create evaluation with valid evaluator_id succeeds."""
+    payload = {
+        "name": "Good Evaluator",
+        "mode": "qa",
+        "config": {"model": "test-model", "evaluator_id": "litellm"},
+    }
+    response = await client.post("/api/v1/evaluations", json=payload)
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
 async def test_run_pending_evaluation_conflict(client, db_session):
     """Run a completed evaluation via /run (not /rerun) returns 409."""
     create_resp = await client.post("/api/v1/evaluations", json={"name": "Completed Eval", "mode": "qa"})

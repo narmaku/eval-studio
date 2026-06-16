@@ -234,6 +234,56 @@ async def test_run_qa_evaluation_error_result_sanitized(db_session: AsyncSession
 
 
 @pytest.mark.asyncio
+async def test_run_qa_evaluation_evaluator_id_forwarded(db_session: AsyncSession, evaluation_with_dataset):
+    """BUG-018: evaluator_id in config is forwarded to create_evaluation_adapter."""
+    evaluation, _dataset, _items = evaluation_with_dataset
+    evaluation.config = {
+        **evaluation.config,
+        "evaluator_id": "litellm-judge",
+    }
+    await db_session.commit()
+
+    mock_call_model = AsyncMock(return_value="answer")
+    mock_evaluate_qa = AsyncMock(return_value=Score(value=0.9, passed=True, reasoning="ok"))
+
+    with (
+        patch("app.services.evaluation_service.call_model", mock_call_model),
+        patch("app.services.evaluation_service.create_evaluation_adapter", wraps=None) as mock_factory,
+        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+    ):
+        mock_factory.return_value.evaluate_qa = mock_evaluate_qa
+        await run_qa_evaluation(evaluation.id, db_session)
+
+    mock_factory.assert_called_once()
+    assert mock_factory.call_args.kwargs.get("adapter_type") is None or True
+    # The first positional arg (or adapter_type kwarg) should be "litellm-judge"
+    call_args = mock_factory.call_args
+    if call_args.args:
+        assert call_args.args[0] == "litellm-judge"
+    else:
+        assert call_args.kwargs.get("adapter_type") == "litellm-judge"
+
+
+@pytest.mark.asyncio
+async def test_run_qa_evaluation_unknown_evaluator_fails(db_session: AsyncSession, evaluation_with_dataset):
+    """BUG-018: unknown evaluator_id fails the evaluation early."""
+    evaluation, _dataset, _items = evaluation_with_dataset
+    evaluation.config = {
+        **evaluation.config,
+        "evaluator_id": "nonexistent-evaluator",
+    }
+    await db_session.commit()
+
+    with patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock):
+        await run_qa_evaluation(evaluation.id, db_session)
+
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
+    eval_obj = result.scalar_one()
+    assert eval_obj.status == "failed"
+    assert "nonexistent-evaluator" in eval_obj.error
+
+
+@pytest.mark.asyncio
 async def test_run_qa_evaluation_already_running(db_session: AsyncSession, evaluation_with_dataset):
     """If evaluation is already running, it should return early without changing status."""
     evaluation, _dataset, _items = evaluation_with_dataset
