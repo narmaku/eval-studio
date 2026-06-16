@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
 import { ContestantSelector } from '@/components/evaluation/ContestantSelector';
 import { DatasetSelector } from '@/components/evaluation/DatasetSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
@@ -10,6 +11,7 @@ import { ArenaLeaderboard } from '@/components/evaluation/ArenaLeaderboard';
 import { ArenaResultsGrid } from '@/components/evaluation/ArenaResultsGrid';
 import { ContestantScoreChart, RadarComparisonChart } from '@/components/results';
 import { useEvaluationStore } from '@/stores/evaluationStore';
+import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { api } from '@/services/api';
@@ -62,12 +64,13 @@ export default function ArenaComparison() {
 
   const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
     useEvaluationStore();
+  const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults } = useResultStore();
 
   // Need at least 2 contestants with valid config (single-model providers don't need default_model)
   const validContestants = contestants.filter((c) => c.name && (c.default_model || c.single_model));
   const isConfigValid = Boolean(
-    validContestants.length >= 2 && selectedDatasetId && judgeConfig,
+    validContestants.length >= 2 && selectedDatasetId && judgeConfig && selectedEvaluatorId,
   );
 
   const handleStart = async () => {
@@ -84,6 +87,7 @@ export default function ArenaComparison() {
       config: {
         model_endpoint: primaryEndpoint,
         judge_config: judgeConfig,
+        evaluator_id: selectedEvaluatorId ?? undefined,
         contestants: validContestants,
         ...(Object.keys(modelParams).length > 0 && { model_params: modelParams }),
         ...(Object.keys(judgeParams).length > 0 && { judge_params: judgeParams }),
@@ -155,6 +159,7 @@ export default function ArenaComparison() {
     setModelParams({});
     setJudgeParams({});
     setLeaderboard(null);
+    useEvaluatorStore.getState().resetSelection();
   };
 
   // Extract unique contestant model names for the results grid
@@ -174,6 +179,7 @@ export default function ArenaComparison() {
       {/* Configure Phase */}
       {phase === 'configure' && (
         <>
+          <EvaluatorSelector mode="qa" />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-2">

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import Score
-from app.adapters.litellm_judge import LiteLLMJudgeAdapter
+from app.adapters.factory import create_evaluation_adapter
 from app.core.config import settings
 from app.core.exceptions import sanitize_error_for_client
 from app.models.dataset import Dataset, DatasetItem
@@ -166,7 +166,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             details={"model": judge_resolved.model, "api_base": judge_resolved.api_base},
         )
 
-        adapter = LiteLLMJudgeAdapter(
+        adapter = create_evaluation_adapter(
             model=judge_resolved.model,
             api_key=judge_resolved.api_key,
             api_base=judge_resolved.api_base,

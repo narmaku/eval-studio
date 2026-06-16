@@ -4,10 +4,51 @@ Tracks session-by-session progress implementing the deep-quality review.
 Review at commit `ffc4b27` (branch `main`), 94 issues across 13 categories.
 
 ## Status board
-- Done: INFRA-007, INFRA-008, BUG-003, BUG-004, BUG-005, BUG-007, BUG-009, BUG-010, BUG-012, BUG-014, BUG-015, BUG-017, INFRA-001, INFRA-002, INFRA-003, INFRA-004, INFRA-006, SIMP-003, SIMP-007, DUP-001, DUP-005, API-001, DATA-002, DATA-004, PERF-002, PERF-004, CONS-001, CONS-006, ARCH-002, ARCH-008, SIMP-001, SIMP-002, BUG-006 (superseded), DOC-004 (superseded by SIMP-007), CONS-007 (superseded by ARCH-002), FE-005 (superseded by SIMP-001), DOC-003 (superseded by SIMP-001), SIMP-005 (superseded by SIMP-002), BUG-018 (closed, conflict loser to SIMP-002)
+- Done: INFRA-007, INFRA-008, BUG-003, BUG-004, BUG-005, BUG-007, BUG-009, BUG-010, BUG-012, BUG-014, BUG-015, BUG-017, INFRA-001, INFRA-002, INFRA-003, INFRA-004, INFRA-006, SIMP-003, SIMP-007, DUP-001, DUP-005, API-001, DATA-002, DATA-004, PERF-002, PERF-004, CONS-001, CONS-006, ARCH-002, ARCH-008, SIMP-001, BUG-006 (superseded), DOC-004 (superseded by SIMP-007), CONS-007 (superseded by ARCH-002), FE-005 (superseded by SIMP-001), DOC-003 (superseded by SIMP-001)
+- **SIMP-002 REVERTED** — owner decision: evaluator machinery is kept; a second evaluator is planned. SIMP-005 and BUG-018 reopen accordingly.
 - In progress / partial: —
-- **Phase 1 continues.** Next: SEC-001 (high), SIMP-004 (medium), ARCH-001 (high, L), ARCH-006 (high, S)
-- Toolchain baseline as of 2026-06-15: backend pytest 868 passed, ruff 0 errors, format 0 files, frontend 562 passed (53 files), lint 6 warnings (not errors), build succeeds
+- **Phase 1 continues.** Next: BUG-018 (high, S — wire the evaluator selection), SEC-001 (high), SIMP-004 (medium), ARCH-001 (high, L), ARCH-006 (high, S)
+- Toolchain baseline as of 2026-06-16: backend pytest 915 passed, ruff 0 errors, frontend 607 passed (57 files), lint 6 warnings (not errors), build succeeds
+
+## Firm decisions
+- **Keep evaluator machinery.** A second evaluator is concretely planned. SIMP-002 is permanently rejected. BUG-018 (wire the evaluator selection so it is actually used at runtime) becomes the correct resolution instead.
+
+---
+
+## Session 6 — 2026-06-16 — claude-opus-4-6[1m]
+
+### Scope
+**Revert SIMP-002** per owner decision. The evaluator machinery (registry, factory, API, FE selector/store/settings) is being kept because a second evaluator integration is concretely planned.
+
+### Changes
+- Restored from parent commit: `backend/app/adapters/registry.py`, `factory.py`, `api/v1/evaluators.py`, `config/evaluators.yaml`, 3 backend test files, 6 FE component/store files, `types/evaluator.ts`
+- Reverted 3 service files (`evaluation_service.py`, `arena_evaluation_service.py`, `rag_evaluation_service.py`) from direct `LiteLLMJudgeAdapter` back to `create_evaluation_adapter()`
+- Restored `evaluator_config_dir` in `core/config.py`
+- Restored evaluator lines in `.env.example`
+- Restored evaluator router import/include in `main.py`
+- Restored `EvaluatorInfo` import + evaluator API methods in `api.ts`
+- Restored `evaluator` re-export in `types/index.ts`, `evaluator_id` in `EvaluationConfig`
+- Restored 4 evaluate pages, Settings page, Settings test, AgentEvaluation test, ArenaComparison test, session.ts from parent commit
+- Reverted arena test patch target back to `create_evaluation_adapter`
+- Restored `test_yaml_reload.py` `TestEvaluatorRegistryReload` class
+- Reverted SIMP-002, SIMP-005, BUG-018 issue files back to `status: open`
+
+### Verification
+- Backend pytest: 915 passed (restored to session 4 count)
+- Frontend tests: 607 passed (restored to session 4 count)
+- Backend lint: 0 errors, format clean
+- Frontend lint: 6 warnings, build succeeds
+
+### Graph/roadmap updates
+- SIMP-002: status → **open (permanently rejected — owner decision)**
+- SIMP-005: status → open (no longer superseded)
+- BUG-018: status → open (conflict resolution reversed; BUG-018 is now the preferred path)
+- ROADMAP conflict resolution overridden: SIMP-002 vs BUG-018 → **BUG-018 wins** (implement wiring, not deletion)
+
+### Handoff / next session should start with
+1. **BUG-018** (S, high) — Wire the evaluator selection so it's actually used at runtime (now the correct resolution)
+2. **SEC-001** (M, high) — Secrets out of evaluation.config
+3. **SIMP-004** (M, medium) — Delete clients/ SDK+CLI
 
 ---
 
@@ -629,17 +670,15 @@ removing spurious function arguments — no API or behavioral changes.
 | ARCH-002 | 4 | Deleted DB provider store + migration |
 | CONS-007 | 4 | Superseded by ARCH-002 |
 | SIMP-001 | 5 | Deleted environments vertical (~900 lines + 4 dirs) |
-| SIMP-002 | 5 | Deleted evaluator machinery (~1,400 lines); direct LiteLLMJudgeAdapter |
+| ~~SIMP-002~~ | 5→6 | **REVERTED** — owner decision: keep evaluator machinery (second evaluator planned) |
 | ARCH-008 | 5 | _migrate_scored_sessions → Alembic; lifespan clean |
 | FE-005 | 5 | Superseded by SIMP-001 |
 | DOC-003 | 5 | Superseded by SIMP-001 |
-| SIMP-005 | 5 | Superseded by SIMP-002 |
-| BUG-018 | 5 | Conflict loser to SIMP-002 (closed unimplemented) |
 
-**Total: 39 issues done** (32 direct + 7 superseded/conflict-closed) out of 94.
+**Total: 35 issues done** (31 direct + 4 superseded) out of 94.
 
 ---
 
 ## Next recommended issue(s)
 
-Phase 1 structural decisions — see Session 5 handoff above.
+Phase 1 structural decisions — see Session 6 entry and status board above.
