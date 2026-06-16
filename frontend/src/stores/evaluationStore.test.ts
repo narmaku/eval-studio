@@ -8,6 +8,7 @@ vi.mock('@/services/api', () => ({
     createEvaluation: vi.fn(),
     rerunEvaluation: vi.fn(),
   },
+  getWsAuthParam: vi.fn(() => ''),
 }));
 
 import { api } from '@/services/api';

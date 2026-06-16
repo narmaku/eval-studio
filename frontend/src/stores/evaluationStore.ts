@@ -6,7 +6,7 @@ import type {
   RunningEvaluation,
   WebSocketMessage,
 } from '@/types';
-import { api } from '@/services/api';
+import { api, getWsAuthParam } from '@/services/api';
 
 const MAX_LOGS = 500;
 
@@ -54,12 +54,12 @@ interface EvaluationStore {
 function getWsUrl(evaluationId: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+  const auth = getWsAuthParam();
   if (baseUrl) {
-    // Convert http(s) base URL to ws(s)
     const wsBase = baseUrl.replace(/^http/, 'ws');
-    return `${wsBase}/ws/progress/${evaluationId}`;
+    return `${wsBase}/ws/progress/${evaluationId}${auth}`;
   }
-  return `${protocol}//${window.location.host}/ws/progress/${evaluationId}`;
+  return `${protocol}//${window.location.host}/ws/progress/${evaluationId}${auth}`;
 }
 
 export const useEvaluationStore = create<EvaluationStore>((set, get) => ({

@@ -37,16 +37,17 @@ echo "Syncing frontend dependencies..."
 cd "$SCRIPT_DIR/frontend"
 npm install --silent
 
-# Backend
-echo "Starting backend on :8000..."
+# Backend — bind localhost by default; override with HOST=0.0.0.0 for LAN access
+BIND_HOST="${HOST:-127.0.0.1}"
+echo "Starting backend on $BIND_HOST:8000..."
 cd "$SCRIPT_DIR/backend"
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
+uv run uvicorn app.main:app --reload --host "$BIND_HOST" --port 8000 &
 BACKEND_PID=$!
 
 # Frontend
-echo "Starting frontend on :5173..."
+echo "Starting frontend on $BIND_HOST:5173..."
 cd "$SCRIPT_DIR/frontend"
-npm run dev -- --host 0.0.0.0 &
+npm run dev -- --host "$BIND_HOST" &
 FRONTEND_PID=$!
 
 echo ""

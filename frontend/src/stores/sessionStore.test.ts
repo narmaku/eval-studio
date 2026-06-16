@@ -7,6 +7,7 @@ vi.mock('@/services/api', () => ({
     endSession: vi.fn(),
     scoreSession: vi.fn(),
   },
+  getWsAuthParam: vi.fn(() => ''),
 }));
 
 import { api } from '@/services/api';

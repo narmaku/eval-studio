@@ -63,9 +63,25 @@ Once the servers are running:
 2. The frontend should display the eval-studio dashboard
 3. Check the API health endpoint: [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
 
+## Security Model
+
+eval-studio is a **single-trust-domain tool**: every user or process that can
+reach the API or UI is treated as fully trusted. The application makes
+server-side HTTP requests to user-configured endpoints (LLM providers, RAG
+backends, custom agent APIs) by design — this is how it evaluates external
+systems. There is no URL allowlisting or egress filtering.
+
+**Do not expose eval-studio beyond your trusted network.** In development the
+backend binds to `127.0.0.1` by default. If you override this (e.g.
+`HOST=0.0.0.0`), ensure network-level controls restrict access to authorized
+users.
+
+For shared or multi-user deployments, enable API-key authentication
+(`AUTH_DISABLED=false` in `.env`) and issue keys to each user. See the
+[API Reference](api-reference.md) for key management details.
+
 ## Next Steps
 
 - Learn about the [Evaluation Modes](evaluation-modes.md) available
 - Explore the [Adapters](adapters.md) architecture
-- Set up [Environments](environments.md) for agent evaluation
 - Browse the [API Reference](api-reference.md)
