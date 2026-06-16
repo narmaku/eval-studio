@@ -57,8 +57,7 @@ export default function QAEvaluation() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
 
-  const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
-    useEvaluationStore();
+  const { currentEvaluation, createAndRunEvaluation, isLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults, fetchAggregateMetrics } = useResultStore();
 
@@ -210,11 +209,11 @@ export default function QAEvaluation() {
           <Button
             variant="outline"
             onClick={() => {
-              setCurrentEvaluation(null);
-              clearRunningEvaluation();
-              clearLogs();
-              setPhase('configure');
-              toast('Evaluation cancelled');
+              if (currentEvaluation?.id) {
+                api.cancelEvaluation(currentEvaluation.id).catch(() => {
+                  toast.error('Failed to cancel evaluation');
+                });
+              }
             }}
           >
             Cancel

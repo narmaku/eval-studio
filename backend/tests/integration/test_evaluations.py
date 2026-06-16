@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import select
 
 from app.models.evaluation import Evaluation
 from app.models.result import Result
@@ -80,7 +81,6 @@ async def test_delete_running_evaluation(client, db_session):
     eval_id = create_resp.json()["id"]
 
     # Set status to running directly in DB
-    from sqlalchemy import select
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
     evaluation = result.scalar_one()
@@ -174,7 +174,6 @@ async def test_run_pending_evaluation_conflict(client, db_session):
     eval_id = create_resp.json()["id"]
 
     # Set status to completed
-    from sqlalchemy import select
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
     evaluation = result.scalar_one()
@@ -183,3 +182,52 @@ async def test_run_pending_evaluation_conflict(client, db_session):
 
     run_resp = await client.post(f"/api/v1/evaluations/{eval_id}/run")
     assert run_resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_cancel_running_evaluation(client, db_session):
+    """POST /evaluations/{id}/cancel on a running evaluation returns 200 with cancelled status."""
+    create_resp = await client.post("/api/v1/evaluations", json={"name": "Cancel Test", "mode": "qa"})
+    eval_id = create_resp.json()["id"]
+
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
+    evaluation = result.scalar_one()
+    evaluation.status = "running"
+    await db_session.commit()
+
+    cancel_resp = await client.post(f"/api/v1/evaluations/{eval_id}/cancel")
+    assert cancel_resp.status_code == 200
+    data = cancel_resp.json()
+    assert data["status"] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_cancel_non_running_returns_409(client):
+    """POST /evaluations/{id}/cancel on a pending evaluation returns 409."""
+    create_resp = await client.post("/api/v1/evaluations", json={"name": "Cancel Pending", "mode": "qa"})
+    eval_id = create_resp.json()["id"]
+
+    cancel_resp = await client.post(f"/api/v1/evaluations/{eval_id}/cancel")
+    assert cancel_resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_cancel_not_found_returns_404(client):
+    """POST /evaluations/{id}/cancel on nonexistent evaluation returns 404."""
+    cancel_resp = await client.post("/api/v1/evaluations/nonexistent/cancel")
+    assert cancel_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_run_cancelled_evaluation(client, db_session):
+    """POST /evaluations/{id}/run on a cancelled evaluation is allowed."""
+    create_resp = await client.post("/api/v1/evaluations", json={"name": "Rerun Cancelled", "mode": "qa"})
+    eval_id = create_resp.json()["id"]
+
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
+    evaluation = result.scalar_one()
+    evaluation.status = "cancelled"
+    await db_session.commit()
+
+    run_resp = await client.post(f"/api/v1/evaluations/{eval_id}/run")
+    assert run_resp.status_code == 200

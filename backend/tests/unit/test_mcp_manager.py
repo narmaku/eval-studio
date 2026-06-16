@@ -218,3 +218,90 @@ async def test_cleanup_manager():
 async def test_cleanup_manager_noop_for_unknown():
     """cleanup_manager is a no-op for unknown session IDs."""
     await cleanup_manager("nonexistent-session")  # Should not raise
+
+
+@pytest.mark.asyncio
+async def test_start_servers_idempotent_reuses_client(manager):
+    """Calling start_servers twice with the same profile reuses the existing client."""
+    profile = _make_mcp_profile("server-a")
+    tools = [McpToolDefinition(name="tool_a", description="Tool A", parameters={}, server_id="server-a")]
+
+    mock_client = AsyncMock()
+    mock_client.start = AsyncMock()
+    mock_client.list_tools = AsyncMock(return_value=tools)
+    mock_client.stop = AsyncMock()
+
+    clients_created = []
+
+    def client_factory(**kwargs):
+        clients_created.append(kwargs["server_id"])
+        return mock_client
+
+    with (
+        patch("app.mcp.manager.tool_server_registry") as mock_registry,
+        patch("app.mcp.manager.McpStdioClient", side_effect=client_factory),
+    ):
+        mock_registry.get_tool_server.return_value = profile
+
+        await manager.start_servers(["server-a"])
+        await manager.start_servers(["server-a"])
+
+    assert len(clients_created) == 1
+    mock_client.start.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_start_servers_replaces_on_profile_change(manager):
+    """start_servers stops old client and creates new one when profile changes."""
+    profile_v1 = ToolServerProfile(
+        id="server-a",
+        name="Server A",
+        type="mcp_stdio",
+        command="/usr/bin/v1",
+        args=[],
+        env={},
+        enabled=True,
+    )
+    profile_v2 = ToolServerProfile(
+        id="server-a",
+        name="Server A",
+        type="mcp_stdio",
+        command="/usr/bin/v2",
+        args=[],
+        env={},
+        enabled=True,
+    )
+    tools = [McpToolDefinition(name="tool_a", description="Tool A", parameters={}, server_id="server-a")]
+
+    mock_client_v1 = AsyncMock()
+    mock_client_v1.start = AsyncMock()
+    mock_client_v1.list_tools = AsyncMock(return_value=tools)
+    mock_client_v1.stop = AsyncMock()
+
+    mock_client_v2 = AsyncMock()
+    mock_client_v2.start = AsyncMock()
+    mock_client_v2.list_tools = AsyncMock(return_value=tools)
+    mock_client_v2.stop = AsyncMock()
+
+    call_count = 0
+
+    def client_factory(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        return mock_client_v1 if call_count == 1 else mock_client_v2
+
+    profiles = [profile_v1]
+
+    with (
+        patch("app.mcp.manager.tool_server_registry") as mock_registry,
+        patch("app.mcp.manager.McpStdioClient", side_effect=client_factory),
+    ):
+        mock_registry.get_tool_server.side_effect = lambda sid: profiles[0]
+
+        await manager.start_servers(["server-a"])
+        profiles[0] = profile_v2
+        await manager.start_servers(["server-a"])
+
+    assert call_count == 2
+    mock_client_v1.stop.assert_called_once()
+    mock_client_v2.start.assert_called_once()

@@ -104,6 +104,8 @@ export const api = {
     request<void>(`/api/v1/evaluations/${id}`, { method: 'DELETE' }),
   rerunEvaluation: (id: string) =>
     request<Evaluation>(`/api/v1/evaluations/${id}/rerun`, { method: 'POST' }),
+  cancelEvaluation: (id: string) =>
+    request<Evaluation>(`/api/v1/evaluations/${id}/cancel`, { method: 'POST' }),
 
   // --- Sessions ---
   listSessions: (params?: {

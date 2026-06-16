@@ -139,9 +139,12 @@ vi.mock('@/stores/resultStore', () => ({
   })),
 }));
 
+const mockCancelEvaluation = vi.fn();
+
 vi.mock('@/services/api', () => ({
   api: {
     getArenaLeaderboard: mockGetArenaLeaderboard,
+    cancelEvaluation: (...args: unknown[]) => mockCancelEvaluation(...args),
   },
 }));
 
@@ -350,9 +353,10 @@ describe('ArenaComparison page', () => {
     });
   });
 
-  it('returns to configure phase when Cancel is clicked', async () => {
+  it('calls cancelEvaluation API when Cancel is clicked', async () => {
     const user = userEvent.setup();
     mockCreateAndRunEvaluation.mockResolvedValue({ id: 'eval-123', status: 'running' });
+    mockCancelEvaluation.mockResolvedValue({ id: 'eval-123', status: 'cancelled' });
 
     const { useEvaluationStore } = await import('@/stores/evaluationStore');
     (useEvaluationStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -361,8 +365,6 @@ describe('ArenaComparison page', () => {
       setCurrentEvaluation: mockSetCurrentEvaluation,
       isLoading: false,
       getRunningEvaluation: () => null,
-      clearRunningEvaluation: vi.fn(),
-      clearLogs: vi.fn(),
     });
 
     await renderPage();
@@ -380,8 +382,7 @@ describe('ArenaComparison page', () => {
 
     await user.click(screen.getByRole('button', { name: /cancel/i }));
 
-    // Should call setCurrentEvaluation(null) and return to configure
-    expect(mockSetCurrentEvaluation).toHaveBeenCalledWith(null);
+    expect(mockCancelEvaluation).toHaveBeenCalledWith('eval-123');
   });
 
   it('returns to configure phase when evaluation fails', async () => {
