@@ -114,6 +114,7 @@ from app.api.v1.artifacts import router as artifacts_router  # noqa: E402
 from app.api.v1.dataset_import import router as dataset_import_router  # noqa: E402
 from app.api.v1.datasets import router as datasets_router  # noqa: E402
 from app.api.v1.evaluations import router as evaluations_router  # noqa: E402
+from app.api.v1.evaluators import router as evaluators_router  # noqa: E402
 from app.api.v1.harnesses import router as harnesses_router  # noqa: E402
 from app.api.v1.health import router as health_router  # noqa: E402
 from app.api.v1.judges import router as judges_router  # noqa: E402
@@ -131,6 +132,7 @@ app.include_router(artifacts_router, prefix="/api/v1")
 app.include_router(dataset_import_router, prefix="/api/v1")
 app.include_router(datasets_router, prefix="/api/v1")
 app.include_router(evaluations_router, prefix="/api/v1")
+app.include_router(evaluators_router, prefix="/api/v1")
 app.include_router(sessions_router, prefix="/api/v1")
 app.include_router(judges_router, prefix="/api/v1")
 app.include_router(providers_router, prefix="/api/v1")

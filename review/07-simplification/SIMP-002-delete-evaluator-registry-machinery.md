@@ -6,7 +6,7 @@ severity: high
 effort: M
 confidence: high
 breaking: true
-status: done
+status: open (permanently rejected)
 depends_on: []
 blocks: [TEST-002]
 supersedes: [SIMP-005]

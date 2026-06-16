@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
 import { DatasetSelector } from '@/components/evaluation/DatasetSelector';
 import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
@@ -9,6 +10,7 @@ import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { QAResultsTable } from '@/components/evaluation/QAResultsTable';
 import { ResultDetailDrawer } from '@/components/evaluation/ResultDetailDrawer';
 import { useEvaluationStore } from '@/stores/evaluationStore';
+import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
@@ -57,6 +59,7 @@ export default function QAEvaluation() {
 
   const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
     useEvaluationStore();
+  const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults, fetchAggregateMetrics } = useResultStore();
 
   const itemMap = useMemo(() => {
@@ -66,7 +69,7 @@ export default function QAEvaluation() {
   }, [datasetItems]);
 
   const isConfigValid = Boolean(
-    selectedDatasetId && modelEndpoint && judgeConfig,
+    selectedDatasetId && modelEndpoint && judgeConfig && selectedEvaluatorId,
   );
 
   const handleStart = async () => {
@@ -79,6 +82,7 @@ export default function QAEvaluation() {
       config: {
         model_endpoint: modelEndpoint,
         judge_config: judgeConfig,
+        evaluator_id: selectedEvaluatorId ?? undefined,
         ...(Object.keys(modelParams).length > 0 && { model_params: modelParams }),
         ...(Object.keys(judgeParams).length > 0 && { judge_params: judgeParams }),
       },
@@ -156,6 +160,7 @@ export default function QAEvaluation() {
     setSelectedResult(null);
     setDrawerOpen(false);
     setDatasetItems([]);
+    useEvaluatorStore.getState().resetSelection();
   };
 
   return (
@@ -171,6 +176,7 @@ export default function QAEvaluation() {
       {/* Configure Phase */}
       {phase === 'configure' && (
         <>
+          <EvaluatorSelector mode="qa" />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-2">

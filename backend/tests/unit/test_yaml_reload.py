@@ -1,10 +1,11 @@
-"""Unit tests for YAML live-reload in ProviderRegistry."""
+"""Unit tests for YAML live-reload in ProviderRegistry and EvaluatorRegistry."""
 
 import os
 import time
 
 import yaml
 
+from app.adapters.registry import EvaluatorRegistry
 from app.core.providers import ProviderProfile, ProviderRegistry
 
 
@@ -164,3 +165,140 @@ class TestProviderRegistryReload:
         assert len(providers) == 1
         assert providers[0].id == "p2"
         assert registry._last_mtime == mtime_after_delete
+
+
+class TestEvaluatorRegistryReload:
+    """Tests for EvaluatorRegistry mtime-based auto-reload."""
+
+    def _write_evaluators_yaml(self, path, evaluators):
+        """Helper: write an evaluators YAML file."""
+        data = {"evaluators": evaluators}
+        path.write_text(yaml.dump(data))
+
+    def test_reload_detects_file_modification(self, tmp_path):
+        """After modifying the YAML file, list_evaluators returns updated data."""
+        config_file = tmp_path / "evaluators.yaml"
+        self._write_evaluators_yaml(
+            config_file,
+            [
+                {
+                    "id": "e1",
+                    "name": "Eval 1",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                }
+            ],
+        )
+
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+        assert len(registry.list_evaluators()) == 1
+
+        # Modify the file
+        time.sleep(0.05)
+        self._write_evaluators_yaml(
+            config_file,
+            [
+                {
+                    "id": "e1",
+                    "name": "Eval 1",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                },
+                {
+                    "id": "e2",
+                    "name": "Eval 2",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["rag"],
+                },
+            ],
+        )
+
+        evaluators = registry.list_evaluators()
+        assert len(evaluators) == 2
+        ids = {e.id for e in evaluators}
+        assert ids == {"e1", "e2"}
+
+    def test_no_reload_when_file_unchanged(self, tmp_path):
+        """When the file hasn't changed, the registry doesn't re-parse."""
+        config_file = tmp_path / "evaluators.yaml"
+        self._write_evaluators_yaml(
+            config_file,
+            [
+                {
+                    "id": "e1",
+                    "name": "Eval 1",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                }
+            ],
+        )
+
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+
+        # Record the internal dict reference
+        evaluators_dict_id = id(registry._items)
+        _ = registry.list_evaluators()
+        assert id(registry._items) == evaluators_dict_id
+
+    def test_file_deleted_returns_empty_no_crash(self, tmp_path):
+        """If the YAML file is deleted, list_evaluators returns empty without crashing."""
+        config_file = tmp_path / "evaluators.yaml"
+        self._write_evaluators_yaml(
+            config_file,
+            [
+                {
+                    "id": "e1",
+                    "name": "Eval 1",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                }
+            ],
+        )
+
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+        assert len(registry.list_evaluators()) == 1
+
+        # Delete the file
+        os.remove(config_file)
+
+        evaluators = registry.list_evaluators()
+        assert evaluators == []
+
+    def test_get_evaluator_triggers_reload(self, tmp_path):
+        """get_evaluator also triggers a reload when the file changes."""
+        config_file = tmp_path / "evaluators.yaml"
+        self._write_evaluators_yaml(
+            config_file,
+            [
+                {
+                    "id": "e1",
+                    "name": "Original",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                }
+            ],
+        )
+
+        registry = EvaluatorRegistry()
+        registry.load_from_yaml(config_file)
+        assert registry.get_evaluator("e1").name == "Original"
+
+        # Modify file
+        time.sleep(0.05)
+        self._write_evaluators_yaml(
+            config_file,
+            [
+                {
+                    "id": "e1",
+                    "name": "Updated",
+                    "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                    "modes": ["qa"],
+                }
+            ],
+        )
+
+        evaluator = registry.get_evaluator("e1")
+        assert evaluator.name == "Updated"

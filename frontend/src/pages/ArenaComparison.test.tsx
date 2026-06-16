@@ -3,6 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock all child components to isolate page logic
+vi.mock('@/components/evaluation/EvaluatorSelector', () => ({
+  EvaluatorSelector: ({ mode }: { mode: string }) => (
+    <div data-testid="evaluator-selector">Evaluator Selector (mode={mode})</div>
+  ),
+}));
+
 vi.mock('@/components/evaluation/ContestantSelector', () => ({
   ContestantSelector: ({
     value,
@@ -91,6 +97,7 @@ vi.mock('@/components/results', () => ({
 const mockCreateAndRunEvaluation = vi.fn();
 const mockSetCurrentEvaluation = vi.fn();
 const mockFetchResults = vi.fn();
+const mockResetSelection = vi.fn();
 const mockGetArenaLeaderboard = vi.fn();
 
 vi.mock('@/stores/evaluationStore', () => ({
@@ -107,6 +114,19 @@ vi.mock('@/stores/evaluationStore', () => ({
     {
       getState: () => ({
         currentEvaluation: { id: 'eval-123', status: 'completed', name: 'Arena Test' },
+      }),
+    },
+  ),
+}));
+
+vi.mock('@/stores/evaluatorStore', () => ({
+  useEvaluatorStore: Object.assign(
+    vi.fn(() => ({
+      selectedEvaluatorId: 'eval-1',
+    })),
+    {
+      getState: () => ({
+        resetSelection: mockResetSelection,
       }),
     },
   ),
@@ -155,9 +175,16 @@ describe('ArenaComparison page', () => {
   it('renders configure phase with all selectors', async () => {
     await renderPage();
 
+    expect(screen.getByTestId('evaluator-selector')).toBeInTheDocument();
     expect(screen.getByTestId('contestant-selector')).toBeInTheDocument();
     expect(screen.getByTestId('dataset-selector')).toBeInTheDocument();
     expect(screen.getByTestId('judge-config')).toBeInTheDocument();
+  });
+
+  it('renders evaluator selector with mode="qa"', async () => {
+    await renderPage();
+
+    expect(screen.getByText(/mode=qa/)).toBeInTheDocument();
   });
 
   it('has Start Arena button', async () => {
@@ -177,7 +204,7 @@ describe('ArenaComparison page', () => {
     const user = userEvent.setup();
     await renderPage();
 
-    // Need: >=2 contestants + dataset + judge
+    // Need: >=2 contestants + dataset + judge + evaluator (already mocked)
     // Add 2 contestants
     await user.click(screen.getByTestId('mock-add-contestant'));
     await user.click(screen.getByTestId('mock-add-contestant'));

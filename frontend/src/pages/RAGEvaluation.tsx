@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
 import { DatasetSelector } from '@/components/evaluation/DatasetSelector';
 import { RAGEndpointConfig } from '@/components/evaluation/RAGEndpointConfig';
 import type { RAGEndpointSettings } from '@/types';
@@ -11,6 +12,7 @@ import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { RAGResultsTable } from '@/components/evaluation/RAGResultsTable';
 import { RAGResultDetailDrawer } from '@/components/evaluation/RAGResultDetailDrawer';
 import { useEvaluationStore } from '@/stores/evaluationStore';
+import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
@@ -59,6 +61,7 @@ export default function RAGEvaluation() {
 
   const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
     useEvaluationStore();
+  const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults, fetchAggregateMetrics } = useResultStore();
 
   const itemMap = useMemo(() => {
@@ -79,7 +82,8 @@ export default function RAGEvaluation() {
     selectedDatasetId &&
     isRagEndpointValid &&
     judgeConfig &&
-    selectedMetrics.length > 0,
+    selectedMetrics.length > 0 &&
+    selectedEvaluatorId,
   );
 
   const handleStart = async () => {
@@ -104,6 +108,7 @@ export default function RAGEvaluation() {
           api_base: modelApiBase,
         },
         judge_config: judgeConfig,
+        evaluator_id: selectedEvaluatorId ?? undefined,
         rag_endpoint: ragEndpoint,
         rag_metrics: selectedMetrics,
         ...(Object.keys(judgeParams).length > 0 && { judge_params: judgeParams }),
@@ -182,6 +187,7 @@ export default function RAGEvaluation() {
     setSelectedResult(null);
     setDrawerOpen(false);
     setDatasetItems([]);
+    useEvaluatorStore.getState().resetSelection();
   };
 
   return (
@@ -198,6 +204,7 @@ export default function RAGEvaluation() {
       {/* Configure Phase */}
       {phase === 'configure' && (
         <>
+          <EvaluatorSelector mode="rag" />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-2">

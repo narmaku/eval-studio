@@ -49,6 +49,7 @@ export interface LLMParams {
 export interface EvaluationConfig {
   model_endpoint: ModelEndpoint;
   judge_config: JudgeReference;
+  evaluator_id?: string;
   max_turns?: number;
   scenario_id?: string;
   contestants?: ModelEndpoint[]; // arena mode

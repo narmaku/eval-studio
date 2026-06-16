@@ -71,12 +71,14 @@ export interface CreateSessionRequest {
     default_model?: string;
     api_base?: string;
     system_prompt?: string;
+    evaluator_id?: string;
     tool_server_ids?: string[];
     harness_id?: string;
   };
   judge_config?: {
     provider_id?: string;
   };
+  environment_id?: string;
   scenario_id?: string;
 }
 
