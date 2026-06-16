@@ -1,7 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useState, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as yaml from 'yaml';
@@ -26,14 +23,6 @@ import {
 
 import { useDatasetStore } from '@/stores/datasetStore';
 import type { DatasetFormat, DatasetItemCreate } from '@/types';
-
-const uploadSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255),
-  description: z.string().optional(),
-  format: z.enum(['qa_pairs', 'jsonl', 'csv']),
-});
-
-type UploadFormData = z.infer<typeof uploadSchema>;
 
 interface DatasetUploadDialogProps {
   open: boolean;
@@ -124,38 +113,29 @@ function parseCsv(text: string): DatasetItemCreate[] {
 export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogProps) {
   const { uploadDataset } = useDatasetStore();
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm<UploadFormData>({
-    resolver: zodResolver(uploadSchema),
-    defaultValues: {
-      name: '',
-      description: '',
-      format: 'qa_pairs',
-    },
-  });
-
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [format, setFormat] = useState<DatasetFormat>('qa_pairs');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [parsedItems, setParsedItems] = useState<DatasetItemCreate[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const format = watch('format');
-  const name = watch('name');
-
-  // Reset state when dialog closes
-  useEffect(() => {
-    if (!open) {
-      reset();
-      setParsedItems([]);
-      setParseError(null);
-      setIsUploading(false);
-    }
-  }, [open, reset]);
+  const handleOpenChange = useCallback(
+    (newOpen: boolean) => {
+      if (!newOpen) {
+        setName('');
+        setDescription('');
+        setFormat('qa_pairs');
+        setNameError(null);
+        setParsedItems([]);
+        setParseError(null);
+        setIsUploading(false);
+      }
+      onOpenChange(newOpen);
+    },
+    [onOpenChange],
+  );
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,17 +186,28 @@ export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogP
     [format],
   );
 
-  const onSubmit = async (data: UploadFormData) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setNameError('Name is required');
+      return;
+    }
+    if (trimmed.length > 255) {
+      setNameError('Name must be 255 characters or fewer');
+      return;
+    }
+    setNameError(null);
     setIsUploading(true);
     try {
       await uploadDataset({
-        name: data.name,
-        description: data.description || undefined,
-        format: data.format,
+        name: trimmed,
+        description: description || undefined,
+        format,
         items: parsedItems,
       });
       toast.success('Dataset uploaded successfully');
-      onOpenChange(false);
+      handleOpenChange(false);
     } catch {
       toast.error('Failed to upload dataset');
     } finally {
@@ -224,10 +215,10 @@ export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogP
     }
   };
 
-  const isSubmitDisabled = !name || parsedItems.length === 0 || isUploading;
+  const isSubmitDisabled = !name.trim() || parsedItems.length === 0 || isUploading;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Upload Dataset</DialogTitle>
@@ -236,13 +227,21 @@ export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogP
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleFormSubmit} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="dataset-name" className="text-sm font-medium">
               Name
             </label>
-            <Input id="dataset-name" placeholder="My Dataset" {...register('name')} />
-            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+            <Input
+              id="dataset-name"
+              placeholder="My Dataset"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameError(null);
+              }}
+            />
+            {nameError && <p className="text-sm text-destructive">{nameError}</p>}
           </div>
 
           <div className="space-y-2">
@@ -252,7 +251,8 @@ export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogP
             <Input
               id="dataset-description"
               placeholder="Optional description"
-              {...register('description')}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             />
           </div>
 
@@ -260,7 +260,7 @@ export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogP
             <label className="text-sm font-medium">Format</label>
             <Select
               value={format}
-              onValueChange={(value: DatasetFormat) => setValue('format', value)}
+              onValueChange={(value: DatasetFormat) => setFormat(value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select format" />
@@ -326,7 +326,7 @@ export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogP
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitDisabled}>

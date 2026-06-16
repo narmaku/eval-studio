@@ -54,7 +54,7 @@ docker-down: ## Stop development environment (docker compose)
 	docker compose down
 
 docs-serve: ## Serve documentation locally (MkDocs)
-	cd backend && uv run mkdocs serve -f ../docs/mkdocs.yml
+	cd docs && uv run mkdocs serve
 
 docs-build: ## Build documentation site
-	cd backend && uv run mkdocs build -f ../docs/mkdocs.yml
+	cd docs && uv run mkdocs build
