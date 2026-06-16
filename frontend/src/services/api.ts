@@ -36,6 +36,24 @@ import type {
 } from '@/types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+const API_KEY_STORAGE_KEY = 'eval-studio-api-key';
+
+export function getStoredApiKey(): string | null {
+  return localStorage.getItem(API_KEY_STORAGE_KEY);
+}
+
+export function setStoredApiKey(key: string | null): void {
+  if (key) {
+    localStorage.setItem(API_KEY_STORAGE_KEY, key);
+  } else {
+    localStorage.removeItem(API_KEY_STORAGE_KEY);
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const key = getStoredApiKey();
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
 
 class ApiClientError extends Error {
   status: number;
@@ -55,6 +73,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(),
       ...options?.headers,
     },
   });
@@ -365,6 +384,11 @@ export const api = {
       method: 'POST',
     }),
 };
+
+export function getWsAuthParam(): string {
+  const key = getStoredApiKey();
+  return key ? `?token=${encodeURIComponent(key)}` : '';
+}
 
 export { ApiClientError };
 export type { ApiError };

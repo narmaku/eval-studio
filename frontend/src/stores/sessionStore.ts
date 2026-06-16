@@ -14,21 +14,21 @@ import type {
   WsSessionEndedMessage,
   WsErrorMessage,
 } from '@/types';
-import { api } from '@/services/api';
+import { api, getWsAuthParam } from '@/services/api';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { generateId } from '@/lib/utils';
 
 function buildWsUrl(sessionId: string): string {
   const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  const auth = getWsAuthParam();
 
   if (apiBase) {
     const wsBase = apiBase.replace(/^http/, 'ws');
-    return `${wsBase}/ws/session/${sessionId}`;
+    return `${wsBase}/ws/session/${sessionId}${auth}`;
   }
 
-  // Derive from current window location
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/ws/session/${sessionId}`;
+  return `${protocol}//${window.location.host}/ws/session/${sessionId}${auth}`;
 }
 
 interface SessionStore {

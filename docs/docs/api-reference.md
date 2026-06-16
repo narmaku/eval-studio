@@ -13,8 +13,11 @@ When the backend is running, interactive API documentation is available at:
 
 ## Authentication
 
-eval-studio uses **API key authentication** via Bearer tokens. All endpoints
-except `/api/v1/health` require a valid API key.
+eval-studio supports **API key authentication** via Bearer tokens.
+**Authentication is disabled by default** (`AUTH_DISABLED=true`) — the
+application is designed as a single-trust-domain local tool (see
+[Security Model](getting-started.md#security-model)). When enabled, all
+REST and WebSocket endpoints except `/api/v1/health` require a valid API key.
 
 ### Creating your first API key (bootstrap mode)
 

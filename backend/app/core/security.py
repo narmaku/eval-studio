@@ -4,15 +4,19 @@ import re
 import secrets
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 
-from fastapi import Depends, Request
+import structlog
+from fastapi import Depends, Request, WebSocket
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import async_session_factory, get_db
 from app.core.exceptions import UnauthorizedException
 from app.models.api_key import ApiKey
+
+logger = structlog.get_logger()
 
 API_KEY_PREFIX = "esk_"
 
@@ -49,11 +53,11 @@ def extract_bearer_token(request: Request) -> str | None:
     return parts[1]
 
 
+LAST_USED_THROTTLE_SECONDS = 60
+
+
 async def verify_api_key(token: str, db: AsyncSession) -> ApiKey:
     """Look up and validate an API key token against the database.
-
-    Uses timing-safe comparison via ``hmac.compare_digest`` to prevent
-    side-channel attacks on the hash lookup.
 
     Args:
         token: The raw bearer token string.
@@ -66,14 +70,13 @@ async def verify_api_key(token: str, db: AsyncSession) -> ApiKey:
         UnauthorizedException: If no matching active key is found.
     """
     token_hash = hash_api_key(token)
-    result = await db.execute(select(ApiKey).where(ApiKey.is_active.is_(True)))
-    active_keys = result.scalars().all()
+    result = await db.execute(select(ApiKey).where(ApiKey.key_hash == token_hash, ApiKey.is_active.is_(True)))
+    api_key = result.scalar_one_or_none()
 
-    for api_key in active_keys:
-        if hmac.compare_digest(api_key.key_hash, token_hash):
-            return api_key
+    if api_key is None or not hmac.compare_digest(api_key.key_hash, token_hash):
+        raise UnauthorizedException()
 
-    raise UnauthorizedException()
+    return api_key
 
 
 async def require_auth(
@@ -101,9 +104,73 @@ async def require_auth(
 
     api_key = await verify_api_key(token, db)
 
-    api_key.last_used_at = datetime.now(UTC)
-    await db.commit()
+    now = datetime.now(UTC)
+    last = api_key.last_used_at
+    if last is not None and last.tzinfo is None:
+        last = last.replace(tzinfo=UTC)
+    if last is None or (now - last).total_seconds() > LAST_USED_THROTTLE_SECONDS:
+        api_key.last_used_at = now
+        await db.commit()
     return api_key
+
+
+WS_CLOSE_AUTH_FAILED = 4401
+WS_CLOSE_ORIGIN_REJECTED = 4403
+
+
+async def require_ws_auth(websocket: WebSocket) -> bool:
+    """Authenticate a WebSocket connection. Returns True if accepted, False if closed.
+
+    Reads the token from the Authorization header or a ``?token=`` query param.
+    Checks the Origin header against ``settings.cors_origins_list`` when present.
+    Must be called **after** ``websocket.accept()``.
+    """
+    if settings.auth_disabled:
+        return await _check_ws_origin(websocket)
+
+    # Extract token: Authorization header first, then ?token= query param
+    token = None
+    auth_header = websocket.headers.get("authorization")
+    if auth_header:
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+
+    if not token:
+        token = websocket.query_params.get("token")
+
+    if not token:
+        await websocket.close(code=WS_CLOSE_AUTH_FAILED, reason="Authentication required")
+        return False
+
+    try:
+        async with async_session_factory() as db:
+            await verify_api_key(token, db)
+    except UnauthorizedException:
+        await websocket.close(code=WS_CLOSE_AUTH_FAILED, reason="Invalid API key")
+        return False
+
+    return await _check_ws_origin(websocket)
+
+
+async def _check_ws_origin(websocket: WebSocket) -> bool:
+    """Verify the Origin header against allowed CORS origins. Returns True if OK."""
+    origin = websocket.headers.get("origin")
+    if not origin:
+        return True
+
+    allowed = settings.cors_origins_list
+    if not allowed:
+        return True
+
+    origin_host = urlparse(origin).netloc
+    for allowed_origin in allowed:
+        if urlparse(allowed_origin).netloc == origin_host:
+            return True
+
+    logger.warning("ws.origin_rejected", origin=origin, allowed=allowed)
+    await websocket.close(code=WS_CLOSE_ORIGIN_REJECTED, reason="Origin not allowed")
+    return False
 
 
 _SECRET_KEY_PATTERN = re.compile(r"(auth|token|key|secret|password|connection_string)", re.IGNORECASE)

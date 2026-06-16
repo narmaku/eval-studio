@@ -121,6 +121,7 @@ class CustomHttpxAdapter(AgentBackendAdapter):
             has_template=bool(self.request_body_template),
         )
 
+        # Trust model: user-supplied URL; see docs/getting-started.md#security-model
         async with httpx.AsyncClient(**client_kwargs) as client:
             response = await client.post(self.endpoint_url, json=request_body)
             response.raise_for_status()

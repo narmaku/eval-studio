@@ -4,6 +4,7 @@ Retrieves context chunks directly from a PostgreSQL database with pgvector,
 generates embeddings via LiteLLM, and produces an answer using an LLM.
 """
 
+import re
 from typing import Any
 
 import structlog
@@ -12,10 +13,19 @@ from app.rag_backends.base import RAGBackendAdapter, RAGResponse
 
 logger = structlog.get_logger()
 
+_SQL_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
 try:
     import asyncpg
 except ImportError:
     asyncpg = None  # type: ignore[assignment]
+
+
+def _validate_identifier(label: str, value: str) -> None:
+    parts = value.split(".", 1)
+    for part in parts:
+        if not _SQL_IDENT.match(part):
+            raise ValueError(f"{label} must be a simple SQL identifier (or schema.name), got: {value!r}")
 
 
 class PgVectorRAGAdapter(RAGBackendAdapter):
@@ -38,11 +48,15 @@ class PgVectorRAGAdapter(RAGBackendAdapter):
                 "asyncpg is required for PgVectorRAGAdapter. Install it with: uv add asyncpg  or  pip install asyncpg"
             )
 
+        _validate_identifier("table_name", table_name)
+        _validate_identifier("embedding_column", embedding_column)
+        _validate_identifier("content_column", content_column)
+
         self.connection_string = connection_string
         self.table_name = table_name
         self.embedding_column = embedding_column
         self.content_column = content_column
-        self.top_k = top_k
+        self.top_k = int(top_k)
         self.generator_model = generator_model
         self.generator_api_key = generator_api_key
         self.generator_api_base = generator_api_base
@@ -64,10 +78,10 @@ class PgVectorRAGAdapter(RAGBackendAdapter):
         conn = await asyncpg.connect(self.connection_string)
         try:
             query = (
-                f"SELECT {self.content_column}, "
-                f"1 - ({self.embedding_column} <=> $1::vector) as relevance "
-                f"FROM {self.table_name} "
-                f"ORDER BY {self.embedding_column} <=> $1::vector "
+                f'SELECT "{self.content_column}", '
+                f'1 - ("{self.embedding_column}" <=> $1::vector) as relevance '
+                f'FROM "{self.table_name}" '
+                f'ORDER BY "{self.embedding_column}" <=> $1::vector '
                 f"LIMIT {self.top_k}"
             )
             rows = await conn.fetch(query, embedding_str)

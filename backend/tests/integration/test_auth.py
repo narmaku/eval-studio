@@ -1,5 +1,8 @@
 """Integration tests for API key authentication middleware."""
 
+from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
 
@@ -141,3 +144,48 @@ async def test_auth_missing_bearer_prefix(client: AsyncClient):
         headers={"Authorization": "Token esk_something"},
     )
     assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# PERF-003: last_used_at throttling
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.usefixtures("_auth_enabled")
+async def test_last_used_at_throttled(client: AsyncClient):
+    """Two requests within LAST_USED_THROTTLE_SECONDS produce only one DB write."""
+    raw_key = await _create_key(client)
+    headers = {"Authorization": f"Bearer {raw_key}"}
+
+    # First request: sets last_used_at
+    await client.get("/api/v1/datasets", headers=headers)
+    list_resp = await client.get("/api/v1/api-keys", headers=headers)
+    first_ts = list_resp.json()["items"][0]["last_used_at"]
+    assert first_ts is not None
+
+    # Second request within the throttle window: last_used_at should NOT change
+    await client.get("/api/v1/datasets", headers=headers)
+    list_resp2 = await client.get("/api/v1/api-keys", headers=headers)
+    second_ts = list_resp2.json()["items"][0]["last_used_at"]
+    assert second_ts == first_ts
+
+
+@pytest.mark.usefixtures("_auth_enabled")
+async def test_last_used_at_updates_after_throttle_window(client: AsyncClient):
+    """After the throttle window, last_used_at is updated."""
+    raw_key = await _create_key(client)
+    headers = {"Authorization": f"Bearer {raw_key}"}
+
+    # First request
+    await client.get("/api/v1/datasets", headers=headers)
+
+    # Simulate time passing beyond the throttle window
+    future = datetime.now(UTC) + timedelta(seconds=120)
+    with patch("app.core.security.datetime") as mock_dt:
+        mock_dt.now.return_value = future
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        await client.get("/api/v1/datasets", headers=headers)
+
+    list_resp = await client.get("/api/v1/api-keys", headers=headers)
+    ts = list_resp.json()["items"][0]["last_used_at"]
+    assert ts is not None

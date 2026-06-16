@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from app.core.database import async_session_factory
 from app.core.exceptions import sanitize_error_for_client
+from app.core.security import require_ws_auth
 from app.models.session import Session
 from app.schemas.ws_chat import ConnectedMsg, ErrorData, ErrorMsg, SessionEndedMsg
 from app.services.agent_chat_service import end_session, process_user_message
@@ -60,6 +61,9 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
         session = result.scalar_one_or_none()
 
     await websocket.accept()
+
+    if not await require_ws_auth(websocket):
+        return
 
     if not session:
         await websocket.close(code=4004, reason=f"Session '{session_id}' not found")

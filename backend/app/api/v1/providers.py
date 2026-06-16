@@ -132,6 +132,7 @@ async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
 
         elif payload.api_base:
             # No model but has api_base — try /v1/models listing (local servers)
+            # Trust model: user-supplied URL; see docs/getting-started.md#security-model
             base = payload.api_base.rstrip("/")
             if base.endswith("/v1"):
                 base = base[:-3]
@@ -172,6 +173,7 @@ async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
             return TestConnectionResponse(success=False, message=f"Invalid request body template: {exc}")
 
         try:
+            # Trust model: user-supplied URL; see docs/getting-started.md#security-model
             async with httpx.AsyncClient(**client_kwargs) as client:
                 resp = await client.post(payload.endpoint_url, json=body, headers=headers)
                 resp.raise_for_status()
@@ -260,6 +262,7 @@ async def list_provider_models(provider_id: str) -> list[ProviderModelResponse]:
     if not api_base:
         return [ProviderModelResponse(id=default_model_name, owned_by="configured")]
 
+    # Trust model: user-supplied URL; see docs/getting-started.md#security-model
     base = api_base.rstrip("/")
     if base.endswith("/v1"):
         base = base[:-3]

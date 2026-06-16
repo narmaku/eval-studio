@@ -49,6 +49,7 @@ class HttpRAGAdapter(RAGBackendAdapter):
         if self.auth_header:
             headers.update(self.auth_header)
 
+        # Trust model: user-supplied URL; see docs/getting-started.md#security-model
         request_body: dict[str, Any] = {self.query_field: question}
         response = await client.post(self.url, json=request_body, headers=headers)
         response.raise_for_status()

@@ -33,6 +33,14 @@ Whether you're iterating on a chatbot's response quality, validating a RAG pipel
 - **LLM Access**: LiteLLM proxy (100+ providers)
 - **Evaluation Design**: rubric-kit for AI-assisted rubric generation and refinement
 
+## Security Model
+
+eval-studio is a **single-trust-domain tool** — everyone who can reach the
+API/UI is fully trusted. The backend makes server-side HTTP requests to
+user-configured endpoints by design; do not expose it beyond your trusted
+network. See [Getting Started — Security Model](docs/docs/getting-started.md)
+for details and authentication options.
+
 ## Development
 
 ```bash
