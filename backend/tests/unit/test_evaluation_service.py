@@ -235,7 +235,7 @@ async def test_run_qa_evaluation_error_result_sanitized(db_session: AsyncSession
 
 @pytest.mark.asyncio
 async def test_run_qa_evaluation_evaluator_id_forwarded(db_session: AsyncSession, evaluation_with_dataset):
-    """BUG-018: evaluator_id in config is forwarded to create_evaluation_adapter."""
+    """BUG-018: evaluator_id in config is forwarded to create_adapter_from_config."""
     evaluation, _dataset, _items = evaluation_with_dataset
     evaluation.config = {
         **evaluation.config,
@@ -248,20 +248,15 @@ async def test_run_qa_evaluation_evaluator_id_forwarded(db_session: AsyncSession
 
     with (
         patch("app.services.evaluation_service.call_model", mock_call_model),
-        patch("app.services.evaluation_service.create_evaluation_adapter", wraps=None) as mock_factory,
+        patch("app.services.evaluation_service.create_adapter_from_config", wraps=None) as mock_factory,
         patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
     ):
         mock_factory.return_value.evaluate_qa = mock_evaluate_qa
         await run_qa_evaluation(evaluation.id, db_session)
 
     mock_factory.assert_called_once()
-    assert mock_factory.call_args.kwargs.get("adapter_type") is None or True
-    # The first positional arg (or adapter_type kwarg) should be "litellm-judge"
-    call_args = mock_factory.call_args
-    if call_args.args:
-        assert call_args.args[0] == "litellm-judge"
-    else:
-        assert call_args.kwargs.get("adapter_type") == "litellm-judge"
+    config_arg = mock_factory.call_args.args[0]
+    assert config_arg["evaluator_id"] == "litellm-judge"
 
 
 @pytest.mark.asyncio
