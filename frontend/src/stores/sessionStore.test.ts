@@ -298,6 +298,68 @@ describe('sessionStore', () => {
     });
   });
 
+  describe('endSession', () => {
+    it('uses REST only — no WS end_session frame is sent (FE-003)', async () => {
+      const endedSession = {
+        id: 'sess-1',
+        evaluation_id: 'eval-1',
+        mode: 'live' as const,
+        status: 'ended' as const,
+        agent_config: null,
+        judge_config_snapshot: null,
+        transcript: [],
+        name: null,
+        scores: null,
+        error: null,
+        started_at: '2026-01-01T00:00:00Z',
+        ended_at: '2026-01-01T00:10:00Z',
+        created_at: '2026-01-01T00:00:00Z',
+      };
+
+      mockedApi.endSession.mockResolvedValue(endedSession);
+
+      useSessionStore.setState({
+        currentSession: {
+          id: 'sess-1',
+          evaluation_id: 'eval-1',
+          mode: 'live',
+          status: 'active',
+          agent_config: null,
+          judge_config_snapshot: null,
+          transcript: [],
+          name: null,
+          scores: null,
+          error: null,
+          started_at: '2026-01-01T00:00:00Z',
+          ended_at: null,
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      });
+
+      // Connect WS
+      useSessionStore.getState().connectWebSocket('sess-1');
+      const ws = getWs();
+      ws.simulateOpen();
+
+      // End the session
+      await useSessionStore.getState().endSession();
+
+      // REST should have been called
+      expect(mockedApi.endSession).toHaveBeenCalledWith('sess-1');
+
+      // WS should NOT have been sent an end_session frame
+      const wsSent = ws.sent.map((s) => JSON.parse(s));
+      const endFrames = wsSent.filter((m: Record<string, unknown>) => m.type === 'end_session');
+      expect(endFrames).toHaveLength(0);
+
+      // Session should be updated
+      expect(useSessionStore.getState().currentSession?.status).toBe('ended');
+
+      // WS should be disconnected
+      expect(useSessionStore.getState().isConnected).toBe(false);
+    });
+  });
+
   describe('resetSession', () => {
     it('clears all state for new session', () => {
       useSessionStore.setState({
@@ -466,31 +528,23 @@ describe('sessionStore', () => {
       expect(useSessionStore.getState().toolCalls[0]).toEqual({ ...toolCall, status: 'pending' });
     });
 
-    it('handles score by appending to scores', () => {
+    it('handles connected by setting isConnected', () => {
       useSessionStore.getState().connectWebSocket('sess-1');
       const ws = getWs();
       ws.simulateOpen();
 
-      const score = {
-        turn_number: null,
-        dimensions: { accuracy: 0.9 },
-        overall: 0.9,
-        judge_reasoning: 'Excellent response',
-      };
-
       ws.simulateMessage({
-        type: 'score',
-        data: score,
+        type: 'connected',
+        data: { session_id: 'sess-1' },
         timestamp: '2026-01-01T00:00:01Z',
-        sender: 'judge',
+        sender: 'system',
         session_id: 'sess-1',
       });
 
-      expect(useSessionStore.getState().scores).toHaveLength(1);
-      expect(useSessionStore.getState().scores[0]).toEqual(score);
+      expect(useSessionStore.getState().isConnected).toBe(true);
     });
 
-    it('handles status update', () => {
+    it('handles session_ended by updating session status', () => {
       useSessionStore.setState({
         currentSession: {
           id: 'sess-1',
@@ -508,20 +562,23 @@ describe('sessionStore', () => {
           ended_at: null,
           created_at: '2026-01-01T00:00:00Z',
         },
+        isProcessing: true,
       });
       useSessionStore.getState().connectWebSocket('sess-1');
       const ws = getWs();
       ws.simulateOpen();
 
       ws.simulateMessage({
-        type: 'status',
-        data: { status: 'completed' },
-        timestamp: '2026-01-01T00:00:01Z',
+        type: 'session_ended',
+        data: { status: 'ended', ended_at: '2026-01-01T00:10:00Z' },
+        timestamp: '2026-01-01T00:10:00Z',
         sender: 'system',
         session_id: 'sess-1',
       });
 
-      expect(useSessionStore.getState().currentSession?.status).toBe('completed');
+      expect(useSessionStore.getState().currentSession?.status).toBe('ended');
+      expect(useSessionStore.getState().currentSession?.ended_at).toBe('2026-01-01T00:10:00Z');
+      expect(useSessionStore.getState().isProcessing).toBe(false);
     });
 
     it('handles error message', () => {

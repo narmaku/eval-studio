@@ -11,8 +11,7 @@ import type {
   WsToolCallMessage,
   WsToolExecutingMessage,
   WsToolResultMessage,
-  WsScoreMessage,
-  WsStatusMessage,
+  WsSessionEndedMessage,
   WsErrorMessage,
 } from '@/types';
 import { api } from '@/services/api';
@@ -104,16 +103,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   endSession: async () => {
-    const { currentSession } = get();
+    const { currentSession, disconnectWebSocket } = get();
     if (!currentSession) return;
 
     set({ error: null });
     try {
-      if (wsRef && wsRef.readyState === WebSocket.OPEN) {
-        wsRef.send(JSON.stringify({ type: 'end_session' }));
-      }
       const updatedSession = await api.endSession(currentSession.id);
       set({ currentSession: updatedSession });
+      disconnectWebSocket();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to end session';
       set({ error: message });
@@ -326,20 +323,22 @@ function handleWsMessage(
       break;
     }
 
-    case 'score': {
-      const scoreMsg = envelope as unknown as WsScoreMessage;
-      set((state) => ({
-        scores: [...state.scores, scoreMsg.data],
-      }));
+    case 'connected': {
+      set({ isConnected: true });
       break;
     }
 
-    case 'status': {
-      const statusMsg = envelope as unknown as WsStatusMessage;
+    case 'session_ended': {
+      const endedMsg = envelope as unknown as WsSessionEndedMessage;
       const session = get().currentSession;
       if (session) {
         set({
-          currentSession: { ...session, status: statusMsg.data.status },
+          currentSession: {
+            ...session,
+            status: 'ended',
+            ended_at: endedMsg.data.ended_at,
+          },
+          isProcessing: false,
         });
       }
       break;

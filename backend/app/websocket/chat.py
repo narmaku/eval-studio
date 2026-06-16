@@ -19,9 +19,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
 from app.core.database import async_session_factory
-from app.core.database import iso_now as _iso_now
 from app.core.exceptions import sanitize_error_for_client
 from app.models.session import Session
+from app.schemas.ws_chat import ConnectedMsg, ErrorData, ErrorMsg, SessionEndedMsg
 from app.services.agent_chat_service import end_session, process_user_message
 
 logger = structlog.get_logger()
@@ -36,13 +36,11 @@ _processing: set[str] = set()
 async def _send_error(ws: WebSocket, session_id: str, message: str) -> None:
     """Send a typed error envelope to the WebSocket client."""
     await ws.send_json(
-        {
-            "type": "error",
-            "data": {"message": message},
-            "timestamp": _iso_now(),
-            "sender": "system",
-            "session_id": session_id,
-        }
+        ErrorMsg(
+            data=ErrorData(message=message),
+            sender="system",
+            session_id=session_id,
+        ).model_dump()
     )
 
 
@@ -77,13 +75,11 @@ async def session_websocket(websocket: WebSocket, session_id: str) -> None:
 
     try:
         await websocket.send_json(
-            {
-                "type": "connected",
-                "data": {"session_id": session_id},
-                "timestamp": _iso_now(),
-                "sender": "system",
-                "session_id": session_id,
-            }
+            ConnectedMsg(
+                data={"session_id": session_id},
+                sender="system",
+                session_id=session_id,
+            ).model_dump()
         )
 
         # 3. Main message loop
@@ -167,13 +163,11 @@ async def _handle_end_session(ws: WebSocket, session_id: str) -> None:
             result = await end_session(session_id, db)
 
         await ws.send_json(
-            {
-                "type": "session_ended",
-                "data": result,
-                "timestamp": _iso_now(),
-                "sender": "system",
-                "session_id": session_id,
-            }
+            SessionEndedMsg(
+                data=result,
+                sender="system",
+                session_id=session_id,
+            ).model_dump()
         )
 
         await ws.close(code=1000, reason="Session ended")
