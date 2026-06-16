@@ -9,7 +9,7 @@ from app.core.providers import ProviderProfile, provider_registry
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation
 from app.models.result import Result
-from app.services.evaluation_service import run_qa_evaluation
+from app.services.eval_runner import run_evaluation
 
 
 @pytest.fixture(autouse=True)
@@ -64,7 +64,7 @@ async def evaluation_with_dataset(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_happy_path(db_session: AsyncSession, evaluation_with_dataset):
+async def test_run_evaluation_happy_path(db_session: AsyncSession, evaluation_with_dataset):
     """Run a full evaluation with mocked LLM calls, verify results created."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
@@ -72,11 +72,11 @@ async def test_run_qa_evaluation_happy_path(db_session: AsyncSession, evaluation
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good answer"))
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_call_model),
+        patch("app.services.eval_runner.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Verify status
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
@@ -95,7 +95,7 @@ async def test_run_qa_evaluation_happy_path(db_session: AsyncSession, evaluation
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_no_dataset(db_session: AsyncSession):
+async def test_run_evaluation_no_dataset(db_session: AsyncSession):
     """Evaluation without dataset_id should fail with error message."""
     evaluation = Evaluation(
         name="no dataset eval",
@@ -107,7 +107,7 @@ async def test_run_qa_evaluation_no_dataset(db_session: AsyncSession):
     db_session.add(evaluation)
     await db_session.commit()
 
-    await run_qa_evaluation(evaluation.id, db_session)
+    await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -116,7 +116,7 @@ async def test_run_qa_evaluation_no_dataset(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_missing_dataset(db_session: AsyncSession):
+async def test_run_evaluation_missing_dataset(db_session: AsyncSession):
     """Evaluation with nonexistent dataset_id should fail with error message."""
     evaluation = Evaluation(
         name="missing dataset eval",
@@ -128,7 +128,7 @@ async def test_run_qa_evaluation_missing_dataset(db_session: AsyncSession):
     db_session.add(evaluation)
     await db_session.commit()
 
-    await run_qa_evaluation(evaluation.id, db_session)
+    await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -137,7 +137,7 @@ async def test_run_qa_evaluation_missing_dataset(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_default_judge_config(db_session: AsyncSession, evaluation_with_dataset):
+async def test_run_evaluation_default_judge_config(db_session: AsyncSession, evaluation_with_dataset):
     """Evaluation without judge_config_id uses default JudgeConfigParams."""
     evaluation, _dataset, _items = evaluation_with_dataset
     evaluation.judge_config_id = None
@@ -147,11 +147,11 @@ async def test_run_qa_evaluation_default_judge_config(db_session: AsyncSession, 
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good answer"))
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_call_model),
+        patch("app.services.eval_runner.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -159,7 +159,7 @@ async def test_run_qa_evaluation_default_judge_config(db_session: AsyncSession, 
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_item_error_partial_results(db_session: AsyncSession, evaluation_with_dataset):
+async def test_run_evaluation_item_error_partial_results(db_session: AsyncSession, evaluation_with_dataset):
     """One item fails, other succeeds -- status should be completed (partial)."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
@@ -175,11 +175,11 @@ async def test_run_qa_evaluation_item_error_partial_results(db_session: AsyncSes
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good answer"))
 
     with (
-        patch("app.services.evaluation_service.call_model", side_effect=mock_call),
+        patch("app.services.eval_runner.call_model", side_effect=mock_call),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -192,7 +192,7 @@ async def test_run_qa_evaluation_item_error_partial_results(db_session: AsyncSes
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_all_items_fail(db_session: AsyncSession, evaluation_with_dataset):
+async def test_run_evaluation_all_items_fail(db_session: AsyncSession, evaluation_with_dataset):
     """All items fail -- status should be failed with error message."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
@@ -200,10 +200,10 @@ async def test_run_qa_evaluation_all_items_fail(db_session: AsyncSession, evalua
         raise RuntimeError("API Error for all")
 
     with (
-        patch("app.services.evaluation_service.call_model", side_effect=mock_call_fail),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.call_model", side_effect=mock_call_fail),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -212,7 +212,7 @@ async def test_run_qa_evaluation_all_items_fail(db_session: AsyncSession, evalua
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_error_result_sanitized(db_session: AsyncSession, evaluation_with_dataset):
+async def test_run_evaluation_error_result_sanitized(db_session: AsyncSession, evaluation_with_dataset):
     """BUG-010: Error results store sanitized text, not raw exception details."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
@@ -220,10 +220,10 @@ async def test_run_qa_evaluation_error_result_sanitized(db_session: AsyncSession
         raise RuntimeError("secret-path /home/user/.ssh/id_rsa connection failed")
 
     with (
-        patch("app.services.evaluation_service.call_model", side_effect=mock_call_fail),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.call_model", side_effect=mock_call_fail),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     results_result = await db_session.execute(select(Result).where(Result.evaluation_id == evaluation.id))
     results = results_result.scalars().all()
@@ -234,7 +234,7 @@ async def test_run_qa_evaluation_error_result_sanitized(db_session: AsyncSession
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_evaluator_id_forwarded(db_session: AsyncSession, evaluation_with_dataset):
+async def test_run_evaluation_evaluator_id_forwarded(db_session: AsyncSession, evaluation_with_dataset):
     """BUG-018: evaluator_id in config is forwarded to create_adapter_from_config."""
     evaluation, _dataset, _items = evaluation_with_dataset
     evaluation.config = {
@@ -247,12 +247,12 @@ async def test_run_qa_evaluation_evaluator_id_forwarded(db_session: AsyncSession
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.9, passed=True, reasoning="ok"))
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_call_model),
-        patch("app.services.evaluation_service.create_adapter_from_config", wraps=None) as mock_factory,
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.call_model", mock_call_model),
+        patch("app.services.eval_runner.create_adapter_from_config", wraps=None) as mock_factory,
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
         mock_factory.return_value.evaluate_qa = mock_evaluate_qa
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     mock_factory.assert_called_once()
     config_arg = mock_factory.call_args.args[0]
@@ -260,7 +260,7 @@ async def test_run_qa_evaluation_evaluator_id_forwarded(db_session: AsyncSession
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_unknown_evaluator_fails(db_session: AsyncSession, evaluation_with_dataset):
+async def test_run_evaluation_unknown_evaluator_fails(db_session: AsyncSession, evaluation_with_dataset):
     """BUG-018: unknown evaluator_id fails the evaluation early."""
     evaluation, _dataset, _items = evaluation_with_dataset
     evaluation.config = {
@@ -269,8 +269,8 @@ async def test_run_qa_evaluation_unknown_evaluator_fails(db_session: AsyncSessio
     }
     await db_session.commit()
 
-    with patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock):
-        await run_qa_evaluation(evaluation.id, db_session)
+    with patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock):
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -279,13 +279,13 @@ async def test_run_qa_evaluation_unknown_evaluator_fails(db_session: AsyncSessio
 
 
 @pytest.mark.asyncio
-async def test_run_qa_evaluation_already_running(db_session: AsyncSession, evaluation_with_dataset):
+async def test_run_evaluation_already_running(db_session: AsyncSession, evaluation_with_dataset):
     """If evaluation is already running, it should return early without changing status."""
     evaluation, _dataset, _items = evaluation_with_dataset
     evaluation.status = "running"
     await db_session.commit()
 
-    await run_qa_evaluation(evaluation.id, db_session)
+    await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()

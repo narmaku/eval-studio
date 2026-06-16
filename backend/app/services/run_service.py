@@ -16,9 +16,7 @@ from app.models.result import Result
 from app.schemas.evaluation import EvaluationMode, EvaluationStatus
 from app.schemas.result import ResultResponse
 from app.schemas.run import RunResponse
-from app.services.arena_evaluation_service import run_arena_evaluation
-from app.services.evaluation_service import run_qa_evaluation
-from app.services.rag_evaluation_service import run_rag_evaluation
+from app.services.eval_runner import run_evaluation
 
 logger = structlog.get_logger()
 
@@ -40,18 +38,7 @@ async def execute_evaluation_sync(
         TimeoutError: If the evaluation exceeds the timeout.
     """
     async with async_session_factory() as session:
-        # Fetch evaluation to determine mode
-        result = await session.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
-        evaluation = result.scalar_one()
-
-        if evaluation.mode == "arena":
-            runner = run_arena_evaluation(evaluation_id, session)
-        elif evaluation.mode == "rag":
-            runner = run_rag_evaluation(evaluation_id, session)
-        else:
-            runner = run_qa_evaluation(evaluation_id, session)
-
-        await asyncio.wait_for(runner, timeout=timeout)
+        await asyncio.wait_for(run_evaluation(evaluation_id, session), timeout=timeout)
 
 
 async def compute_run_results(

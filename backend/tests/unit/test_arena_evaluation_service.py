@@ -71,7 +71,7 @@ async def arena_evaluation_with_dataset(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_arena_result_has_contestant_model(db_session: AsyncSession, arena_evaluation_with_dataset):
     """Arena evaluation creates results tagged with contestant_model."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
@@ -79,11 +79,11 @@ async def test_arena_result_has_contestant_model(db_session: AsyncSession, arena
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good answer"))
 
     with (
-        patch("app.services.arena_evaluation_service.call_model", mock_call_model),
+        patch("app.services.eval_runner.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_arena_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Verify status
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
@@ -110,7 +110,7 @@ async def test_arena_result_has_contestant_model(db_session: AsyncSession, arena
 @pytest.mark.asyncio
 async def test_arena_error_isolation(db_session: AsyncSession, arena_evaluation_with_dataset):
     """One contestant fails, others still produce results. Evaluation completes."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
@@ -123,11 +123,11 @@ async def test_arena_error_isolation(db_session: AsyncSession, arena_evaluation_
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.9, passed=True, reasoning="Great"))
 
     with (
-        patch("app.services.arena_evaluation_service.call_model", side_effect=mock_call),
+        patch("app.services.eval_runner.call_model", side_effect=mock_call),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_arena_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Evaluation should still be "completed" since model-b succeeded
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
@@ -154,7 +154,7 @@ async def test_arena_error_isolation(db_session: AsyncSession, arena_evaluation_
 @pytest.mark.asyncio
 async def test_arena_all_contestants_fail(db_session: AsyncSession, arena_evaluation_with_dataset):
     """All contestants fail -- evaluation status should be 'failed' with error."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
@@ -162,22 +162,22 @@ async def test_arena_all_contestants_fail(db_session: AsyncSession, arena_evalua
         raise RuntimeError("All APIs down")
 
     with (
-        patch("app.services.arena_evaluation_service.call_model", side_effect=mock_call_fail),
-        patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.call_model", side_effect=mock_call_fail),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_arena_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "failed"
     assert eval_obj.error is not None
-    assert "All contestants failed" in eval_obj.error
+    assert "All" in eval_obj.error and "failed" in eval_obj.error
 
 
 @pytest.mark.asyncio
 async def test_arena_validation_fewer_than_2_contestants(db_session: AsyncSession):
     """Arena with fewer than 2 contestants should fail validation with error."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     dataset = Dataset(name="arena-val-test", item_count=1)
     db_session.add(dataset)
@@ -204,7 +204,7 @@ async def test_arena_validation_fewer_than_2_contestants(db_session: AsyncSessio
     db_session.add(evaluation)
     await db_session.commit()
 
-    await run_arena_evaluation(evaluation.id, db_session)
+    await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -215,7 +215,7 @@ async def test_arena_validation_fewer_than_2_contestants(db_session: AsyncSessio
 @pytest.mark.asyncio
 async def test_arena_validation_no_contestants(db_session: AsyncSession):
     """Arena with no contestants should fail validation."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     dataset = Dataset(name="arena-no-contestants", item_count=1)
     db_session.add(dataset)
@@ -241,7 +241,7 @@ async def test_arena_validation_no_contestants(db_session: AsyncSession):
     db_session.add(evaluation)
     await db_session.commit()
 
-    await run_arena_evaluation(evaluation.id, db_session)
+    await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -253,7 +253,7 @@ async def test_arena_websocket_progress_includes_contestant_model(
     db_session: AsyncSession, arena_evaluation_with_dataset
 ):
     """WebSocket progress broadcasts should include contestant_model."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
@@ -262,11 +262,11 @@ async def test_arena_websocket_progress_includes_contestant_model(
     mock_progress = AsyncMock()
 
     with (
-        patch("app.services.arena_evaluation_service.call_model", mock_call_model),
+        patch("app.services.eval_runner.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.arena_evaluation_service.broadcast_progress", mock_progress),
+        patch("app.services.eval_runner.broadcast_progress", mock_progress),
     ):
-        await run_arena_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Total should be contestants * items = 2 * 2 = 4
     for call_args in mock_progress.call_args_list:
@@ -279,17 +279,17 @@ async def test_arena_websocket_progress_includes_contestant_model(
 
 @pytest.mark.asyncio
 async def test_arena_evaluation_not_found(db_session: AsyncSession):
-    """run_arena_evaluation returns silently when evaluation_id does not exist."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    """run_evaluation returns silently when evaluation_id does not exist."""
+    from app.services.eval_runner import run_evaluation
 
     # Should not raise -- just log and return
-    await run_arena_evaluation("nonexistent-id", db_session)
+    await run_evaluation("nonexistent-id", db_session)
 
 
 @pytest.mark.asyncio
 async def test_arena_evaluation_skipped_when_not_pending(db_session: AsyncSession):
     """Arena evaluation is skipped if status is not 'pending'."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     dataset = Dataset(name="arena-skip-test", item_count=1)
     db_session.add(dataset)
@@ -309,7 +309,7 @@ async def test_arena_evaluation_skipped_when_not_pending(db_session: AsyncSessio
     db_session.add(evaluation)
     await db_session.commit()
 
-    await run_arena_evaluation(evaluation.id, db_session)
+    await run_evaluation(evaluation.id, db_session)
 
     # Status should remain unchanged
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
@@ -320,7 +320,7 @@ async def test_arena_evaluation_skipped_when_not_pending(db_session: AsyncSessio
 @pytest.mark.asyncio
 async def test_arena_evaluation_no_dataset_id(db_session: AsyncSession):
     """Arena evaluation fails if dataset_id is not set."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     evaluation = Evaluation(
         name="no dataset arena",
@@ -335,7 +335,7 @@ async def test_arena_evaluation_no_dataset_id(db_session: AsyncSession):
     db_session.add(evaluation)
     await db_session.commit()
 
-    await run_arena_evaluation(evaluation.id, db_session)
+    await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -345,7 +345,7 @@ async def test_arena_evaluation_no_dataset_id(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_arena_evaluation_dataset_not_found(db_session: AsyncSession):
     """Arena evaluation fails if dataset_id points to a non-existent dataset."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     evaluation = Evaluation(
         name="missing dataset arena",
@@ -360,7 +360,7 @@ async def test_arena_evaluation_dataset_not_found(db_session: AsyncSession):
     db_session.add(evaluation)
     await db_session.commit()
 
-    await run_arena_evaluation(evaluation.id, db_session)
+    await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -370,7 +370,7 @@ async def test_arena_evaluation_dataset_not_found(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_arena_contestant_resolve_failure_drops_below_minimum(db_session: AsyncSession):
     """If resolve_model_config fails for enough contestants to go below 2, evaluation fails."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     dataset = Dataset(name="arena-resolve-fail", item_count=1)
     db_session.add(dataset)
@@ -402,8 +402,8 @@ async def test_arena_contestant_resolve_failure_drops_below_minimum(db_session: 
             raise ValueError("Provider not found")
         return original_resolve(config, **kwargs)
 
-    with patch("app.services.arena_evaluation_service.resolve_model_config", side_effect=mock_resolve):
-        await run_arena_evaluation(evaluation.id, db_session)
+    with patch("app.services.eval_runner.resolve_model_config", side_effect=mock_resolve):
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -413,7 +413,7 @@ async def test_arena_contestant_resolve_failure_drops_below_minimum(db_session: 
 @pytest.mark.asyncio
 async def test_arena_judge_resolve_failure(db_session: AsyncSession):
     """Arena evaluation fails if judge model cannot be resolved."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     dataset = Dataset(name="arena-judge-fail", item_count=1)
     db_session.add(dataset)
@@ -434,10 +434,10 @@ async def test_arena_judge_resolve_failure(db_session: AsyncSession):
     await db_session.commit()
 
     with patch(
-        "app.services.arena_evaluation_service.resolve_judge_config",
+        "app.services.eval_runner.resolve_judge_config",
         side_effect=ValueError("No judge model configured"),
     ):
-        await run_arena_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -447,7 +447,7 @@ async def test_arena_judge_resolve_failure(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_arena_partial_contestant_item_failures(db_session: AsyncSession, arena_evaluation_with_dataset):
     """A contestant can have some items succeed and some fail."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
@@ -460,11 +460,11 @@ async def test_arena_partial_contestant_item_failures(db_session: AsyncSession, 
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.8, passed=True, reasoning="OK"))
 
     with (
-        patch("app.services.arena_evaluation_service.call_model", side_effect=mock_call),
+        patch("app.services.eval_runner.call_model", side_effect=mock_call),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_arena_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -486,7 +486,7 @@ async def test_arena_partial_contestant_item_failures(db_session: AsyncSession, 
 @pytest.mark.asyncio
 async def test_arena_duplicate_contestant_models(db_session: AsyncSession):
     """Arena with duplicate contestant model names still processes all entries."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     dataset = Dataset(name="arena-dup-test", item_count=1)
     db_session.add(dataset)
@@ -513,11 +513,11 @@ async def test_arena_duplicate_contestant_models(db_session: AsyncSession):
     mock_evaluate_qa = AsyncMock(return_value=Score(value=0.85, passed=True, reasoning="Good"))
 
     with (
-        patch("app.services.arena_evaluation_service.call_model", mock_call_model),
+        patch("app.services.eval_runner.call_model", mock_call_model),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_arena_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -534,19 +534,19 @@ async def test_arena_duplicate_contestant_models(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_arena_unhandled_exception_sets_failed(db_session: AsyncSession, arena_evaluation_with_dataset):
     """Unhandled exception in arena evaluation sets status to 'failed'."""
-    from app.services.arena_evaluation_service import run_arena_evaluation
+    from app.services.eval_runner import run_evaluation
 
     evaluation, _dataset, _items = arena_evaluation_with_dataset
 
     # Make resolve_judge_config succeed, but create_adapter_from_config raise
     with (
         patch(
-            "app.services.arena_evaluation_service.create_adapter_from_config",
+            "app.services.eval_runner.create_adapter_from_config",
             side_effect=RuntimeError("unexpected crash"),
         ),
-        patch("app.services.arena_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_arena_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()

@@ -81,9 +81,9 @@ async def test_full_qa_evaluation_flow(client, mock_bg_session_factory):
 
     # 4. Run the evaluation (with mocked LLM and session factory)
     with (
-        patch("app.services.evaluation_service.call_model", side_effect=_make_mock_call_model()),
+        patch("app.services.eval_runner.call_model", side_effect=_make_mock_call_model()),
         patch("app.adapters.litellm_judge.litellm.acompletion", new_callable=AsyncMock) as mock_judge,
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
         patch("app.api.v1.evaluations.async_session_factory", mock_bg_session_factory),
     ):
         mock_judge.return_value = MagicMock(
@@ -141,9 +141,9 @@ async def test_rerun_evaluation(client, mock_bg_session_factory):
     )
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_call),
+        patch("app.services.eval_runner.call_model", mock_call),
         patch("app.adapters.litellm_judge.litellm.acompletion", mock_judge),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
         patch("app.api.v1.evaluations.async_session_factory", mock_bg_session_factory),
     ):
         # First run

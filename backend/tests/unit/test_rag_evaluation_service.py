@@ -9,7 +9,7 @@ from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.rag_backends.base import RAGResponse
-from app.services.rag_evaluation_service import _build_rag_adapter_config, run_rag_evaluation
+from app.services.eval_runner import _build_rag_adapter_config, run_evaluation
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def _mock_rag_adapter(answer: str = "Red Hat Enterprise Linux", chunks: list | N
 
 
 @pytest.mark.asyncio
-async def test_run_rag_evaluation_success(db_session: AsyncSession, rag_evaluation_with_dataset):
+async def test_run_evaluation_success(db_session: AsyncSession, rag_evaluation_with_dataset):
     """Full RAG evaluation flow with mocked RAG adapter and judge."""
     evaluation, _dataset, _items = rag_evaluation_with_dataset
 
@@ -83,11 +83,11 @@ async def test_run_rag_evaluation_success(db_session: AsyncSession, rag_evaluati
     )
 
     with (
-        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
+        patch("app.services.eval_runner.create_rag_adapter", return_value=mock_adapter),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
-        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_rag_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Verify status is completed
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
@@ -120,10 +120,10 @@ async def test_rag_endpoint_error(db_session: AsyncSession, rag_evaluation_with_
     mock_adapter.retrieve_and_generate = AsyncMock(side_effect=Exception("Connection refused"))
 
     with (
-        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
-        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.create_rag_adapter", return_value=mock_adapter),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_rag_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # All items failed so evaluation should be failed
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
@@ -153,11 +153,11 @@ async def test_rag_empty_response(db_session: AsyncSession, rag_evaluation_with_
     )
 
     with (
-        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
+        patch("app.services.eval_runner.create_rag_adapter", return_value=mock_adapter),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
-        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_rag_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -217,11 +217,11 @@ async def test_rag_custom_field_mapping(db_session: AsyncSession):
     )
 
     with (
-        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter) as mock_factory,
+        patch("app.services.eval_runner.create_rag_adapter", return_value=mock_adapter) as mock_factory,
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
-        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_rag_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Verify the factory was called with the custom field config
     factory_call_config = mock_factory.call_args[0][0]
@@ -256,11 +256,11 @@ async def test_rag_evaluate_not_implemented_graceful(db_session: AsyncSession, r
     mock_evaluate_rag = AsyncMock(side_effect=NotImplementedError("RAG evaluation not yet implemented"))
 
     with (
-        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
+        patch("app.services.eval_runner.create_rag_adapter", return_value=mock_adapter),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
-        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_rag_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Should still complete -- just no scoring
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
@@ -305,7 +305,7 @@ async def test_rag_no_rag_endpoint_config(db_session: AsyncSession):
     db_session.add(evaluation)
     await db_session.commit()
 
-    await run_rag_evaluation(evaluation.id, db_session)
+    await run_evaluation(evaluation.id, db_session)
 
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
@@ -436,11 +436,11 @@ async def test_rag_evaluation_with_endpoint_url(db_session: AsyncSession):
     )
 
     with (
-        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter) as mock_factory,
+        patch("app.services.eval_runner.create_rag_adapter", return_value=mock_adapter) as mock_factory,
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
-        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_rag_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Verify the factory received url (mapped from endpoint_url)
     factory_call_config = mock_factory.call_args[0][0]
@@ -467,11 +467,11 @@ async def test_rag_adapter_closed_on_success(db_session: AsyncSession, rag_evalu
     )
 
     with (
-        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
+        patch("app.services.eval_runner.create_rag_adapter", return_value=mock_adapter),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_rag", mock_evaluate_rag),
-        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_rag_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     mock_adapter.close.assert_awaited_once()
 
@@ -485,9 +485,9 @@ async def test_rag_adapter_closed_on_failure(db_session: AsyncSession, rag_evalu
     mock_adapter.retrieve_and_generate = AsyncMock(side_effect=RuntimeError("RAG endpoint down"))
 
     with (
-        patch("app.services.rag_evaluation_service.create_rag_adapter", return_value=mock_adapter),
-        patch("app.services.rag_evaluation_service.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.create_rag_adapter", return_value=mock_adapter),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
     ):
-        await run_rag_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     mock_adapter.close.assert_awaited_once()

@@ -9,7 +9,7 @@ from app.adapters.base import Score
 from app.core.providers import ProviderProfile, provider_registry
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation
-from app.services.evaluation_service import run_qa_evaluation
+from app.services.eval_runner import run_evaluation
 
 
 def _extract_log_messages(mock_broadcast_log: AsyncMock) -> list[str]:
@@ -78,7 +78,7 @@ def _mock_acompletion_response(content: str = "This is the model's answer."):
 
 @pytest.mark.asyncio
 async def test_qa_evaluation_emits_start_log(db_session: AsyncSession, evaluation_with_dataset):
-    """run_qa_evaluation emits a 'Starting evaluation' log at the beginning."""
+    """run_evaluation emits a 'Starting evaluation' log at the beginning."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
     mock_acompletion = AsyncMock(return_value="This is the model's answer.")
@@ -86,12 +86,12 @@ async def test_qa_evaluation_emits_start_log(db_session: AsyncSession, evaluatio
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_acompletion),
+        patch("app.services.eval_runner.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
-        patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_log", mock_broadcast_log),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Check that at least one log was called with "Starting evaluation"
     log_messages = _extract_log_messages(mock_broadcast_log)
@@ -101,7 +101,7 @@ async def test_qa_evaluation_emits_start_log(db_session: AsyncSession, evaluatio
 
 @pytest.mark.asyncio
 async def test_qa_evaluation_emits_model_resolved_log(db_session: AsyncSession, evaluation_with_dataset):
-    """run_qa_evaluation emits a 'Model resolved' log after model config resolution."""
+    """run_evaluation emits a 'Model resolved' log after model config resolution."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
     mock_acompletion = AsyncMock(return_value="This is the model's answer.")
@@ -109,12 +109,12 @@ async def test_qa_evaluation_emits_model_resolved_log(db_session: AsyncSession, 
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_acompletion),
+        patch("app.services.eval_runner.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
-        patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_log", mock_broadcast_log),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     log_messages = _extract_log_messages(mock_broadcast_log)
     model_logs = [m for m in log_messages if "Model resolved" in m]
@@ -123,7 +123,7 @@ async def test_qa_evaluation_emits_model_resolved_log(db_session: AsyncSession, 
 
 @pytest.mark.asyncio
 async def test_qa_evaluation_emits_judge_resolved_log(db_session: AsyncSession, evaluation_with_dataset):
-    """run_qa_evaluation emits a 'Judge model' log after judge resolution."""
+    """run_evaluation emits a 'Judge model' log after judge resolution."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
     mock_acompletion = AsyncMock(return_value="This is the model's answer.")
@@ -131,12 +131,12 @@ async def test_qa_evaluation_emits_judge_resolved_log(db_session: AsyncSession, 
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_acompletion),
+        patch("app.services.eval_runner.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
-        patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_log", mock_broadcast_log),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     log_messages = _extract_log_messages(mock_broadcast_log)
     judge_logs = [m for m in log_messages if "Judge model" in m]
@@ -145,7 +145,7 @@ async def test_qa_evaluation_emits_judge_resolved_log(db_session: AsyncSession, 
 
 @pytest.mark.asyncio
 async def test_qa_evaluation_emits_per_item_logs(db_session: AsyncSession, evaluation_with_dataset):
-    """run_qa_evaluation emits per-item logs: processing, response, score."""
+    """run_evaluation emits per-item logs: processing, response, score."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
     mock_acompletion = AsyncMock(return_value="This is the model's answer.")
@@ -153,12 +153,12 @@ async def test_qa_evaluation_emits_per_item_logs(db_session: AsyncSession, evalu
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_acompletion),
+        patch("app.services.eval_runner.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
-        patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_log", mock_broadcast_log),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     log_messages = _extract_log_messages(mock_broadcast_log)
 
@@ -177,7 +177,7 @@ async def test_qa_evaluation_emits_per_item_logs(db_session: AsyncSession, evalu
 
 @pytest.mark.asyncio
 async def test_qa_evaluation_emits_completion_log(db_session: AsyncSession, evaluation_with_dataset):
-    """run_qa_evaluation emits a completion summary log at the end."""
+    """run_evaluation emits a completion summary log at the end."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
     mock_acompletion = AsyncMock(return_value="This is the model's answer.")
@@ -185,12 +185,12 @@ async def test_qa_evaluation_emits_completion_log(db_session: AsyncSession, eval
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_acompletion),
+        patch("app.services.eval_runner.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
-        patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_log", mock_broadcast_log),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     log_messages = _extract_log_messages(mock_broadcast_log)
     completion_logs = [m for m in log_messages if "Evaluation complete" in m]
@@ -199,7 +199,7 @@ async def test_qa_evaluation_emits_completion_log(db_session: AsyncSession, eval
 
 @pytest.mark.asyncio
 async def test_qa_evaluation_emits_error_log_on_item_failure(db_session: AsyncSession, evaluation_with_dataset):
-    """run_qa_evaluation emits error-level log when an item fails."""
+    """run_evaluation emits error-level log when an item fails."""
     evaluation, _dataset, _items = evaluation_with_dataset
 
     call_count = 0
@@ -215,12 +215,12 @@ async def test_qa_evaluation_emits_error_log_on_item_failure(db_session: AsyncSe
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.call_model", side_effect=mock_acompletion_fail),
+        patch("app.services.eval_runner.call_model", side_effect=mock_acompletion_fail),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
-        patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_log", mock_broadcast_log),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     # Find error-level logs
     error_calls = [
@@ -241,12 +241,12 @@ async def test_qa_evaluation_log_uses_correct_evaluation_id(db_session: AsyncSes
     mock_broadcast_log = AsyncMock()
 
     with (
-        patch("app.services.evaluation_service.call_model", mock_acompletion),
+        patch("app.services.eval_runner.call_model", mock_acompletion),
         patch("app.adapters.litellm_judge.LiteLLMJudgeAdapter.evaluate_qa", mock_evaluate_qa),
-        patch("app.services.evaluation_service.broadcast_progress", new_callable=AsyncMock),
-        patch("app.services.evaluation_service.broadcast_log", mock_broadcast_log),
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_log", mock_broadcast_log),
     ):
-        await run_qa_evaluation(evaluation.id, db_session)
+        await run_evaluation(evaluation.id, db_session)
 
     for c in mock_broadcast_log.call_args_list:
         eval_id = c.kwargs.get("evaluation_id", c.args[0] if c.args else None)
