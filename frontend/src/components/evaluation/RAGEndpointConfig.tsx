@@ -21,7 +21,7 @@ interface RAGEndpointConfigProps {
 const DEFAULT_HTTP_SETTINGS: RAGEndpointSettings = {
   backend_type: 'http',
   endpoint_url: '',
-  auth_header: '',
+  auth_token_env: '',
   query_field: 'query',
   answer_field: 'answer',
   chunks_field: 'source_documents',
@@ -104,14 +104,17 @@ export function RAGEndpointConfig({ value, onChange, disabled }: RAGEndpointConf
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="rag-auth-header">Auth Header Value (optional)</Label>
+              <Label htmlFor="rag-auth-token-env">Auth Token Env Var (optional)</Label>
               <Input
-                id="rag-auth-header"
-                placeholder="Bearer token..."
-                value={settings.auth_header ?? ''}
-                onChange={(e) => handleStringChange('auth_header', e.target.value)}
+                id="rag-auth-token-env"
+                placeholder="RAG_AUTH_TOKEN"
+                value={settings.auth_token_env ?? ''}
+                onChange={(e) => handleStringChange('auth_token_env', e.target.value)}
                 disabled={disabled}
               />
+              <p className="text-xs text-muted-foreground">
+                Name of environment variable containing the bearer token
+              </p>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
@@ -223,6 +226,20 @@ export function RAGEndpointConfig({ value, onChange, disabled }: RAGEndpointConf
                 onChange={(e) => handleStringChange('generator_provider_id', e.target.value)}
                 disabled={disabled}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="rag-generator-api-key-env">Generator API Key Env Var (optional)</Label>
+              <Input
+                id="rag-generator-api-key-env"
+                placeholder="GENERATOR_API_KEY"
+                value={settings.generator_api_key_env ?? ''}
+                onChange={(e) => handleStringChange('generator_api_key_env', e.target.value)}
+                disabled={disabled}
+              />
+              <p className="text-xs text-muted-foreground">
+                Name of environment variable containing the generator API key
+              </p>
             </div>
 
             <div className="space-y-1.5">

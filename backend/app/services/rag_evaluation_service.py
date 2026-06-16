@@ -6,6 +6,7 @@ answer + context chunks, and scores them with the LiteLLM judge adapter.
 """
 
 import asyncio
+import os
 from typing import Any
 
 import structlog
@@ -30,13 +31,15 @@ logger = structlog.get_logger()
 
 
 def _build_rag_adapter_config(rag_endpoint: dict[str, Any]) -> dict[str, Any]:
-    """Build a config dict suitable for create_rag_adapter from the evaluation's rag_endpoint."""
-    # Default to HTTP backend if no explicit backend_type is set
+    """Build a config dict suitable for create_rag_adapter from the evaluation's rag_endpoint.
+
+    Resolves env-var indirection: ``auth_token_env`` → ``auth_header`` dict,
+    ``generator_api_key_env`` → ``generator_api_key`` value.
+    """
     adapter_config: dict[str, Any] = {
         "backend_type": rag_endpoint.get("backend_type", "http"),
     }
 
-    # Pass through all keys from rag_endpoint to the adapter config
     for key in (
         "url",
         "endpoint_url",
@@ -56,7 +59,24 @@ def _build_rag_adapter_config(rag_endpoint: dict[str, Any]) -> dict[str, Any]:
         if key in rag_endpoint:
             adapter_config[key] = rag_endpoint[key]
 
-    # Normalize: if frontend sent endpoint_url but not url, map it for the adapter
+    # Resolve auth_token_env → auth_header dict (preferred over raw auth_header)
+    if "auth_token_env" in rag_endpoint:
+        env_name = rag_endpoint["auth_token_env"]
+        token = os.environ.get(env_name, "")
+        if token:
+            adapter_config["auth_header"] = {"Authorization": f"Bearer {token}"}
+        else:
+            logger.warning("rag.auth_token_env_missing", env_var=env_name)
+
+    # Resolve generator_api_key_env → generator_api_key (preferred over raw key)
+    if "generator_api_key_env" in rag_endpoint:
+        env_name = rag_endpoint["generator_api_key_env"]
+        api_key = os.environ.get(env_name, "")
+        if api_key:
+            adapter_config["generator_api_key"] = api_key
+        else:
+            logger.warning("rag.generator_api_key_env_missing", env_var=env_name)
+
     if "url" not in adapter_config and "endpoint_url" in adapter_config:
         adapter_config["url"] = adapter_config.pop("endpoint_url")
 

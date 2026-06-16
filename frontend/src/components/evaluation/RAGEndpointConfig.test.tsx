@@ -10,7 +10,7 @@ describe('RAGEndpointConfig', () => {
 
       expect(screen.getByText('RAG Backend Configuration')).toBeInTheDocument();
       expect(screen.getByLabelText('Endpoint URL')).toBeInTheDocument();
-      expect(screen.getByLabelText('Auth Header Value (optional)')).toBeInTheDocument();
+      expect(screen.getByLabelText('Auth Token Env Var (optional)')).toBeInTheDocument();
       expect(screen.getByLabelText('Query Field Name')).toBeInTheDocument();
       expect(screen.getByLabelText('Answer Field Name')).toBeInTheDocument();
       expect(screen.getByLabelText('Chunks Field Name')).toBeInTheDocument();
@@ -32,7 +32,7 @@ describe('RAGEndpointConfig', () => {
           value={{
             backend_type: 'http',
             endpoint_url: 'https://rag.example.com/query',
-            auth_header: 'Bearer abc123',
+            auth_token_env: 'RAG_AUTH_TOKEN',
             query_field: 'q',
             answer_field: 'a',
             chunks_field: 'docs',
@@ -42,7 +42,7 @@ describe('RAGEndpointConfig', () => {
       );
 
       expect(screen.getByLabelText('Endpoint URL')).toHaveValue('https://rag.example.com/query');
-      expect(screen.getByLabelText('Auth Header Value (optional)')).toHaveValue('Bearer abc123');
+      expect(screen.getByLabelText('Auth Token Env Var (optional)')).toHaveValue('RAG_AUTH_TOKEN');
       expect(screen.getByLabelText('Query Field Name')).toHaveValue('q');
       expect(screen.getByLabelText('Answer Field Name')).toHaveValue('a');
       expect(screen.getByLabelText('Chunks Field Name')).toHaveValue('docs');
@@ -98,7 +98,7 @@ describe('RAGEndpointConfig', () => {
       render(<RAGEndpointConfig value={undefined} onChange={onChange} disabled />);
 
       expect(screen.getByLabelText('Endpoint URL')).toBeDisabled();
-      expect(screen.getByLabelText('Auth Header Value (optional)')).toBeDisabled();
+      expect(screen.getByLabelText('Auth Token Env Var (optional)')).toBeDisabled();
       expect(screen.getByLabelText('Query Field Name')).toBeDisabled();
       expect(screen.getByLabelText('Answer Field Name')).toBeDisabled();
       expect(screen.getByLabelText('Chunks Field Name')).toBeDisabled();
@@ -130,6 +130,7 @@ describe('RAGEndpointConfig', () => {
       expect(screen.getByLabelText('Embedding Column')).toBeInTheDocument();
       expect(screen.getByLabelText('Top K Results')).toBeInTheDocument();
       expect(screen.getByLabelText('Generator Provider ID')).toBeInTheDocument();
+      expect(screen.getByLabelText('Generator API Key Env Var (optional)')).toBeInTheDocument();
       expect(screen.getByLabelText('Embedding Model')).toBeInTheDocument();
     });
 
@@ -147,7 +148,7 @@ describe('RAGEndpointConfig', () => {
       );
 
       expect(screen.queryByLabelText('Endpoint URL')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Auth Header Value (optional)')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Auth Token Env Var (optional)')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Query Field Name')).not.toBeInTheDocument();
     });
 

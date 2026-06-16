@@ -2,7 +2,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.core.security import redact_config
 
 
 class EvaluationMode(StrEnum):
@@ -48,3 +50,9 @@ class EvaluationResponse(BaseModel):
     updated_at: datetime = Field(description="Timestamp when the evaluation was last updated.")
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def _redact_secrets(self) -> "EvaluationResponse":
+        if self.config:
+            self.config = redact_config(self.config)
+        return self

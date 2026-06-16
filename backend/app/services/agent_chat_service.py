@@ -563,11 +563,11 @@ async def end_session(session_id: str, db: AsyncSession) -> dict:
     session.status = "ended"
     session.ended_at = utcnow()
 
-    # Update linked Evaluation status to "completed"
+    # Update linked Evaluation: only transition to "completed" when currently "running"
     if session.evaluation_id:
         eval_result = await db.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
         evaluation = eval_result.scalar_one_or_none()
-        if evaluation:
+        if evaluation and evaluation.status == "running":
             evaluation.status = "completed"
 
     await db.commit()
