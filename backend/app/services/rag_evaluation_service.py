@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import Score
-from app.adapters.factory import create_evaluation_adapter
+from app.adapters.factory import create_adapter_from_config
 from app.core.config import settings
 from app.core.exceptions import sanitize_error_for_client
 from app.models.dataset import Dataset, DatasetItem
@@ -167,14 +167,7 @@ async def run_rag_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         )
 
         try:
-            adapter = create_evaluation_adapter(
-                config.get("evaluator_id", "litellm"),
-                model=judge_resolved.model,
-                api_key=judge_resolved.api_key,
-                api_base=judge_resolved.api_base,
-                max_concurrency=config.get("max_concurrency", 10),
-                extra_params=judge_llm_params if judge_llm_params else None,
-            )
+            adapter = create_adapter_from_config(config, judge_resolved, judge_llm_params)
         except ValueError as e:
             logger.error("evaluation.evaluator_unavailable", evaluation_id=evaluation_id, error=str(e))
             evaluation.status = "failed"
