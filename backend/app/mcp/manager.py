@@ -46,12 +46,21 @@ class McpServerManager:
         self._tool_to_server: dict[str, str] = {}
         self._tool_definitions: list[McpToolDefinition] = []
         self._openai_tools: list[dict[str, Any]] = []
+        self._client_profiles: dict[str, tuple[str, list[str], dict[str, str]]] = {}
+        self._cached_tools: dict[str, list[McpToolDefinition]] = {}
+
+    def _profile_key(self, profile: object) -> tuple[str, list[str], dict[str, str]]:
+        cmd = getattr(profile, "command", "") or ""
+        args = list(getattr(profile, "args", []))
+        env = dict(getattr(profile, "env", {}))
+        return (cmd, args, env)
 
     async def start_servers(self, server_ids: list[str]) -> list[dict[str, Any]]:
         """Start MCP servers and collect their tool definitions.
 
-        For mcp_stdio servers: spawns the subprocess and performs the MCP handshake.
-        For standalone servers: converts tool defs directly to OpenAI format.
+        Idempotent: reuses existing clients when the server profile has not
+        changed. Stops and replaces a client only when its command/args/env
+        differ from the running instance.
 
         Args:
             server_ids: List of tool server IDs to start.
@@ -77,6 +86,27 @@ class McpServerManager:
                     logger.warning("mcp_manager.no_command", server_id=server_id)
                     continue
 
+                new_key = self._profile_key(profile)
+                existing_client = self._clients.get(server_id)
+                existing_key = self._client_profiles.get(server_id)
+
+                if existing_client and existing_key == new_key:
+                    cached = self._cached_tools.get(server_id, [])
+                    for tool_def in cached:
+                        self._tool_definitions.append(tool_def)
+                        self._tool_to_server[tool_def.name] = server_id
+                        self._openai_tools.append(_tool_def_to_openai(tool_def))
+                    logger.debug("mcp_manager.server_reused", server_id=server_id, tool_count=len(cached))
+                    continue
+
+                if existing_client:
+                    logger.info("mcp_manager.server_profile_changed", server_id=server_id)
+                    with contextlib.suppress(Exception):
+                        await existing_client.stop()
+                    del self._clients[server_id]
+                    self._client_profiles.pop(server_id, None)
+                    self._cached_tools.pop(server_id, None)
+
                 client = McpStdioClient(
                     server_id=server_id,
                     command=profile.command,
@@ -88,6 +118,8 @@ class McpServerManager:
                     await client.start()
                     tools = await client.list_tools()
                     self._clients[server_id] = client
+                    self._client_profiles[server_id] = new_key
+                    self._cached_tools[server_id] = tools
 
                     for tool_def in tools:
                         self._tool_definitions.append(tool_def)
@@ -164,6 +196,8 @@ class McpServerManager:
             except Exception:
                 logger.exception("mcp_manager.stop_failed", server_id=server_id)
         self._clients.clear()
+        self._client_profiles.clear()
+        self._cached_tools.clear()
         self._tool_to_server.clear()
         self._tool_definitions.clear()
         self._openai_tools.clear()

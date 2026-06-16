@@ -59,7 +59,7 @@ export default function RAGEvaluation() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
 
-  const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
+  const { currentEvaluation, createAndRunEvaluation, isLoading } =
     useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults, fetchAggregateMetrics } = useResultStore();
@@ -236,11 +236,11 @@ export default function RAGEvaluation() {
           <Button
             variant="outline"
             onClick={() => {
-              setCurrentEvaluation(null);
-              clearRunningEvaluation();
-              clearLogs();
-              setPhase('configure');
-              toast('Evaluation cancelled');
+              if (currentEvaluation?.id) {
+                api.cancelEvaluation(currentEvaluation.id).catch(() => {
+                  toast.error('Failed to cancel evaluation');
+                });
+              }
             }}
           >
             Cancel

@@ -62,7 +62,7 @@ export default function ArenaComparison() {
   const [judgeParams, setJudgeParams] = useState<LLMParams>({});
   const [leaderboard, setLeaderboard] = useState<ArenaLeaderboardResponse | null>(null);
 
-  const { currentEvaluation, createAndRunEvaluation, setCurrentEvaluation, isLoading, clearRunningEvaluation, clearLogs } =
+  const { currentEvaluation, createAndRunEvaluation, isLoading } =
     useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults } = useResultStore();
@@ -213,11 +213,11 @@ export default function ArenaComparison() {
           <Button
             variant="outline"
             onClick={() => {
-              setCurrentEvaluation(null);
-              clearRunningEvaluation();
-              clearLogs();
-              setPhase('configure');
-              toast('Arena cancelled');
+              if (currentEvaluation?.id) {
+                api.cancelEvaluation(currentEvaluation.id).catch(() => {
+                  toast.error('Failed to cancel evaluation');
+                });
+              }
             }}
           >
             Cancel

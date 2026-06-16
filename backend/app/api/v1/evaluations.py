@@ -29,14 +29,42 @@ from app.services.artifact_service import delete_artifact_file
 from app.services.evaluation_service import run_qa_evaluation
 from app.services.rag_evaluation_service import run_rag_evaluation
 from app.services.run_service import compute_run_results, execute_evaluation_sync
+from app.websocket.progress import broadcast_status
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/evaluations", tags=["evaluations"], dependencies=[Depends(require_auth)])
 
-# Keep strong references to background evaluation tasks so they are
-# not garbage-collected while still running.
-_background_tasks: set[asyncio.Task] = set()
+_running_tasks: dict[str, asyncio.Task] = {}
+
+
+def _launch_evaluation(evaluation_id: str, coro: object) -> asyncio.Task:
+    """Launch an evaluation as a background task, tracked by evaluation_id.
+
+    On CancelledError, sets evaluation status to 'cancelled' and broadcasts.
+    """
+
+    async def _wrapper() -> None:
+        try:
+            await coro  # type: ignore[misc]
+        except asyncio.CancelledError:
+            logger.info("evaluation.cancelled", evaluation_id=evaluation_id)
+            try:
+                async with async_session_factory() as cancel_db:
+                    result = await cancel_db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
+                    evaluation = result.scalar_one_or_none()
+                    if evaluation and evaluation.status == "running":
+                        evaluation.status = "cancelled"
+                        await cancel_db.commit()
+                        await broadcast_status(evaluation_id, "cancelled")
+            except Exception:
+                logger.exception("evaluation.cancel_status_update_failed", evaluation_id=evaluation_id)
+        finally:
+            _running_tasks.pop(evaluation_id, None)
+
+    task = asyncio.create_task(_wrapper())
+    _running_tasks[evaluation_id] = task
+    return task
 
 
 async def _cleanup_artifacts(evaluation_id: str, db: AsyncSession) -> None:
@@ -228,9 +256,7 @@ async def run_and_wait(
                 else:
                     await run_qa_evaluation(evaluation_id, bg_session)
 
-        task = asyncio.create_task(_run_bg())
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
+        _launch_evaluation(evaluation_id, _run_bg())
 
         async_resp = RunAsyncResponse(
             evaluation_id=evaluation_id,
@@ -313,6 +339,36 @@ async def delete_evaluation(evaluation_id: str, db: AsyncSession = Depends(get_d
     return Response(status_code=204)
 
 
+@router.post("/{evaluation_id}/cancel", response_model=EvaluationResponse)
+async def cancel_evaluation(
+    evaluation_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EvaluationResponse:
+    """Cancel a running evaluation."""
+    result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
+    evaluation = result.scalar_one_or_none()
+    if not evaluation:
+        raise NotFoundException("Evaluation", evaluation_id)
+
+    if evaluation.status != "running":
+        raise ConflictException(
+            f"Evaluation is '{evaluation.status}' and cannot be cancelled. Only 'running' evaluations can be cancelled."
+        )
+
+    task = _running_tasks.get(evaluation_id)
+    if task and not task.done():
+        task.cancel()
+        logger.info("evaluation.cancel_requested", id=evaluation_id)
+    else:
+        evaluation.status = "cancelled"
+        await db.commit()
+        await broadcast_status(evaluation_id, "cancelled")
+        logger.info("evaluation.cancelled_no_task", id=evaluation_id)
+
+    await db.refresh(evaluation)
+    return EvaluationResponse.model_validate(evaluation)
+
+
 @router.post("/{evaluation_id}/run", response_model=EvaluationResponse)
 async def run_evaluation(
     evaluation_id: str,
@@ -324,10 +380,10 @@ async def run_evaluation(
     if not evaluation:
         raise NotFoundException("Evaluation", evaluation_id)
 
-    if evaluation.status not in ("pending", "failed"):
+    if evaluation.status not in ("pending", "failed", "cancelled"):
         raise ConflictException(
             f"Evaluation is '{evaluation.status}' and cannot be started. "
-            "Only 'pending' or 'failed' evaluations can be run."
+            "Only 'pending', 'failed', or 'cancelled' evaluations can be run."
         )
 
     if evaluation.mode not in ("qa", "rag", "arena"):
@@ -348,9 +404,7 @@ async def run_evaluation(
             else:
                 await run_qa_evaluation(evaluation_id, bg_session)
 
-    task = asyncio.create_task(_run_in_background())
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    _launch_evaluation(evaluation_id, _run_in_background())
 
     logger.info("evaluation.run_started", id=evaluation_id, mode=evaluation.mode)
     return EvaluationResponse.model_validate(evaluation)
@@ -383,7 +437,7 @@ async def rerun_evaluation(
     await db.refresh(evaluation)
 
     # Launch background task
-    async def _run_in_background() -> None:
+    async def _rerun_in_background() -> None:
         async with async_session_factory() as bg_session:
             if evaluation.mode == "arena":
                 await run_arena_evaluation(evaluation_id, bg_session)
@@ -392,9 +446,7 @@ async def rerun_evaluation(
             else:
                 await run_qa_evaluation(evaluation_id, bg_session)
 
-    task = asyncio.create_task(_run_in_background())
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    _launch_evaluation(evaluation_id, _rerun_in_background())
 
     logger.info("evaluation.rerun_started", id=evaluation_id, mode=evaluation.mode)
     return EvaluationResponse.model_validate(evaluation)
