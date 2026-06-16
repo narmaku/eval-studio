@@ -148,13 +148,22 @@ async def run_qa_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             details={"model": judge_resolved.model, "api_base": judge_resolved.api_base},
         )
 
-        adapter = create_evaluation_adapter(
-            model=judge_resolved.model,
-            api_key=judge_resolved.api_key,
-            api_base=judge_resolved.api_base,
-            max_concurrency=config.get("max_concurrency", 10),
-            extra_params=judge_llm_params if judge_llm_params else None,
-        )
+        try:
+            adapter = create_evaluation_adapter(
+                config.get("evaluator_id", "litellm"),
+                model=judge_resolved.model,
+                api_key=judge_resolved.api_key,
+                api_base=judge_resolved.api_base,
+                max_concurrency=config.get("max_concurrency", 10),
+                extra_params=judge_llm_params if judge_llm_params else None,
+            )
+        except ValueError as e:
+            logger.error("evaluation.evaluator_unavailable", evaluation_id=evaluation_id, error=str(e))
+            evaluation.status = "failed"
+            evaluation.error = str(e)
+            await db.commit()
+            await broadcast_status(evaluation_id, "failed", error=evaluation.error)
+            return
 
         # 6b. Create rate limiter if provider has rate limits enabled
         rate_limiter: AsyncRateLimiter | None = None
