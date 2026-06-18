@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Generic, TypeVar
 
@@ -197,6 +198,27 @@ class YAMLBackedRegistry(ABC, Generic[T]):
             self._items[item_id] = removed
             raise
         return True
+
+    @contextmanager
+    def isolated(self, path: Path):
+        """Swap state to an empty registry at *path*; restore on exit.
+
+        For test isolation — prevents tests from reading or writing real
+        config files.
+        """
+        saved_items = self._items.copy()
+        saved_path = self._config_path
+        saved_mtime = self._last_mtime
+        self._config_path = path
+        self._items.clear()
+        self._last_mtime = 0.0
+        try:
+            yield self
+        finally:
+            self._items.clear()
+            self._items.update(saved_items)
+            self._config_path = saved_path
+            self._last_mtime = saved_mtime
 
     def _persist_yaml(self) -> None:
         """Write current state to the YAML config file."""

@@ -1,7 +1,10 @@
+from contextlib import ExitStack
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.adapters.registry import evaluator_registry
 from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.providers import ProviderProfile, provider_registry
@@ -64,36 +67,20 @@ def _isolate_yaml_registries(tmp_path):
     Prevents tests from reading or writing real config/*.yaml files.
     Integration tests that need seeded data add their own fixtures on top.
     """
-    registries = [provider_registry, tool_server_registry, harness_registry]
-    originals = []
-    for registry in registries:
-        originals.append(
-            {
-                "registry": registry,
-                "data": registry._items.copy(),
-                "config_path": registry._config_path,
-                "last_mtime": registry._last_mtime,
-            }
+    registries = [provider_registry, tool_server_registry, harness_registry, evaluator_registry]
+
+    with ExitStack() as stack:
+        for registry in registries:
+            config_name = registry._config_path.name if registry._config_path else "config.yaml"
+            stack.enter_context(registry.isolated(tmp_path / config_name))
+
+        # Seed a minimal test judge provider (many evaluation tests need one)
+        # and persist so _check_reload() doesn't wipe it when the file is missing
+        provider_registry._items["__test__"] = ProviderProfile(
+            id="__test__",
+            name="Test Judge",
+            default_model="test-judge-model",
         )
-        config_name = registry._config_path.name if registry._config_path else "config.yaml"
-        registry._config_path = tmp_path / config_name
-        registry._items.clear()
-        registry._last_mtime = 0.0
+        provider_registry._persist_yaml()
 
-    # Seed a minimal test judge provider (many evaluation tests need one)
-    # and persist so _check_reload() doesn't wipe it when the file is missing
-    provider_registry._items["__test__"] = ProviderProfile(
-        id="__test__",
-        name="Test Judge",
-        default_model="test-judge-model",
-    )
-    provider_registry._persist_yaml()
-
-    yield
-
-    for orig in originals:
-        reg = orig["registry"]
-        reg._items.clear()
-        reg._items.update(orig["data"])
-        reg._config_path = orig["config_path"]
-        reg._last_mtime = orig["last_mtime"]
+        yield

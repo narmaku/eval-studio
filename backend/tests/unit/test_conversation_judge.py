@@ -201,7 +201,7 @@ async def test_evaluate_conversation_parse_error():
 
     assert score.value == 0.0
     assert score.passed is False
-    assert "Failed to parse" in score.reasoning
+    assert "unparseable" in score.reasoning
 
 
 @pytest.mark.asyncio
@@ -254,7 +254,7 @@ async def test_evaluate_conversation_none_content():
 
     assert score.value == 0.0
     assert score.passed is False
-    assert "empty response" in score.reasoning
+    assert "empty" in score.reasoning
 
 
 @pytest.mark.asyncio

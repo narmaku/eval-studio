@@ -94,7 +94,7 @@ async def test_litellm_adapter_evaluate_qa_invalid_json():
         )
         assert score.value == 0.0
         assert score.passed is False
-        assert "Failed to parse" in score.reasoning
+        assert "unparseable" in score.reasoning
 
 
 @pytest.mark.asyncio
@@ -125,7 +125,7 @@ async def test_litellm_adapter_evaluate_qa_none_content():
         )
         assert score.value == 0.0
         assert score.passed is False
-        assert "empty response" in score.reasoning
+        assert "empty" in score.reasoning
 
 
 @pytest.mark.asyncio
@@ -134,3 +134,55 @@ async def test_litellm_adapter_supports_mode():
     assert adapter.supports_mode("qa") is True
     assert adapter.supports_mode("agent") is True
     assert adapter.supports_mode("rag") is True
+
+
+@pytest.mark.asyncio
+async def test_extra_params_do_not_override_explicit_kwargs():
+    """extra_params must not clobber model/temperature/response_format."""
+    adapter = LiteLLMJudgeAdapter(
+        model="judge-model",
+        extra_params={"model": "should-not-win", "temperature": 99.0},
+    )
+    judge_config = JudgeConfigParams(model="judge-model", temperature=0.5, pass_threshold=0.7)
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = '{"score": 0.9, "reasoning": "ok"}'
+
+    with patch(
+        "app.adapters.litellm_judge.litellm.acompletion",
+        new_callable=AsyncMock,
+        return_value=mock_response,
+    ) as mock_call:
+        await adapter.evaluate_qa(question="q", expected_answer="a", actual_answer="a", judge_config=judge_config)
+        kwargs = mock_call.call_args.kwargs
+        assert kwargs["model"] == "judge-model"
+        assert kwargs["temperature"] == 0.5
+
+
+@pytest.mark.asyncio
+async def test_proxy_env_called_during_judge_call():
+    """proxy_env context manager is activated with adapter's proxy/SSL settings."""
+    adapter = LiteLLMJudgeAdapter(
+        model="judge-model",
+        proxy="http://proxy:8080",
+        ssl_cert_path="/tmp/ca.pem",
+    )
+    judge_config = JudgeConfigParams(model="judge-model", temperature=0.0, pass_threshold=0.7)
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = '{"score": 0.9, "reasoning": "ok"}'
+
+    with (
+        patch(
+            "app.adapters.litellm_judge.litellm.acompletion",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ),
+        patch("app.adapters.litellm_judge.proxy_env") as mock_proxy,
+    ):
+        mock_proxy.return_value.__enter__ = MagicMock(return_value=None)
+        mock_proxy.return_value.__exit__ = MagicMock(return_value=False)
+        await adapter.evaluate_qa(question="q", expected_answer="a", actual_answer="a", judge_config=judge_config)
+        mock_proxy.assert_called_once_with("http://proxy:8080", "/tmp/ca.pem", None)

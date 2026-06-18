@@ -205,6 +205,9 @@ async def score_session(
             model=judge_resolved.model,
             api_key=judge_resolved.api_key,
             api_base=judge_resolved.api_base,
+            proxy=judge_resolved.proxy,
+            ssl_cert_path=judge_resolved.ssl_cert_path,
+            ssl_client_key=judge_resolved.ssl_client_key,
         )
 
         transcript = session.transcript or []
