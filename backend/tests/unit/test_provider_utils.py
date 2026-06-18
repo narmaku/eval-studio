@@ -91,8 +91,8 @@ async def test_resolve_falls_back_to_settings(registry):
 
 
 @pytest.mark.asyncio
-async def test_resolve_empty_model_when_none_configured(registry):
-    """When no model can be resolved, model is set to empty string (not an error)."""
+async def test_resolve_no_model_raises_valueerror(registry):
+    """When no model can be resolved for a non-custom provider, raises ValueError."""
     with patch("app.services.provider_utils.settings") as mock_settings:
         mock_settings.default_model = None
         mock_settings.litellm_api_key = None
@@ -100,8 +100,30 @@ async def test_resolve_empty_model_when_none_configured(registry):
         mock_settings.ssl_client_key = None
 
         config = {}
-        result = resolve_model_config(config, registry=registry)
-        assert result.model == ""
+        with pytest.raises(ValueError, match="No model could be resolved"):
+            resolve_model_config(config, registry=registry)
+
+
+@pytest.mark.asyncio
+async def test_resolve_custom_provider_without_endpoint_raises():
+    """Custom provider without endpoint_url raises ValueError."""
+    reg = ProviderRegistry()
+    reg._items["bad-custom"] = ProviderProfile(
+        id="bad-custom",
+        name="Bad Custom",
+        default_model="",
+        provider_type="custom",
+        endpoint_url="",
+    )
+    with patch("app.services.provider_utils.settings") as mock_settings:
+        mock_settings.default_model = None
+        mock_settings.litellm_api_key = None
+        mock_settings.ssl_cert_file = None
+        mock_settings.ssl_client_key = None
+
+        config = {"provider_id": "bad-custom"}
+        with pytest.raises(ValueError, match="Custom provider requires endpoint_url"):
+            resolve_model_config(config, registry=reg)
 
 
 @pytest.mark.asyncio

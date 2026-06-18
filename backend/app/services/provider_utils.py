@@ -99,8 +99,14 @@ def resolve_model_config(
         if not api_key:
             api_key = settings.litellm_api_key
 
-    if not model:
-        model = ""
+    provider_type = shared.get("provider_type", "litellm")
+    endpoint_url = shared.get("endpoint_url")
+
+    if provider_type == "custom" and not endpoint_url:
+        raise ValueError("Custom provider requires endpoint_url")
+
+    if not model and provider_type != "custom":
+        raise ValueError("No model could be resolved (no provider_id, model, or DEFAULT_MODEL fallback)")
 
     # Dummy key for local servers that require one
     if not api_key and api_base:

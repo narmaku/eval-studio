@@ -10,7 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.evaluation import Evaluation
 from app.models.session import Session
-from app.services.agent_chat_service import end_session, process_user_message
+from app.services.agent_chat_service import (
+    _build_tool_calls,
+    _transcript_to_llm_messages,
+    end_session,
+    process_user_message,
+)
 
 
 def _make_streaming_chunks(content: str, tool_calls: list | None = None):
@@ -316,3 +321,118 @@ async def test_end_session_idempotent(db_session: AsyncSession, session_with_con
     result2 = await end_session(session.id, db_session)
     assert result2["status"] == "ended"
     assert result2["ended_at"] is not None
+
+
+class TestTranscriptToLlmMessages:
+    """Unit tests for the _transcript_to_llm_messages pure function."""
+
+    def test_empty_transcript(self):
+        assert _transcript_to_llm_messages([]) == []
+
+    def test_user_and_assistant_messages(self):
+        transcript = [
+            {"role": "user", "content": "Hello", "timestamp": "2025-01-01T00:00:00Z"},
+            {"role": "assistant", "content": "Hi!", "timestamp": "2025-01-01T00:00:01Z"},
+        ]
+        result = _transcript_to_llm_messages(transcript)
+        assert result == [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi!"},
+        ]
+
+    def test_system_prompt_in_transcript(self):
+        transcript = [
+            {"role": "system", "content": "You are helpful."},
+            {"role": "user", "content": "Hello"},
+        ]
+        result = _transcript_to_llm_messages(transcript)
+        assert result[0] == {"role": "system", "content": "You are helpful."}
+
+    def test_assistant_with_tool_calls(self):
+        transcript = [
+            {
+                "role": "assistant",
+                "content": "Let me check.",
+                "tool_calls": [
+                    {"id": "call_1", "tool_name": "get_weather", "arguments": {"city": "NYC"}},
+                ],
+            },
+        ]
+        result = _transcript_to_llm_messages(transcript)
+        assert len(result) == 1
+        msg = result[0]
+        assert msg["role"] == "assistant"
+        assert msg["content"] == "Let me check."
+        assert len(msg["tool_calls"]) == 1
+        tc = msg["tool_calls"][0]
+        assert tc["id"] == "call_1"
+        assert tc["type"] == "function"
+        assert tc["function"]["name"] == "get_weather"
+        assert json.loads(tc["function"]["arguments"]) == {"city": "NYC"}
+
+    def test_tool_result_message(self):
+        transcript = [
+            {"role": "tool", "tool_call_id": "call_1", "content": "72°F"},
+        ]
+        result = _transcript_to_llm_messages(transcript)
+        assert result == [{"role": "tool", "tool_call_id": "call_1", "content": "72°F"}]
+
+    def test_assistant_tool_calls_with_name_key(self):
+        """Handles both 'tool_name' and 'name' keys for backward compatibility."""
+        transcript = [
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "c1", "name": "my_tool", "arguments": {}}],
+            },
+        ]
+        result = _transcript_to_llm_messages(transcript)
+        assert result[0]["tool_calls"][0]["function"]["name"] == "my_tool"
+
+    def test_empty_tool_arguments_workaround(self):
+        """Empty arguments get the Gemini workaround placeholder."""
+        transcript = [
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "c1", "tool_name": "ping", "arguments": {}}],
+            },
+        ]
+        result = _transcript_to_llm_messages(transcript)
+        assert result[0]["tool_calls"][0]["function"]["arguments"] == '{"_": ""}'
+
+
+class TestBuildToolCalls:
+    """Unit tests for _build_tool_calls."""
+
+    def test_empty_accumulated(self):
+        assert _build_tool_calls({}) == []
+
+    def test_single_tool_call(self):
+        accumulated = {0: {"id": "call_1", "name": "get_weather", "arguments": '{"city": "NYC"}'}}
+        result = _build_tool_calls(accumulated)
+        assert len(result) == 1
+        assert result[0]["id"] == "call_1"
+        assert result[0]["tool_name"] == "get_weather"
+        assert result[0]["arguments"] == {"city": "NYC"}
+        assert result[0]["status"] == "pending"
+        assert result[0]["result"] is None
+
+    def test_multiple_tool_calls_sorted_by_index(self):
+        accumulated = {
+            2: {"id": "c3", "name": "tool_c", "arguments": "{}"},
+            0: {"id": "c1", "name": "tool_a", "arguments": "{}"},
+            1: {"id": "c2", "name": "tool_b", "arguments": "{}"},
+        }
+        result = _build_tool_calls(accumulated)
+        assert [tc["id"] for tc in result] == ["c1", "c2", "c3"]
+
+    def test_malformed_json_arguments(self):
+        accumulated = {0: {"id": "c1", "name": "tool", "arguments": "not valid json"}}
+        result = _build_tool_calls(accumulated)
+        assert result[0]["arguments"] == {"raw": "not valid json"}
+
+    def test_empty_arguments_string(self):
+        accumulated = {0: {"id": "c1", "name": "tool", "arguments": ""}}
+        result = _build_tool_calls(accumulated)
+        assert result[0]["arguments"] == {}
