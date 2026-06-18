@@ -17,13 +17,10 @@ def create_evaluation_adapter(
 ) -> EvaluationAdapter:
     """Create an evaluation adapter by type.
 
-    The factory first checks a small set of hard-coded aliases for backward
-    compatibility, then falls back to the evaluator registry for any
-    registered evaluator ID.
-
     Args:
-        adapter_type: The type of adapter to create. Accepts both legacy
-            aliases ("litellm") and registry evaluator IDs ("litellm-judge").
+        adapter_type: The type of adapter to create. Built-in types
+            (e.g. "litellm") are resolved directly; other IDs fall
+            through to the evaluator registry.
         **kwargs: Passed to the adapter constructor (model, api_key, api_base, etc.).
 
     Returns:
@@ -32,7 +29,6 @@ def create_evaluation_adapter(
     Raises:
         ValueError: If the adapter_type is unknown.
     """
-    # Legacy aliases for backward compatibility
     if adapter_type == "litellm":
         from app.adapters.litellm_judge import LiteLLMJudgeAdapter
 

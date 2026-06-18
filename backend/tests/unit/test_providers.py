@@ -1,6 +1,5 @@
-"""Unit tests for provider profiles loading, registry, proxy context manager, and test connection."""
+"""Unit tests for provider profiles loading, registry, and test connection."""
 
-import os
 import ssl
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,7 +9,6 @@ import yaml
 
 from app.api.v1.providers import _handle_connection_error
 from app.core.providers import ProviderProfile, ProviderRegistry
-from app.services.provider_utils import proxy_env
 
 
 class TestProviderProfile:
@@ -364,145 +362,6 @@ class TestProviderRegistry:
         assert reloaded.proxy == "http://proxy:3128"
         assert reloaded.single_model is True
         assert reloaded.rate_limits == [{"value": 5, "unit": "requests", "per": "second"}]
-
-
-class TestProxyEnv:
-    def test_proxy_env_sets_and_restores(self):
-        """proxy_env sets HTTP_PROXY/HTTPS_PROXY and restores original values."""
-        # Ensure clean state
-        os.environ.pop("HTTP_PROXY", None)
-        os.environ.pop("HTTPS_PROXY", None)
-
-        with proxy_env("http://proxy:3128"):
-            assert os.environ["HTTP_PROXY"] == "http://proxy:3128"
-            assert os.environ["HTTPS_PROXY"] == "http://proxy:3128"
-
-        assert "HTTP_PROXY" not in os.environ
-        assert "HTTPS_PROXY" not in os.environ
-
-    def test_proxy_env_restores_existing_values(self):
-        """proxy_env restores pre-existing proxy env vars."""
-        os.environ["HTTP_PROXY"] = "http://original:1111"
-        os.environ["HTTPS_PROXY"] = "http://original:2222"
-
-        try:
-            with proxy_env("http://new-proxy:3128"):
-                assert os.environ["HTTP_PROXY"] == "http://new-proxy:3128"
-                assert os.environ["HTTPS_PROXY"] == "http://new-proxy:3128"
-
-            assert os.environ["HTTP_PROXY"] == "http://original:1111"
-            assert os.environ["HTTPS_PROXY"] == "http://original:2222"
-        finally:
-            os.environ.pop("HTTP_PROXY", None)
-            os.environ.pop("HTTPS_PROXY", None)
-
-    def test_proxy_env_noop_when_none(self):
-        """proxy_env is a no-op when proxy is None."""
-        os.environ.pop("HTTP_PROXY", None)
-        os.environ.pop("HTTPS_PROXY", None)
-
-        with proxy_env(None):
-            assert "HTTP_PROXY" not in os.environ
-            assert "HTTPS_PROXY" not in os.environ
-
-    def test_proxy_env_restores_on_exception(self):
-        """proxy_env restores env vars even if an exception occurs."""
-        os.environ.pop("HTTP_PROXY", None)
-        os.environ.pop("HTTPS_PROXY", None)
-
-        with pytest.raises(RuntimeError), proxy_env("http://proxy:3128"):
-            assert os.environ["HTTP_PROXY"] == "http://proxy:3128"
-            raise RuntimeError("test error")
-
-        assert "HTTP_PROXY" not in os.environ
-        assert "HTTPS_PROXY" not in os.environ
-
-    def test_proxy_env_mtls_sets_litellm_ssl_certificate(self, tmp_path):
-        """When both ssl_cert_path and ssl_client_key are set, litellm.ssl_certificate is set."""
-        import litellm
-
-        cert = tmp_path / "cert.pem"
-        key = tmp_path / "key.pem"
-        cert.write_text("CERT")
-        key.write_text("KEY")
-
-        original = getattr(litellm, "ssl_certificate", None)
-        try:
-            with proxy_env(None, str(cert), str(key)):
-                assert litellm.ssl_certificate == (str(cert), str(key))
-
-            # Restored after exit
-            assert getattr(litellm, "ssl_certificate", None) == original
-        finally:
-            litellm.ssl_certificate = original
-
-    def test_proxy_env_mtls_does_not_set_ssl_cert_file(self, tmp_path):
-        """mTLS mode does NOT set SSL_CERT_FILE env vars."""
-        cert = tmp_path / "cert.pem"
-        key = tmp_path / "key.pem"
-        cert.write_text("CERT")
-        key.write_text("KEY")
-
-        os.environ.pop("SSL_CERT_FILE", None)
-
-        with proxy_env(None, str(cert), str(key)):
-            assert "SSL_CERT_FILE" not in os.environ
-
-    def test_proxy_env_ca_only_backward_compat(self, tmp_path):
-        """When only ssl_cert_path is set (no key), SSL_CERT_FILE is set (backward compat)."""
-        cert = tmp_path / "ca-bundle.pem"
-        cert.write_text("CA")
-
-        os.environ.pop("SSL_CERT_FILE", None)
-        os.environ.pop("REQUESTS_CA_BUNDLE", None)
-
-        with proxy_env(None, str(cert)):
-            assert os.environ["SSL_CERT_FILE"] == str(cert)
-            assert os.environ["REQUESTS_CA_BUNDLE"] == str(cert)
-
-        assert "SSL_CERT_FILE" not in os.environ
-        assert "REQUESTS_CA_BUNDLE" not in os.environ
-
-    def test_proxy_env_mtls_restores_on_exception(self, tmp_path):
-        """litellm.ssl_certificate is restored even on exception."""
-        import litellm
-
-        cert = tmp_path / "cert.pem"
-        key = tmp_path / "key.pem"
-        cert.write_text("CERT")
-        key.write_text("KEY")
-
-        original = getattr(litellm, "ssl_certificate", None)
-        try:
-            with pytest.raises(RuntimeError), proxy_env(None, str(cert), str(key)):
-                assert litellm.ssl_certificate == (str(cert), str(key))
-                raise RuntimeError("test")
-
-            assert getattr(litellm, "ssl_certificate", None) == original
-        finally:
-            litellm.ssl_certificate = original
-
-    def test_proxy_env_mtls_missing_cert_raises(self, tmp_path):
-        """mTLS mode raises FileNotFoundError when cert file is missing."""
-        key = tmp_path / "key.pem"
-        key.write_text("KEY")
-
-        with (
-            pytest.raises(FileNotFoundError, match="ssl_cert_path"),
-            proxy_env(None, "/nonexistent/cert.pem", str(key)),
-        ):
-            pass
-
-    def test_proxy_env_mtls_missing_key_raises(self, tmp_path):
-        """mTLS mode raises FileNotFoundError when key file is missing."""
-        cert = tmp_path / "cert.pem"
-        cert.write_text("CERT")
-
-        with (
-            pytest.raises(FileNotFoundError, match="ssl_client_key"),
-            proxy_env(None, str(cert), "/nonexistent/key.pem"),
-        ):
-            pass
 
 
 class TestTestConnection:

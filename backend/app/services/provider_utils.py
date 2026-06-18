@@ -4,10 +4,8 @@ Extracts the model/key/base/proxy resolution logic that is used by both
 eval_runner (Q/A mode) and agent_chat_service (interactive mode).
 """
 
-import asyncio
 import hashlib
 import os
-from contextlib import contextmanager
 from dataclasses import dataclass
 
 import httpx
@@ -251,69 +249,6 @@ def get_litellm_client(
     )
     _litellm_clients[key] = client
     return client
-
-
-_proxy_env_lock = asyncio.Lock()
-
-
-@contextmanager
-def proxy_env(proxy: str | None, ssl_cert_path: str | None = None, ssl_client_key: str | None = None):
-    """Temporarily configure proxy and SSL for LiteLLM calls.
-
-    .. deprecated::
-        Prefer ``get_litellm_client()`` which injects a per-provider
-        ``AsyncOpenAI`` client via the ``client=`` kwarg — no global
-        mutation.  This context manager remains only for call sites
-        that cannot use the client kwarg (e.g. ``test_connection``).
-        It is guarded by ``_proxy_env_lock`` to prevent concurrent
-        interleaving.
-
-    Two modes:
-
-    - **CA-only** (ssl_cert_path without ssl_client_key): sets SSL_CERT_FILE,
-      REQUESTS_CA_BUNDLE, and CURL_CA_BUNDLE for server certificate verification.
-    - **mTLS** (ssl_cert_path + ssl_client_key): sets ``litellm.ssl_certificate``
-      to a ``(cert, key)`` tuple for mutual TLS client authentication.
-    """
-    import litellm as _litellm
-
-    if not proxy and not ssl_cert_path:
-        yield
-        return
-
-    saved: dict[str, str | None] = {}
-    cert_vars = ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
-    proxy_vars = ("HTTP_PROXY", "HTTPS_PROXY")
-    saved_ssl_certificate = getattr(_litellm, "ssl_certificate", None)
-    mtls_mode = bool(ssl_cert_path and ssl_client_key)
-
-    if mtls_mode:
-        for path, label in [(ssl_cert_path, "ssl_cert_path"), (ssl_client_key, "ssl_client_key")]:
-            if not os.path.isfile(path):
-                raise FileNotFoundError(f"{label} not found: {path}")
-
-    try:
-        if proxy:
-            for var in proxy_vars:
-                saved[var] = os.environ.get(var)
-                os.environ[var] = proxy
-
-        if mtls_mode:
-            _litellm.ssl_certificate = (ssl_cert_path, ssl_client_key)
-        elif ssl_cert_path:
-            for var in cert_vars:
-                saved[var] = os.environ.get(var)
-                os.environ[var] = ssl_cert_path
-
-        yield
-    finally:
-        for var, old_val in saved.items():
-            if old_val is None:
-                os.environ.pop(var, None)
-            else:
-                os.environ[var] = old_val
-        if mtls_mode:
-            _litellm.ssl_certificate = saved_ssl_certificate
 
 
 async def call_model(
