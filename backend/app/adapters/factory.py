@@ -67,4 +67,7 @@ def create_adapter_from_config(
         api_base=judge_resolved.api_base,
         max_concurrency=config.get("max_concurrency", 10),
         extra_params=judge_llm_params if judge_llm_params else None,
+        proxy=judge_resolved.proxy,
+        ssl_cert_path=judge_resolved.ssl_cert_path,
+        ssl_client_key=judge_resolved.ssl_client_key,
     )

@@ -467,6 +467,46 @@ class TestPersistYAML:
         assert registry.get_item("x") is not None
 
 
+class TestIsolated:
+    """Tests for the isolated() context manager (test isolation seam)."""
+
+    def test_isolated_swaps_and_restores_state(self, tmp_path):
+        """isolated() clears items and redirects path; exit restores everything."""
+        config = tmp_path / "real.yaml"
+        data = {"items": [{"id": "a", "name": "Alpha"}]}
+        config.write_text(yaml.dump(data))
+
+        registry = FakeRegistry()
+        registry.load_from_yaml(config)
+        assert registry.get_item("a") is not None
+
+        iso_path = tmp_path / "isolated.yaml"
+        with registry.isolated(iso_path):
+            assert registry.list_items() == []
+            assert registry._config_path == iso_path
+            registry.add_item(FakeItem(id="temp", name="Temp"))
+            assert registry.get_item("temp") is not None
+
+        assert registry.get_item("a") is not None
+        assert registry.get_item("temp") is None
+        assert registry._config_path == config
+
+    def test_isolated_restores_on_exception(self, tmp_path):
+        """isolated() restores state even when the body raises."""
+        config = tmp_path / "real.yaml"
+        data = {"items": [{"id": "a", "name": "Alpha"}]}
+        config.write_text(yaml.dump(data))
+
+        registry = FakeRegistry()
+        registry.load_from_yaml(config)
+
+        with pytest.raises(RuntimeError, match="boom"), registry.isolated(tmp_path / "isolated.yaml"):
+            raise RuntimeError("boom")
+
+        assert registry.get_item("a") is not None
+        assert registry._config_path == config
+
+
 class TestResolveRegistryConfigPath:
     """Tests for the shared resolve_registry_config_path helper."""
 

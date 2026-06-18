@@ -11,7 +11,7 @@ from app.adapters.base import (
     Score,
     ToolCall,
 )
-from app.core.exceptions import sanitize_error_for_client
+from app.services.provider_utils import proxy_env
 
 logger = structlog.get_logger()
 
@@ -147,12 +147,59 @@ Respond with ONLY a JSON object:
         api_base: str | None = None,
         max_concurrency: int = 10,
         extra_params: dict | None = None,
+        proxy: str | None = None,
+        ssl_cert_path: str | None = None,
+        ssl_client_key: str | None = None,
     ):
         super().__init__(max_concurrency=max_concurrency)
         self.model = model
         self.api_key = api_key
         self.api_base = api_base
         self.extra_params = extra_params or {}
+        self.proxy = proxy
+        self.ssl_cert_path = ssl_cert_path
+        self.ssl_client_key = ssl_client_key
+
+    async def _ask_judge(
+        self,
+        prompt: str,
+        judge_config: JudgeConfigParams | None,
+        mode: str,
+    ) -> dict | None:
+        """Build kwargs, call litellm, parse JSON response.
+
+        Returns the parsed dict, or None on empty/unparseable content.
+        """
+        model = (judge_config.model if judge_config else None) or self.model
+        temperature = judge_config.temperature if judge_config and judge_config.temperature is not None else 0.0
+
+        kwargs: dict = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "response_format": {"type": "json_object"},
+        }
+        if self.api_key:
+            kwargs["api_key"] = self.api_key
+        if self.api_base:
+            kwargs["api_base"] = self.api_base
+        for k, v in self.extra_params.items():
+            if k not in kwargs:
+                kwargs[k] = v
+
+        with proxy_env(self.proxy, self.ssl_cert_path, self.ssl_client_key):
+            response = await litellm.acompletion(**kwargs)
+
+        content = response.choices[0].message.content
+        if content is None:
+            logger.warning("judge.empty_response", mode=mode)
+            return None
+
+        try:
+            return json.loads(content)
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.error("judge.parse_failed", error=str(exc), raw_content=content)
+            return None
 
     async def evaluate_qa(
         self,
@@ -169,34 +216,9 @@ Respond with ONLY a JSON object:
                 expected_answer=expected_answer,
                 actual_answer=actual_answer,
             )
-            kwargs: dict = {
-                "model": judge_config.model or self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": judge_config.temperature if judge_config.temperature is not None else 0.0,
-                "response_format": {"type": "json_object"},
-            }
-            if self.api_key:
-                kwargs["api_key"] = self.api_key
-            if self.api_base:
-                kwargs["api_base"] = self.api_base
-            # Apply extra LLM params (e.g. max_tokens from provider/eval config)
-            for k, v in self.extra_params.items():
-                if k not in kwargs:
-                    kwargs[k] = v
-            response = await litellm.acompletion(**kwargs)
-            content = response.choices[0].message.content
-            if content is None:
-                logger.warning("judge.empty_response", mode="qa")
-                return Score(value=0.0, passed=False, reasoning="LLM returned empty response")
-            try:
-                result = json.loads(content)
-            except (json.JSONDecodeError, TypeError) as exc:
-                logger.error("judge.parse_failed", error=str(exc), raw_content=content)
-                return Score(
-                    value=0.0,
-                    passed=False,
-                    reasoning=f"Failed to parse judge response: {sanitize_error_for_client(exc)}",
-                )
+            result = await self._ask_judge(prompt, judge_config, "qa")
+            if result is None:
+                return Score(value=0.0, passed=False, reasoning="LLM returned empty or unparseable response")
             score_value = float(result.get("score", 0.0))
             reasoning = result.get("reasoning", "")
             passed = score_value >= (judge_config.pass_threshold or 0.7)
@@ -267,37 +289,9 @@ Respond with ONLY a JSON object:
         async with self._semaphore:
             transcript = self._format_conversation(messages, tool_calls)
             prompt = self.CONVERSATION_PROMPT_TEMPLATE.format(transcript=transcript)
-
-            kwargs: dict = {
-                "model": judge_config.model or self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": judge_config.temperature if judge_config.temperature is not None else 0.0,
-                "response_format": {"type": "json_object"},
-            }
-            if self.api_key:
-                kwargs["api_key"] = self.api_key
-            if self.api_base:
-                kwargs["api_base"] = self.api_base
-            for k, v in self.extra_params.items():
-                if k not in kwargs:
-                    kwargs[k] = v
-
-            response = await litellm.acompletion(**kwargs)
-            content = response.choices[0].message.content
-
-            if content is None:
-                logger.warning("judge.empty_response", mode="conversation")
-                return Score(value=0.0, passed=False, reasoning="LLM returned empty response")
-
-            try:
-                result = json.loads(content)
-            except (json.JSONDecodeError, TypeError) as exc:
-                logger.error("judge.parse_failed", error=str(exc), raw_content=content)
-                return Score(
-                    value=0.0,
-                    passed=False,
-                    reasoning=f"Failed to parse judge response: {sanitize_error_for_client(exc)}",
-                )
+            result = await self._ask_judge(prompt, judge_config, "conversation")
+            if result is None:
+                return Score(value=0.0, passed=False, reasoning="LLM returned empty or unparseable response")
 
             breakdown = {dim: float(result.get(dim, 0.0)) for dim in self._CONVERSATION_DIMENSIONS}
             overall = sum(breakdown.values()) / len(self._CONVERSATION_DIMENSIONS)
@@ -318,9 +312,7 @@ Respond with ONLY a JSON object:
         """Score a RAG response with retrieved context using RAGAS-style metrics."""
         requested = set(metrics) if metrics else set(self._RAG_DIMENSIONS)
         threshold = (judge_config.pass_threshold if judge_config else None) or 0.7
-        temperature = judge_config.temperature if judge_config else 0.0
 
-        # Early exit: no chunks AND no answer -> neutral scores
         if not context_chunks and not answer:
             return {
                 dim: Score(value=0.5, passed=False, reasoning="No context chunks or answer provided")
@@ -330,13 +322,11 @@ Respond with ONLY a JSON object:
 
         async with self._semaphore:
             formatted_chunks = self._format_chunks(context_chunks)
-
             context_recall_instruction = (
                 "Score based on coverage relative to the expected answer."
                 if expected_answer
                 else "No expected answer provided; score 0.5 (neutral) for this dimension."
             )
-
             prompt = self.RAG_METRICS_PROMPT_TEMPLATE.format(
                 question=question,
                 expected_answer=expected_answer or "(not provided)",
@@ -344,42 +334,10 @@ Respond with ONLY a JSON object:
                 formatted_chunks=formatted_chunks or "(no chunks retrieved)",
                 context_recall_instruction=context_recall_instruction,
             )
-
-            kwargs: dict = {
-                "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": temperature,
-                "response_format": {"type": "json_object"},
-            }
-            if self.api_key:
-                kwargs["api_key"] = self.api_key
-            if self.api_base:
-                kwargs["api_base"] = self.api_base
-            for k, v in self.extra_params.items():
-                if k not in kwargs:
-                    kwargs[k] = v
-
-            response = await litellm.acompletion(**kwargs)
-            content = response.choices[0].message.content
-
-            if content is None:
-                logger.warning("judge.empty_response", mode="rag")
+            result = await self._ask_judge(prompt, judge_config, "rag")
+            if result is None:
                 return {
-                    dim: Score(value=0.0, passed=False, reasoning="LLM returned empty response")
-                    for dim in self._RAG_DIMENSIONS
-                    if dim in requested
-                }
-
-            try:
-                result = json.loads(content)
-            except (json.JSONDecodeError, TypeError) as exc:
-                logger.error("judge.parse_failed", error=str(exc), raw_content=content)
-                return {
-                    dim: Score(
-                        value=0.0,
-                        passed=False,
-                        reasoning=f"Failed to parse judge response: {sanitize_error_for_client(exc)}",
-                    )
+                    dim: Score(value=0.0, passed=False, reasoning="LLM returned empty or unparseable response")
                     for dim in self._RAG_DIMENSIONS
                     if dim in requested
                 }
@@ -389,8 +347,6 @@ Respond with ONLY a JSON object:
             for dim in self._RAG_DIMENSIONS:
                 if dim not in requested:
                     continue
-
-                # context_recall defaults to neutral when no expected_answer
                 if dim == "context_recall" and expected_answer is None:
                     scores[dim] = Score(
                         value=0.5,
@@ -398,14 +354,12 @@ Respond with ONLY a JSON object:
                         reasoning="No expected answer provided; context_recall set to neutral",
                     )
                     continue
-
                 score_value = float(result.get(dim, 0.0))
                 scores[dim] = Score(
                     value=score_value,
                     passed=score_value >= threshold,
                     reasoning=reasoning,
                 )
-
             return scores
 
     def supports_mode(self, mode: str) -> bool:

@@ -181,7 +181,7 @@ async def test_evaluate_rag_parse_error():
     for metric_name in ("context_precision", "context_recall", "faithfulness", "answer_relevance"):
         assert result[metric_name].value == 0.0
         assert result[metric_name].passed is False
-        assert "Failed to parse" in result[metric_name].reasoning
+        assert "unparseable" in result[metric_name].reasoning
 
 
 @pytest.mark.asyncio
@@ -296,7 +296,7 @@ async def test_evaluate_rag_none_content():
     for metric_name in ("context_precision", "context_recall", "faithfulness", "answer_relevance"):
         assert result[metric_name].value == 0.0
         assert result[metric_name].passed is False
-        assert "empty response" in result[metric_name].reasoning
+        assert "empty" in result[metric_name].reasoning
 
 
 @pytest.mark.asyncio
