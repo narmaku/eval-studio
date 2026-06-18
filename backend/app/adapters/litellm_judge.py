@@ -11,7 +11,7 @@ from app.adapters.base import (
     Score,
     ToolCall,
 )
-from app.services.provider_utils import proxy_env
+from app.services.provider_utils import get_litellm_client
 
 logger = structlog.get_logger()
 
@@ -187,8 +187,17 @@ Respond with ONLY a JSON object:
             if k not in kwargs:
                 kwargs[k] = v
 
-        with proxy_env(self.proxy, self.ssl_cert_path, self.ssl_client_key):
-            response = await litellm.acompletion(**kwargs)
+        client = get_litellm_client(
+            self.proxy,
+            self.ssl_cert_path,
+            self.ssl_client_key,
+            self.api_key,
+            self.api_base,
+        )
+        if client is not None:
+            kwargs["client"] = client
+
+        response = await litellm.acompletion(**kwargs)
 
         content = response.choices[0].message.content
         if content is None:

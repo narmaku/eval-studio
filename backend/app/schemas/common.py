@@ -23,3 +23,4 @@ class ProblemDetail(BaseModel):
     status: int
     detail: str
     instance: str | None = None
+    errors: list[dict] | None = None

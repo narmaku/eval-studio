@@ -11,7 +11,7 @@ import litellm
 import structlog
 
 from app.agent_backends.base import AgentBackendAdapter, AgentStreamChunk
-from app.services.provider_utils import proxy_env
+from app.services.provider_utils import get_litellm_client
 
 logger = structlog.get_logger()
 
@@ -76,45 +76,54 @@ class LiteLLMAgentAdapter(AgentBackendAdapter):
             message_count=len(llm_messages),
         )
 
-        with proxy_env(self.proxy, self.ssl_cert_path, self.ssl_client_key):
-            try:
-                stream = await litellm.acompletion(**litellm_kwargs)
-                async for chunk in stream:
-                    delta = chunk.choices[0].delta
+        client = get_litellm_client(
+            self.proxy,
+            self.ssl_cert_path,
+            self.ssl_client_key,
+            self.api_key,
+            self.api_base,
+        )
+        if client is not None:
+            litellm_kwargs["client"] = client
 
-                    if delta.content:
-                        yield AgentStreamChunk(content=delta.content)
+        try:
+            stream = await litellm.acompletion(**litellm_kwargs)
+            async for chunk in stream:
+                delta = chunk.choices[0].delta
 
-                    if delta.tool_calls:
-                        for tc_chunk in delta.tool_calls:
-                            yield AgentStreamChunk(
-                                tool_call_chunk={
-                                    "index": tc_chunk.index,
-                                    "id": tc_chunk.id or "",
-                                    "name": getattr(tc_chunk.function, "name", "") or "",
-                                    "arguments": getattr(tc_chunk.function, "arguments", "") or "",
-                                }
-                            )
-            except litellm.BadRequestError as exc:
-                if "streaming" in str(exc).lower() or "stream" in str(exc).lower():
-                    logger.info("litellm_agent.stream_fallback", model=self.model)
-                    litellm_kwargs["stream"] = False
-                    response = await litellm.acompletion(**litellm_kwargs)
-                    choice = response.choices[0]
-                    if choice.message.content:
-                        yield AgentStreamChunk(content=choice.message.content)
-                    if choice.message.tool_calls:
-                        for idx, tc in enumerate(choice.message.tool_calls):
-                            yield AgentStreamChunk(
-                                tool_call_chunk={
-                                    "index": idx,
-                                    "id": tc.id or "",
-                                    "name": getattr(tc.function, "name", "") or "",
-                                    "arguments": getattr(tc.function, "arguments", "") or "",
-                                }
-                            )
-                else:
-                    raise
+                if delta.content:
+                    yield AgentStreamChunk(content=delta.content)
+
+                if delta.tool_calls:
+                    for tc_chunk in delta.tool_calls:
+                        yield AgentStreamChunk(
+                            tool_call_chunk={
+                                "index": tc_chunk.index,
+                                "id": tc_chunk.id or "",
+                                "name": getattr(tc_chunk.function, "name", "") or "",
+                                "arguments": getattr(tc_chunk.function, "arguments", "") or "",
+                            }
+                        )
+        except litellm.BadRequestError as exc:
+            if "streaming" in str(exc).lower() or "stream" in str(exc).lower():
+                logger.info("litellm_agent.stream_fallback", model=self.model)
+                litellm_kwargs["stream"] = False
+                response = await litellm.acompletion(**litellm_kwargs)
+                choice = response.choices[0]
+                if choice.message.content:
+                    yield AgentStreamChunk(content=choice.message.content)
+                if choice.message.tool_calls:
+                    for idx, tc in enumerate(choice.message.tool_calls):
+                        yield AgentStreamChunk(
+                            tool_call_chunk={
+                                "index": idx,
+                                "id": tc.id or "",
+                                "name": getattr(tc.function, "name", "") or "",
+                                "arguments": getattr(tc.function, "arguments", "") or "",
+                            }
+                        )
+            else:
+                raise
 
         yield AgentStreamChunk(done=True)
 

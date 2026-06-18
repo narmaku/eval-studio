@@ -20,7 +20,7 @@ from app.schemas.provider import (
     ProviderUpdate,
     TestConnectionResponse,
 )
-from app.services.provider_utils import proxy_env
+from app.services.provider_utils import get_litellm_client
 
 logger = structlog.get_logger()
 
@@ -97,9 +97,17 @@ async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
                 litellm_kwargs["api_key"] = api_key
             if payload.api_base:
                 litellm_kwargs["api_base"] = payload.api_base
+            client = get_litellm_client(
+                payload.proxy,
+                payload.ssl_cert_path,
+                payload.ssl_client_key,
+                api_key,
+                payload.api_base,
+            )
+            if client is not None:
+                litellm_kwargs["client"] = client
             try:
-                with proxy_env(payload.proxy, payload.ssl_cert_path, payload.ssl_client_key):
-                    await litellm.acompletion(**litellm_kwargs)
+                await litellm.acompletion(**litellm_kwargs)
                 return TestConnectionResponse(
                     success=True,
                     message=f"Connected to {payload.default_model}",

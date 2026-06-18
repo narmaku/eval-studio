@@ -117,6 +117,23 @@ async def test_create_evaluation_valid_evaluator_id(client):
 
 
 @pytest.mark.asyncio
+async def test_validation_error_returns_structured_errors(client):
+    """CONS-005: 422 response includes structured errors list, not a repr string."""
+    response = await client.post("/api/v1/evaluations", json={})
+    assert response.status_code == 422
+    body = response.json()
+    assert body["detail"] == "Request validation failed"
+    assert isinstance(body["errors"], list)
+    assert len(body["errors"]) > 0
+    locs = [e["loc"] for e in body["errors"]]
+    assert any("name" in loc for loc in locs)
+    for err in body["errors"]:
+        assert "loc" in err
+        assert "msg" in err
+        assert "type" in err
+
+
+@pytest.mark.asyncio
 async def test_config_secrets_redacted_in_response(client):
     """SEC-001: GET /evaluations/{id} redacts secret-bearing config keys."""
     payload = {

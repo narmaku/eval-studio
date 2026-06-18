@@ -1,12 +1,19 @@
 """Tests for provider_utils — shared provider resolution logic."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from openai import AsyncOpenAI
 
 from app.core.providers import ProviderProfile, ProviderRegistry
-from app.services.provider_utils import ResolvedModel, call_model, resolve_model_config
+from app.services.provider_utils import (
+    ResolvedModel,
+    _litellm_clients,
+    call_model,
+    get_litellm_client,
+    resolve_model_config,
+)
 
 
 @pytest.fixture
@@ -295,7 +302,7 @@ class TestCallModel:
 
         with (
             patch("app.services.provider_utils.litellm") as mock_litellm,
-            patch("app.services.provider_utils.proxy_env"),
+            patch("app.services.provider_utils.get_litellm_client", return_value=None),
         ):
             mock_litellm.acompletion = AsyncMock(return_value=mock_completion)
             result = await call_model(resolved, "What is 2+2?")
@@ -318,7 +325,7 @@ class TestCallModel:
 
         with (
             patch("app.services.provider_utils.litellm") as mock_litellm,
-            patch("app.services.provider_utils.proxy_env"),
+            patch("app.services.provider_utils.get_litellm_client", return_value=None),
         ):
             mock_litellm.acompletion = AsyncMock(return_value=mock_completion)
             result = await call_model(resolved, "test", extra_params={"max_tokens": 100})
@@ -326,3 +333,134 @@ class TestCallModel:
         assert result == "Answer"
         call_kwargs = mock_litellm.acompletion.call_args[1]
         assert call_kwargs["max_tokens"] == 100
+
+
+class TestGetLitellmClient:
+    """Tests for get_litellm_client (per-provider httpx client injection)."""
+
+    def setup_method(self):
+        _litellm_clients.clear()
+
+    def teardown_method(self):
+        _litellm_clients.clear()
+
+    def test_returns_none_when_no_proxy_or_ssl(self):
+        assert get_litellm_client(None) is None
+        assert get_litellm_client(None, None, None) is None
+
+    def test_returns_client_with_proxy(self):
+        client = get_litellm_client("http://proxy:8080", api_key="k", api_base="http://base")
+        assert isinstance(client, AsyncOpenAI)
+
+    def test_caches_by_connection_params(self):
+        c1 = get_litellm_client("http://proxy:8080", api_key="k")
+        c2 = get_litellm_client("http://proxy:8080", api_key="k")
+        assert c1 is c2
+
+    def test_different_params_get_different_clients(self):
+        c1 = get_litellm_client("http://proxy-a:8080", api_key="k")
+        c2 = get_litellm_client("http://proxy-b:8080", api_key="k")
+        assert c1 is not c2
+
+    def test_ssl_cert_only_passes_verify_to_httpx(self, tmp_path):
+        """CA-only mode passes ssl_cert_path as verify= to httpx."""
+        cert = tmp_path / "ca.pem"
+        cert.write_text("ca-bundle-contents")
+        with (
+            patch("app.services.provider_utils.httpx.AsyncClient") as mock_httpx,
+            patch("app.services.provider_utils.AsyncOpenAI") as mock_openai,
+        ):
+            client = get_litellm_client(None, str(cert), None, "k")
+        assert client is mock_openai.return_value
+        call_kwargs = mock_httpx.call_args[1]
+        assert call_kwargs["verify"] == str(cert)
+        assert call_kwargs["cert"] is None
+
+    def test_mtls_passes_cert_tuple_to_httpx(self, tmp_path):
+        """mTLS mode passes (cert, key) tuple to httpx."""
+        cert = tmp_path / "cert.pem"
+        key = tmp_path / "key.pem"
+        cert.write_text("cert")
+        key.write_text("key")
+        with (
+            patch("app.services.provider_utils.httpx.AsyncClient") as mock_httpx,
+            patch("app.services.provider_utils.AsyncOpenAI") as mock_openai,
+        ):
+            client = get_litellm_client(None, str(cert), str(key), "k")
+        assert client is mock_openai.return_value
+        call_kwargs = mock_httpx.call_args[1]
+        assert call_kwargs["cert"] == (str(cert), str(key))
+        assert call_kwargs["verify"] is True
+
+    def test_mtls_missing_cert_raises(self):
+        with pytest.raises(FileNotFoundError, match="ssl_cert_path"):
+            get_litellm_client(None, "/nonexistent/cert.pem", "/nonexistent/key.pem")
+
+    @pytest.mark.asyncio
+    async def test_call_model_passes_client_when_proxy(self):
+        """call_model injects client= into litellm kwargs when proxy is set."""
+        resolved = ResolvedModel(
+            model="openai/gpt-4",
+            api_key="sk-test",
+            proxy="http://proxy:8080",
+        )
+        mock_completion = AsyncMock()
+        mock_completion.choices = [AsyncMock()]
+        mock_completion.choices[0].message.content = "ok"
+
+        with patch("app.services.provider_utils.litellm") as mock_litellm:
+            mock_litellm.acompletion = AsyncMock(return_value=mock_completion)
+            await call_model(resolved, "test")
+
+        call_kwargs = mock_litellm.acompletion.call_args[1]
+        assert "client" in call_kwargs
+        assert isinstance(call_kwargs["client"], AsyncOpenAI)
+
+    @pytest.mark.asyncio
+    async def test_call_model_no_client_without_proxy(self):
+        """call_model does not inject client= when no proxy/SSL."""
+        resolved = ResolvedModel(model="openai/gpt-4", api_key="sk-test")
+        mock_completion = AsyncMock()
+        mock_completion.choices = [AsyncMock()]
+        mock_completion.choices[0].message.content = "ok"
+
+        with patch("app.services.provider_utils.litellm") as mock_litellm:
+            mock_litellm.acompletion = AsyncMock(return_value=mock_completion)
+            await call_model(resolved, "test")
+
+        call_kwargs = mock_litellm.acompletion.call_args[1]
+        assert "client" not in call_kwargs
+
+    @pytest.mark.asyncio
+    async def test_concurrent_providers_no_proxy_leakage(self):
+        """Two providers interleaved: proxied A's client stays on A, non-proxied B gets no client."""
+        import asyncio
+
+        resolved_a = ResolvedModel(model="model-a", api_key="key-a", proxy="http://proxy-a:8080")
+        resolved_b = ResolvedModel(model="model-b", api_key="key-b")
+
+        calls: list[dict] = []
+
+        async def fake_acompletion(**kwargs):
+            calls.append(dict(kwargs))
+            await asyncio.sleep(0.01)
+            mock_resp = MagicMock()
+            mock_resp.choices = [MagicMock()]
+            mock_resp.choices[0].message.content = f"resp-{kwargs['model']}"
+            return mock_resp
+
+        with patch("app.services.provider_utils.litellm") as mock_litellm:
+            mock_litellm.acompletion = fake_acompletion
+            tasks = []
+            for i in range(10):
+                tasks.append(call_model(resolved_a, f"q-a-{i}"))
+                tasks.append(call_model(resolved_b, f"q-b-{i}"))
+            results = await asyncio.gather(*tasks)
+
+        assert len(results) == 20
+        for c in calls:
+            if c["model"] == "model-a":
+                assert "client" in c, "Proxied provider A should have client injected"
+                assert isinstance(c["client"], AsyncOpenAI)
+            else:
+                assert "client" not in c, "Non-proxied provider B should NOT have client"
