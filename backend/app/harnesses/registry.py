@@ -1,10 +1,9 @@
 """Harness profiles loaded from YAML configuration."""
 
-import os
 from dataclasses import dataclass, field
-from pathlib import Path
 
-from app.core.registry_base import YAMLBackedRegistry
+from app.core.config import settings
+from app.core.registry_base import YAMLBackedRegistry, resolve_registry_config_path
 
 
 @dataclass
@@ -93,24 +92,5 @@ class HarnessRegistry(YAMLBackedRegistry[HarnessProfile]):
         return self.delete_item(harness_id)
 
 
-def _resolve_config_path() -> Path:
-    """Resolve the harness config file path."""
-    env_path = os.environ.get("HARNESS_CONFIG_PATH")
-    if env_path:
-        return Path(env_path)
-
-    repo_root = Path(__file__).resolve().parents[3]
-    candidate = repo_root / "config" / "harnesses.yaml"
-    if candidate.exists():
-        return candidate
-
-    cwd_candidate = Path.cwd() / "config" / "harnesses.yaml"
-    if cwd_candidate.exists():
-        return cwd_candidate
-
-    return candidate
-
-
 harness_registry = HarnessRegistry()
-_config_path = _resolve_config_path()
-harness_registry.load_from_yaml(_config_path)
+harness_registry.load_from_yaml(resolve_registry_config_path(settings.harnesses_config_path, "harnesses.yaml"))

@@ -51,10 +51,10 @@ def _launch_evaluation(evaluation_id: str, coro: object) -> asyncio.Task:
                 async with async_session_factory() as cancel_db:
                     result = await cancel_db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
                     evaluation = result.scalar_one_or_none()
-                    if evaluation and evaluation.status == "running":
-                        evaluation.status = "cancelled"
+                    if evaluation and evaluation.status == EvaluationStatus.RUNNING:
+                        evaluation.status = EvaluationStatus.CANCELLED
                         await cancel_db.commit()
-                        await broadcast_status(evaluation_id, "cancelled")
+                        await broadcast_status(evaluation_id, EvaluationStatus.CANCELLED)
             except Exception:
                 logger.exception("evaluation.cancel_status_update_failed", evaluation_id=evaluation_id)
         finally:
@@ -104,7 +104,7 @@ async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depend
     evaluation = Evaluation(
         name=payload.name,
         mode=payload.mode.value,
-        status="pending",
+        status=EvaluationStatus.PENDING,
         dataset_id=payload.dataset_id,
         judge_config_id=payload.judge_config_id,
         config=payload.config,
@@ -230,7 +230,7 @@ async def run_and_wait(
     evaluation = Evaluation(
         name=payload.name,
         mode=payload.mode.value,
-        status="pending",
+        status=EvaluationStatus.PENDING,
         dataset_id=payload.dataset_id,
         judge_config_id=payload.judge_config_id,
         config=payload.config,
@@ -253,7 +253,7 @@ async def run_and_wait(
 
         async_resp = RunAsyncResponse(
             evaluation_id=evaluation_id,
-            status="running",
+            status=EvaluationStatus.RUNNING,
             poll_url=f"/api/v1/evaluations/{evaluation_id}",
         )
         return Response(
@@ -322,7 +322,7 @@ async def delete_evaluation(evaluation_id: str, db: AsyncSession = Depends(get_d
     if not evaluation:
         raise NotFoundException("Evaluation", evaluation_id)
 
-    if evaluation.status == "running":
+    if evaluation.status == EvaluationStatus.RUNNING:
         raise ConflictException("Cannot delete a running evaluation.")
 
     await _cleanup_artifacts(evaluation_id, db)
@@ -343,7 +343,7 @@ async def cancel_evaluation(
     if not evaluation:
         raise NotFoundException("Evaluation", evaluation_id)
 
-    if evaluation.status != "running":
+    if evaluation.status != EvaluationStatus.RUNNING:
         raise ConflictException(
             f"Evaluation is '{evaluation.status}' and cannot be cancelled. Only 'running' evaluations can be cancelled."
         )
@@ -353,9 +353,9 @@ async def cancel_evaluation(
         task.cancel()
         logger.info("evaluation.cancel_requested", id=evaluation_id)
     else:
-        evaluation.status = "cancelled"
+        evaluation.status = EvaluationStatus.CANCELLED
         await db.commit()
-        await broadcast_status(evaluation_id, "cancelled")
+        await broadcast_status(evaluation_id, EvaluationStatus.CANCELLED)
         logger.info("evaluation.cancelled_no_task", id=evaluation_id)
 
     await db.refresh(evaluation)
@@ -373,17 +373,17 @@ async def run_evaluation(
     if not evaluation:
         raise NotFoundException("Evaluation", evaluation_id)
 
-    if evaluation.status not in ("pending", "failed", "cancelled"):
+    if evaluation.status not in (EvaluationStatus.PENDING, EvaluationStatus.FAILED, EvaluationStatus.CANCELLED):
         raise ConflictException(
             f"Evaluation is '{evaluation.status}' and cannot be started. "
             "Only 'pending', 'failed', or 'cancelled' evaluations can be run."
         )
 
-    if evaluation.mode not in ("qa", "rag", "arena"):
+    if evaluation.mode not in (EvaluationMode.QA, EvaluationMode.RAG, EvaluationMode.ARENA):
         raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
 
     # Reset status to pending before launching background task
-    evaluation.status = "pending"
+    evaluation.status = EvaluationStatus.PENDING
     await db.commit()
     await db.refresh(evaluation)
 
@@ -409,10 +409,10 @@ async def rerun_evaluation(
     if not evaluation:
         raise NotFoundException("Evaluation", evaluation_id)
 
-    if evaluation.status == "running":
+    if evaluation.status == EvaluationStatus.RUNNING:
         raise ConflictException("Evaluation is currently running.")
 
-    if evaluation.mode not in ("qa", "rag", "arena"):
+    if evaluation.mode not in (EvaluationMode.QA, EvaluationMode.RAG, EvaluationMode.ARENA):
         raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
 
     # Delete existing results and artifacts for this evaluation
@@ -420,7 +420,7 @@ async def rerun_evaluation(
     await db.execute(delete(Result).where(Result.evaluation_id == evaluation_id))
 
     # Reset status
-    evaluation.status = "pending"
+    evaluation.status = EvaluationStatus.PENDING
     await db.commit()
     await db.refresh(evaluation)
 

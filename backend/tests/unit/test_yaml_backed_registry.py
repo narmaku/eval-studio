@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import pytest
 import yaml
 
-from app.core.registry_base import YAMLBackedRegistry
+from app.core.registry_base import YAMLBackedRegistry, resolve_registry_config_path
 
 
 @dataclass
@@ -465,3 +465,30 @@ class TestPersistYAML:
 
         # The item should still exist
         assert registry.get_item("x") is not None
+
+
+class TestResolveRegistryConfigPath:
+    """Tests for the shared resolve_registry_config_path helper."""
+
+    def test_explicit_override_returned_verbatim(self, tmp_path):
+        path = resolve_registry_config_path(str(tmp_path / "custom.yaml"), "providers.yaml")
+        assert path == tmp_path / "custom.yaml"
+
+    def test_falls_back_to_project_root_config(self):
+        path = resolve_registry_config_path(None, "providers.yaml")
+        assert path.parts[-2] == "config"
+        assert path.parts[-1] == "providers.yaml"
+        assert path.parts[-3] != "backend"
+
+    def test_cwd_fallback_when_repo_root_missing(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        (config_dir / "test_reg.yaml").write_text("items: []")
+        path = resolve_registry_config_path(None, "test_reg.yaml")
+        assert path == config_dir / "test_reg.yaml"
+
+    def test_all_four_registries_resolve_to_same_directory(self):
+        filenames = ["providers.yaml", "tool_servers.yaml", "evaluators.yaml", "harnesses.yaml"]
+        dirs = {resolve_registry_config_path(None, f).parent for f in filenames}
+        assert len(dirs) == 1, f"Expected all registries to share one config dir, got {dirs}"

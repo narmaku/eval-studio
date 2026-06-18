@@ -2,9 +2,9 @@
 
 import os
 from dataclasses import dataclass, field
-from pathlib import Path
 
-from app.core.registry_base import YAMLBackedRegistry
+from app.core.config import settings
+from app.core.registry_base import YAMLBackedRegistry, resolve_registry_config_path
 
 
 @dataclass
@@ -114,35 +114,6 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
         return self.delete_item(provider_id)
 
 
-def _resolve_config_path() -> Path:
-    """Resolve the providers.yaml config path.
-
-    Priority:
-    1. PROVIDERS_CONFIG_PATH environment variable (explicit override)
-    2. Auto-discovery relative to this file (repo root / config / providers.yaml)
-    3. Auto-discovery relative to cwd (for Docker where WORKDIR=backend/)
-    """
-    env_path = os.environ.get("PROVIDERS_CONFIG_PATH")
-    if env_path:
-        return Path(env_path)
-
-    # Try repo root: this file is at backend/app/core/providers.py
-    # repo root is 4 levels up
-    repo_root = Path(__file__).resolve().parent.parent.parent.parent
-    candidate = repo_root / "config" / "providers.yaml"
-    if candidate.exists():
-        return candidate
-
-    # Fallback: try relative to cwd (e.g. Docker WORKDIR=/app which is backend/)
-    cwd_candidate = Path.cwd() / "config" / "providers.yaml"
-    if cwd_candidate.exists():
-        return cwd_candidate
-
-    # Return the repo-root path even if it doesn't exist (load_from_yaml handles missing files)
-    return candidate
-
-
 # Singleton - loaded on import
 provider_registry = ProviderRegistry()
-_config_path = _resolve_config_path()
-provider_registry.load_from_yaml(_config_path)
+provider_registry.load_from_yaml(resolve_registry_config_path(settings.providers_config_path, "providers.yaml"))

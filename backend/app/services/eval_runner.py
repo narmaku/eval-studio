@@ -25,6 +25,7 @@ from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
 from app.rag_backends.factory import create_rag_adapter
+from app.schemas.evaluation import EvaluationStatus
 from app.services.artifact_generation import generate_evaluation_artifacts
 from app.services.judge_utils import to_judge_params
 from app.services.provider_utils import (
@@ -73,10 +74,10 @@ class ModeRunner(Protocol):
 
 
 async def _fail(evaluation: Evaluation, db: AsyncSession, detail: str) -> None:
-    evaluation.status = "failed"
+    evaluation.status = EvaluationStatus.FAILED
     evaluation.error = detail
     await db.commit()
-    await broadcast_status(evaluation.id, "failed", error=detail)
+    await broadcast_status(evaluation.id, EvaluationStatus.FAILED, error=detail)
 
 
 async def run_evaluation(evaluation_id: str, db: AsyncSession) -> None:
@@ -89,12 +90,12 @@ async def run_evaluation(evaluation_id: str, db: AsyncSession) -> None:
         if not evaluation:
             logger.error("evaluation.not_found", evaluation_id=evaluation_id)
             return
-        if evaluation.status != "pending":
+        if evaluation.status != EvaluationStatus.PENDING:
             logger.warning("evaluation.skipped", evaluation_id=evaluation_id, status=evaluation.status)
             return
 
         # 2. Set running
-        evaluation.status = "running"
+        evaluation.status = EvaluationStatus.RUNNING
         await db.commit()
 
         # 3. Resolve mode runner
@@ -259,10 +260,10 @@ async def run_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         # 10. Final status
         if error_count == total:
-            evaluation.status = "failed"
+            evaluation.status = EvaluationStatus.FAILED
             evaluation.error = f"All {total} items failed"
         else:
-            evaluation.status = "completed"
+            evaluation.status = EvaluationStatus.COMPLETED
         await db.commit()
         await broadcast_status(evaluation_id, evaluation.status, error=evaluation.error)
 
@@ -281,10 +282,10 @@ async def run_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             eval_result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
             evaluation = eval_result.scalar_one_or_none()
             if evaluation:
-                evaluation.status = "failed"
+                evaluation.status = EvaluationStatus.FAILED
                 evaluation.error = sanitize_error_for_client(exc)
                 await db.commit()
-                await broadcast_status(evaluation_id, "failed", error=evaluation.error)
+                await broadcast_status(evaluation_id, EvaluationStatus.FAILED, error=evaluation.error)
         except Exception:
             logger.exception("evaluation.status_update_failed", evaluation_id=evaluation_id)
     finally:
