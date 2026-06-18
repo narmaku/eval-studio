@@ -31,6 +31,12 @@ class Settings(BaseSettings):
 
     evaluator_config_dir: str = "config/evaluators"
 
+    # YAML registry config path overrides (env var names match existing conventions)
+    providers_config_path: str | None = None
+    tool_servers_config_path: str | None = None
+    evaluators_config_path: str | None = None
+    harnesses_config_path: str | None = None
+
     # Security: comma-separated list of allowed harness binary paths.
     # Leave empty to block all harness subprocess execution (secure default).
     harness_allowed_binaries: str = ""

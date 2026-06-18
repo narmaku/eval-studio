@@ -18,6 +18,32 @@ import yaml
 
 logger = structlog.get_logger()
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+def resolve_registry_config_path(explicit: str | None, filename: str) -> Path:
+    """Resolve a YAML registry config path.
+
+    Priority:
+    1. *explicit* override (from Settings / env var) — returned verbatim.
+    2. ``<project_root>/config/<filename>`` — returned if it exists on disk.
+    3. ``<cwd>/config/<filename>`` — returned if it exists (Docker WORKDIR).
+    4. Falls back to the project-root candidate (``load_from_yaml`` handles missing).
+    """
+    if explicit:
+        return Path(explicit)
+
+    candidate = _PROJECT_ROOT / "config" / filename
+    if candidate.exists():
+        return candidate
+
+    cwd_candidate = Path.cwd() / "config" / filename
+    if cwd_candidate.exists():
+        return cwd_candidate
+
+    return candidate
+
+
 T = TypeVar("T")
 
 

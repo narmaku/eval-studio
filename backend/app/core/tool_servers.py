@@ -1,11 +1,10 @@
 """Tool server profiles loaded from YAML configuration."""
 
-import os
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
-from app.core.registry_base import YAMLBackedRegistry
+from app.core.config import settings
+from app.core.registry_base import YAMLBackedRegistry, resolve_registry_config_path
 
 
 @dataclass
@@ -118,24 +117,7 @@ class ToolServerRegistry(YAMLBackedRegistry[ToolServerProfile]):
         return self.delete_item(server_id)
 
 
-def _resolve_config_path() -> Path:
-    """Resolve the tool_servers.yaml config path."""
-    env_path = os.environ.get("TOOL_SERVERS_CONFIG_PATH")
-    if env_path:
-        return Path(env_path)
-
-    repo_root = Path(__file__).resolve().parent.parent.parent.parent
-    candidate = repo_root / "config" / "tool_servers.yaml"
-    if candidate.exists():
-        return candidate
-
-    cwd_candidate = Path.cwd() / "config" / "tool_servers.yaml"
-    if cwd_candidate.exists():
-        return cwd_candidate
-
-    return candidate
-
-
 tool_server_registry = ToolServerRegistry()
-_config_path = _resolve_config_path()
-tool_server_registry.load_from_yaml(_config_path)
+tool_server_registry.load_from_yaml(
+    resolve_registry_config_path(settings.tool_servers_config_path, "tool_servers.yaml")
+)

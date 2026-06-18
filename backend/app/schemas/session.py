@@ -15,7 +15,6 @@ class SessionStatus(StrEnum):
     ENDED = "ended"
     SCORING = "scoring"
     COMPLETED = "completed"
-    FAILED = "failed"
 
 
 class SessionCreate(BaseModel):

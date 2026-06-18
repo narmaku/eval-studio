@@ -22,6 +22,8 @@ from app.harnesses.registry import harness_registry
 from app.mcp.manager import cleanup_manager, get_or_create_manager
 from app.models.evaluation import Evaluation
 from app.models.session import Session
+from app.schemas.evaluation import EvaluationStatus
+from app.schemas.session import SessionStatus
 from app.schemas.ws_chat import (
     MessageChunk,
     MessageChunkData,
@@ -89,7 +91,7 @@ async def process_user_message(
     session = result.scalar_one_or_none()
     if not session:
         raise ValueError(f"Session '{session_id}' not found")
-    if session.status != "active":
+    if session.status != SessionStatus.ACTIVE:
         raise ValueError(f"Session '{session_id}' is not active (status: {session.status})")
 
     # 2. Check for harness dispatch
@@ -549,21 +551,21 @@ async def end_session(session_id: str, db: AsyncSession) -> dict:
         raise ValueError(f"Session '{session_id}' not found")
 
     # Idempotency guard: if the session is already ended, return current state
-    if session.status != "active":
+    if session.status != SessionStatus.ACTIVE:
         return {
             "status": session.status,
             "ended_at": session.ended_at.isoformat() if session.ended_at else None,
         }
 
-    session.status = "ended"
+    session.status = SessionStatus.ENDED
     session.ended_at = utcnow()
 
     # Update linked Evaluation: only transition to "completed" when currently "running"
     if session.evaluation_id:
         eval_result = await db.execute(select(Evaluation).where(Evaluation.id == session.evaluation_id))
         evaluation = eval_result.scalar_one_or_none()
-        if evaluation and evaluation.status == "running":
-            evaluation.status = "completed"
+        if evaluation and evaluation.status == EvaluationStatus.RUNNING:
+            evaluation.status = EvaluationStatus.COMPLETED
 
     await db.commit()
 

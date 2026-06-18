@@ -11,12 +11,15 @@ from app.core.security import require_auth
 from app.models.evaluation import Evaluation
 from app.models.session import Session
 from app.schemas.common import PaginatedResponse
+from app.schemas.evaluation import EvaluationMode, EvaluationStatus
 from app.schemas.session import (
     ScoreSessionRequest,
     SessionCreate,
     SessionMessageRequest,
+    SessionMode,
     SessionReplayResponse,
     SessionResponse,
+    SessionStatus,
 )
 
 logger = structlog.get_logger()
@@ -74,11 +77,11 @@ async def create_session(payload: SessionCreate, db: AsyncSession = Depends(get_
             raise NotFoundException("Evaluation", evaluation_id)
 
     # Auto-create an Evaluation for live sessions without one
-    if not evaluation_id and payload.mode == "live":
+    if not evaluation_id and payload.mode == SessionMode.LIVE:
         evaluation = Evaluation(
             name=payload.name or "Agent Chat Session",
-            mode="agent",
-            status="running",
+            mode=EvaluationMode.AGENT,
+            status=EvaluationStatus.RUNNING,
         )
         db.add(evaluation)
         await db.flush()
@@ -121,7 +124,7 @@ async def send_message(
     if not session:
         raise NotFoundException("Session", session_id)
 
-    if session.status != "active":
+    if session.status != SessionStatus.ACTIVE:
         raise ConflictException(f"Session '{session_id}' is '{session.status}' and cannot accept messages.")
 
     message = {
@@ -150,7 +153,7 @@ async def end_session_endpoint(session_id: str, db: AsyncSession = Depends(get_d
     session = result.scalar_one_or_none()
     if not session:
         raise NotFoundException("Session", session_id)
-    if session.status != "active":
+    if session.status != SessionStatus.ACTIVE:
         raise ConflictException(f"Session '{session_id}' is '{session.status}' and cannot be ended.")
 
     await end_session_svc(session_id, db)
@@ -179,11 +182,10 @@ async def score_session(
     if not session:
         raise NotFoundException("Session", session_id)
 
-    if session.status == "active":
+    if session.status == SessionStatus.ACTIVE:
         raise ConflictException("Cannot score an active session. End it first.")
 
-    # Transition to "scoring"
-    session.status = "scoring"
+    session.status = SessionStatus.SCORING
     await db.flush()
 
     try:
@@ -231,7 +233,7 @@ async def score_session(
             "reasoning": score.reasoning,
             "breakdown": score.breakdown,
         }
-        session.status = "completed"
+        session.status = SessionStatus.COMPLETED
         session.error = None
 
         # Upsert Result record if session is linked to an evaluation
@@ -263,8 +265,7 @@ async def score_session(
 
     except Exception as exc:
         logger.exception("session.score_error", session_id=session_id)
-        # Revert to "ended" on failure
-        session.status = "ended"
+        session.status = SessionStatus.ENDED
         session.error = f"Scoring failed: {sanitize_error_for_client(exc)}"
         await db.commit()
         raise AppException(500, "Scoring Failed", f"Scoring failed: {sanitize_error_for_client(exc)}") from exc
