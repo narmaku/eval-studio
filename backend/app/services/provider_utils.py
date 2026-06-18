@@ -34,6 +34,22 @@ class ResolvedModel:
     rate_limits: list[dict] | None = None
 
 
+_PROVIDER_SHARED_FIELDS = frozenset(
+    {
+        "proxy",
+        "ssl_cert_path",
+        "ssl_client_key",
+        "default_params",
+        "provider_type",
+        "endpoint_url",
+        "request_body_template",
+        "response_json_path",
+        "rate_limited",
+        "rate_limits",
+    }
+)
+
+
 def resolve_model_config(
     config: dict,
     *,
@@ -59,45 +75,21 @@ def resolve_model_config(
     if registry is None:
         registry = provider_registry
 
-    model: str | None = None
-    api_key: str | None = None
-    api_base: str | None = None
-    proxy: str | None = None
-    default_params: dict | None = None
-    provider_type: str = "litellm"
-    endpoint_url: str | None = None
-    request_body_template: str | None = None
-    response_json_path: str = "choices.0.message.content"
-    rate_limited: bool = False
-    rate_limits: list[dict] | None = None
-
     # 1. Try provider profile
     provider_id = config.get("provider_id")
     provider = registry.get_provider(provider_id) if provider_id else None
 
-    ssl_cert_path: str | None = None
-    ssl_client_key: str | None = None
-
     if provider:
         model = provider.default_model
-        api_base = provider.api_base
         api_key = provider.api_key
-        proxy = provider.proxy
-        ssl_cert_path = provider.ssl_cert_path
-        ssl_client_key = provider.ssl_client_key
-        default_params = provider.default_params
-        provider_type = provider.provider_type
-        endpoint_url = provider.endpoint_url
-        request_body_template = provider.request_body_template
-        response_json_path = provider.response_json_path
-        rate_limited = provider.rate_limited
-        rate_limits = provider.rate_limits
+        api_base = provider.api_base
+        shared = provider.model_dump(include=_PROVIDER_SHARED_FIELDS)
     else:
         # 2. Direct config fields
         model = config.get("default_model") or config.get("model")
-        api_base = config.get("api_base")
         api_key = settings.litellm_api_key
-        proxy = None
+        api_base = config.get("api_base")
+        shared = {}
 
     # 3. Fallback to settings
     if not model:
@@ -112,25 +104,16 @@ def resolve_model_config(
     if not api_key and api_base:
         api_key = "no-key-needed"
 
-    if not ssl_cert_path:
-        ssl_cert_path = settings.ssl_cert_file
-    if not ssl_client_key:
-        ssl_client_key = getattr(settings, "ssl_client_key", None)
+    if not shared.get("ssl_cert_path"):
+        shared["ssl_cert_path"] = settings.ssl_cert_file
+    if not shared.get("ssl_client_key"):
+        shared["ssl_client_key"] = getattr(settings, "ssl_client_key", None)
 
     return ResolvedModel(
         model=model or "",
         api_key=api_key,
         api_base=api_base,
-        proxy=proxy,
-        ssl_cert_path=ssl_cert_path,
-        ssl_client_key=ssl_client_key,
-        default_params=default_params,
-        provider_type=provider_type,
-        endpoint_url=endpoint_url,
-        request_body_template=request_body_template,
-        response_json_path=response_json_path,
-        rate_limited=rate_limited,
-        rate_limits=rate_limits,
+        **shared,
     )
 
 

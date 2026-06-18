@@ -57,29 +57,6 @@ def _handle_connection_error(exc: Exception) -> TestConnectionResponse:
     return TestConnectionResponse(success=False, message="Unexpected error — check server logs for details")
 
 
-def _provider_to_response(p: ProviderProfile) -> ProviderResponse:
-    """Convert a ProviderProfile to a ProviderResponse."""
-    return ProviderResponse(
-        id=p.id,
-        name=p.name,
-        default_model=p.default_model,
-        api_base=p.api_base,
-        has_api_key=p.api_key is not None,
-        proxy=p.proxy,
-        ssl_cert_path=p.ssl_cert_path,
-        ssl_client_key=p.ssl_client_key,
-        tags=p.tags,
-        default_params=p.default_params,
-        provider_type=p.provider_type,
-        endpoint_url=p.endpoint_url,
-        request_body_template=p.request_body_template,
-        response_json_path=p.response_json_path,
-        single_model=p.single_model,
-        rate_limited=p.rate_limited,
-        rate_limits=p.rate_limits,
-    )
-
-
 @router.get("/schema", response_model=dict)
 async def get_provider_schema() -> dict:
     """Return JSON Schema for provider creation, including field descriptions."""
@@ -189,7 +166,7 @@ async def test_connection(payload: ProviderCreate) -> TestConnectionResponse:
 async def list_providers() -> list[ProviderResponse]:
     """List all providers."""
     providers = provider_registry.list_providers()
-    return [_provider_to_response(p) for p in providers]
+    return [ProviderResponse.from_profile(p) for p in providers]
 
 
 @router.get("/{provider_id}", response_model=ProviderResponse)
@@ -198,34 +175,16 @@ async def get_provider(provider_id: str) -> ProviderResponse:
     provider = provider_registry.get_provider(provider_id)
     if not provider:
         raise NotFoundException("Provider", provider_id)
-    return _provider_to_response(provider)
+    return ProviderResponse.from_profile(provider)
 
 
 @router.post("", response_model=ProviderResponse, status_code=201)
 async def create_provider(payload: ProviderCreate) -> ProviderResponse:
     """Create a new provider (persisted to YAML)."""
-    profile = ProviderProfile(
-        id=str(uuid.uuid4()),
-        name=payload.name,
-        default_model=payload.default_model,
-        api_base=payload.api_base,
-        api_key_env=payload.api_key_env,
-        proxy=payload.proxy,
-        ssl_cert_path=payload.ssl_cert_path,
-        ssl_client_key=payload.ssl_client_key,
-        tags=payload.tags,
-        default_params=payload.default_params,
-        provider_type=payload.provider_type,
-        endpoint_url=payload.endpoint_url,
-        request_body_template=payload.request_body_template,
-        response_json_path=payload.response_json_path,
-        single_model=payload.single_model,
-        rate_limited=payload.rate_limited,
-        rate_limits=[rl.model_dump() for rl in payload.rate_limits] if payload.rate_limits else None,
-    )
+    profile = ProviderProfile(id=str(uuid.uuid4()), **payload.model_dump())
     provider_registry.add_provider(profile)
     logger.info("provider.created", id=profile.id, name=profile.name)
-    return _provider_to_response(profile)
+    return ProviderResponse.from_profile(profile)
 
 
 @router.put("/{provider_id}", response_model=ProviderResponse)
@@ -236,7 +195,7 @@ async def update_provider(provider_id: str, payload: ProviderUpdate) -> Provider
     if not updated:
         raise NotFoundException("Provider", provider_id)
     logger.info("provider.updated", id=provider_id)
-    return _provider_to_response(updated)
+    return ProviderResponse.from_profile(updated)
 
 
 @router.delete("/{provider_id}", status_code=204)

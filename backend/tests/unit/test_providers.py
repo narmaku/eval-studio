@@ -281,6 +281,90 @@ class TestProviderRegistry:
 
         assert registry.get_provider("test").single_model is True
 
+    def test_full_profile_round_trip(self, tmp_path):
+        """DUP-010: All fields survive create → persist → reload from YAML."""
+        config_file = tmp_path / "providers.yaml"
+        registry = ProviderRegistry()
+        registry._config_path = config_file
+
+        original = ProviderProfile(
+            id="round-trip",
+            name="Round-Trip Provider",
+            default_model="openai/gpt-4",
+            api_base="https://api.example.com/v1",
+            api_key_env="MY_KEY",
+            proxy="http://squid:3128",
+            ssl_cert_path="/etc/pki/cert.pem",
+            ssl_client_key="/etc/pki/key.pem",
+            tags=["staging", "granite"],
+            default_params={"max_tokens": 2048, "temperature": 0.7},
+            provider_type="custom",
+            endpoint_url="https://host/api/v1/infer",
+            request_body_template='{"question": "{{message}}"}',
+            response_json_path="data.text",
+            single_model=True,
+            rate_limited=True,
+            rate_limits=[{"value": 10, "unit": "requests", "per": "minute"}],
+        )
+        registry.add_item(original)
+
+        reloaded_reg = ProviderRegistry()
+        reloaded_reg.load_from_yaml(config_file)
+        reloaded = reloaded_reg.get_provider("round-trip")
+        assert reloaded is not None
+
+        for field in ProviderProfile.model_fields:
+            assert getattr(reloaded, field) == getattr(original, field), f"Mismatch on field '{field}'"
+
+    def test_from_profile_response_conversion(self):
+        """DUP-010: ProviderResponse.from_profile produces correct output."""
+        from app.schemas.provider import ProviderResponse
+
+        profile = ProviderProfile(
+            id="resp-test",
+            name="Test",
+            default_model="gpt-4",
+            api_key_env="NONEXISTENT_KEY_XYZ",
+            proxy="http://proxy:3128",
+            single_model=True,
+        )
+        resp = ProviderResponse.from_profile(profile)
+        assert resp.id == "resp-test"
+        assert resp.name == "Test"
+        assert resp.proxy == "http://proxy:3128"
+        assert resp.single_model is True
+        assert resp.has_api_key is False
+        assert not hasattr(resp, "api_key_env")
+
+    def test_create_provider_via_model_dump(self, tmp_path):
+        """DUP-010: ProviderProfile(id=..., **ProviderCreate.model_dump()) round-trips."""
+        from app.schemas.provider import ProviderCreate
+
+        config_file = tmp_path / "providers.yaml"
+        registry = ProviderRegistry()
+        registry._config_path = config_file
+
+        payload = ProviderCreate(
+            name="API Created",
+            default_model="openai/gpt-4",
+            api_base="https://api.example.com",
+            proxy="http://proxy:3128",
+            single_model=True,
+            rate_limits=[{"value": 5, "unit": "requests", "per": "second"}],
+        )
+        profile = ProviderProfile(id="api-created", **payload.model_dump())
+        registry.add_item(profile)
+
+        reloaded_reg = ProviderRegistry()
+        reloaded_reg.load_from_yaml(config_file)
+        reloaded = reloaded_reg.get_provider("api-created")
+
+        assert reloaded.name == "API Created"
+        assert reloaded.default_model == "openai/gpt-4"
+        assert reloaded.proxy == "http://proxy:3128"
+        assert reloaded.single_model is True
+        assert reloaded.rate_limits == [{"value": 5, "unit": "requests", "per": "second"}]
+
 
 class TestProxyEnv:
     def test_proxy_env_sets_and_restores(self):

@@ -1,8 +1,13 @@
 """Pydantic schemas for inference provider profiles."""
 
-from typing import Literal
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from app.core.providers import ProviderProfile
 
 
 class RateLimit(BaseModel):
@@ -165,6 +170,10 @@ class ProviderResponse(BaseModel):
     rate_limited: bool = False
     rate_limits: list[dict] | None = None
     model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_profile(cls, profile: ProviderProfile) -> ProviderResponse:
+        return cls(**profile.model_dump(exclude={"api_key_env"}), has_api_key=profile.api_key is not None)
 
 
 class TestConnectionResponse(BaseModel):
