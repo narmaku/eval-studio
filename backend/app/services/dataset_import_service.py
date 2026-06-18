@@ -274,26 +274,20 @@ def extract_schema(content: bytes, fmt: DetectedFormat, sample_size: int = 20) -
         raise ValueError(f"Cannot extract schema for format: {fmt}")
 
 
-def _extract_yaml_schema(text: str, sample_size: int) -> FileSchema:
-    """Extract schema from YAML content."""
-    parsed = yaml.safe_load(text)
+def _rows_from_parsed(parsed: Any) -> list[dict[str, Any]]:
+    """Extract a flat list of row dicts from a parsed YAML/JSON value."""
     if isinstance(parsed, list):
-        rows = [_flatten_dict(item) if isinstance(item, dict) else {"value": item} for item in parsed]
-    elif isinstance(parsed, dict):
-        # Could be a nested structure like SQuAD with a data key
-        # Look for the first list-valued key
-        list_key = None
-        for k, v in parsed.items():
+        return [_flatten_dict(item) if isinstance(item, dict) else {"value": item} for item in parsed]
+    if isinstance(parsed, dict):
+        for v in parsed.values():
             if isinstance(v, list) and v:
-                list_key = k
-                break
-        if list_key:
-            rows = [_flatten_dict(item) if isinstance(item, dict) else {"value": item} for item in parsed[list_key]]
-        else:
-            rows = [_flatten_dict(parsed)]
-    else:
-        rows = [{"value": parsed}]
+                return [_flatten_dict(item) if isinstance(item, dict) else {"value": item} for item in v]
+        return [_flatten_dict(parsed)]
+    return [{"value": parsed}]
 
+
+def _build_schema(rows: list[dict[str, Any]], sample_size: int) -> FileSchema:
+    """Build a FileSchema from extracted rows."""
     fields, nested_paths = _collect_fields(rows[:sample_size] if len(rows) > sample_size else rows)
     return FileSchema(
         fields=fields,
@@ -303,6 +297,11 @@ def _extract_yaml_schema(text: str, sample_size: int) -> FileSchema:
         has_header=True,
         nested_paths=nested_paths,
     )
+
+
+def _extract_yaml_schema(text: str, sample_size: int) -> FileSchema:
+    """Extract schema from YAML content."""
+    return _build_schema(_rows_from_parsed(yaml.safe_load(text)), sample_size)
 
 
 def _extract_jsonl_schema(text: str, sample_size: int) -> FileSchema:
@@ -334,32 +333,7 @@ def _extract_jsonl_schema(text: str, sample_size: int) -> FileSchema:
 
 def _extract_json_schema(text: str, sample_size: int) -> FileSchema:
     """Extract schema from JSON content."""
-    parsed = json.loads(text)
-    if isinstance(parsed, list):
-        rows = [_flatten_dict(item) if isinstance(item, dict) else {"value": item} for item in parsed]
-    elif isinstance(parsed, dict):
-        # Look for nested arrays (like SQuAD format)
-        list_key = None
-        for k, v in parsed.items():
-            if isinstance(v, list) and v:
-                list_key = k
-                break
-        if list_key:
-            rows = [_flatten_dict(item) if isinstance(item, dict) else {"value": item} for item in parsed[list_key]]
-        else:
-            rows = [_flatten_dict(parsed)]
-    else:
-        rows = [{"value": parsed}]
-
-    fields, nested_paths = _collect_fields(rows[:sample_size] if len(rows) > sample_size else rows)
-    return FileSchema(
-        fields=fields,
-        sample_rows=rows[:sample_size],
-        total_rows=len(rows),
-        all_rows=rows,
-        has_header=True,
-        nested_paths=nested_paths,
-    )
+    return _build_schema(_rows_from_parsed(json.loads(text)), sample_size)
 
 
 def _extract_csv_schema(text: str, sample_size: int, delimiter: str = ",") -> FileSchema:

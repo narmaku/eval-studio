@@ -8,15 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.exceptions import NotFoundException
 from app.core.security import require_auth
-from app.models.dataset import Dataset, DatasetItem
+from app.models.dataset import Dataset
 from app.schemas.common import PaginatedResponse
 from app.schemas.dataset import (
     DatasetCreate,
     DatasetDetailResponse,
-    DatasetItemResponse,
     DatasetResponse,
     DatasetUpdate,
 )
+from app.services.dataset_service import create_dataset_with_items, to_detail_response
 
 logger = structlog.get_logger()
 
@@ -26,58 +26,22 @@ router = APIRouter(prefix="/datasets", tags=["datasets"], dependencies=[Depends(
 @router.post("", response_model=DatasetDetailResponse, status_code=201)
 async def create_dataset(payload: DatasetCreate, db: AsyncSession = Depends(get_db)) -> DatasetDetailResponse:
     """Create a new dataset with optional items."""
-    dataset = Dataset(
+    items_data = [
+        {"question": item.question, "expected_answer": item.expected_answer, "metadata": item.metadata}
+        for item in payload.items
+    ]
+    dataset, db_items = await create_dataset_with_items(
+        db,
         name=payload.name,
         description=payload.description,
         format=payload.format,
         version=payload.version,
         tags=payload.tags,
         source_type="upload",
-        item_count=len(payload.items),
+        items=items_data,
     )
-    db.add(dataset)
-    await db.flush()
-
-    items = []
-    for idx, item_data in enumerate(payload.items):
-        item = DatasetItem(
-            dataset_id=dataset.id,
-            question=item_data.question,
-            expected_answer=item_data.expected_answer,
-            metadata_=item_data.metadata,
-            order_index=idx,
-        )
-        db.add(item)
-        items.append(item)
-
-    await db.commit()
-    await db.refresh(dataset)
-
-    item_responses = [
-        DatasetItemResponse(
-            id=item.id,
-            question=item.question,
-            expected_answer=item.expected_answer,
-            metadata=item.metadata_,
-            order_index=item.order_index,
-        )
-        for item in items
-    ]
-
     logger.info("dataset.created", id=dataset.id, name=dataset.name, item_count=len(payload.items))
-    return DatasetDetailResponse(
-        id=dataset.id,
-        name=dataset.name,
-        description=dataset.description,
-        format=dataset.format,
-        version=dataset.version,
-        tags=dataset.tags or [],
-        source_type=dataset.source_type,
-        item_count=dataset.item_count,
-        created_at=dataset.created_at,
-        updated_at=dataset.updated_at,
-        items=item_responses,
-    )
+    return to_detail_response(dataset, db_items)
 
 
 @router.get("", response_model=PaginatedResponse[DatasetResponse])
@@ -119,30 +83,7 @@ async def get_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)) -> Da
     if not dataset:
         raise NotFoundException("Dataset", dataset_id)
 
-    item_responses = [
-        DatasetItemResponse(
-            id=item.id,
-            question=item.question,
-            expected_answer=item.expected_answer,
-            metadata=item.metadata_,
-            order_index=item.order_index,
-        )
-        for item in sorted(dataset.items, key=lambda i: i.order_index)
-    ]
-
-    return DatasetDetailResponse(
-        id=dataset.id,
-        name=dataset.name,
-        description=dataset.description,
-        format=dataset.format,
-        version=dataset.version,
-        tags=dataset.tags or [],
-        source_type=dataset.source_type,
-        item_count=dataset.item_count,
-        created_at=dataset.created_at,
-        updated_at=dataset.updated_at,
-        items=item_responses,
-    )
+    return to_detail_response(dataset, sorted(dataset.items, key=lambda i: i.order_index))
 
 
 @router.put("/{dataset_id}", response_model=DatasetResponse)

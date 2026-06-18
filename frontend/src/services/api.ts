@@ -67,16 +67,18 @@ class ApiClientError extends Error {
   }
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  options?: RequestInit & { parse?: 'json' | 'text' },
+): Promise<T> {
   const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(),
-      ...options?.headers,
-    },
-  });
+  const isFormData = options?.body instanceof FormData;
+  const headers: Record<string, string> = {
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...authHeaders(),
+    ...(options?.headers as Record<string, string>),
+  };
+  const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({
@@ -89,11 +91,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new ApiClientError(response.status, errorBody);
   }
 
-  // Handle 204 No Content
   if (response.status === 204) {
     return undefined as T;
   }
 
+  if (options?.parse === 'text') {
+    return response.text() as Promise<T>;
+  }
   return response.json() as Promise<T>;
 }
 
@@ -173,22 +177,10 @@ export const api = {
   deleteDataset: (id: string) => request<void>(`/api/v1/datasets/${id}`, { method: 'DELETE' }),
 
   // --- Smart Import ---
-  analyzeDatasetFiles: async (files: File[]): Promise<AnalyzeResponse> => {
+  analyzeDatasetFiles: (files: File[]) => {
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
-    const url = `${BASE_URL}/api/v1/datasets/analyze`;
-    const response = await fetch(url, { method: 'POST', body: formData });
-    if (!response.ok) {
-      const errorBody = (await response.json().catch(() => ({
-        type: 'about:blank',
-        title: 'Analysis failed',
-        status: response.status,
-        detail: response.statusText,
-        instance: url,
-      }))) as ApiError;
-      throw new ApiClientError(response.status, errorBody);
-    }
-    return response.json() as Promise<AnalyzeResponse>;
+    return request<AnalyzeResponse>('/api/v1/datasets/analyze', { method: 'POST', body: formData });
   },
   importDataset: (data: ImportRequest) =>
     request<Dataset>('/api/v1/datasets/import', { method: 'POST', body: JSON.stringify(data) }),
@@ -282,42 +274,20 @@ export const api = {
     request<{ filename: string; size: number; modified_at: string }[]>(
       `/api/v1/evaluators/${evaluatorId}/config-files`,
     ),
-  uploadEvaluatorConfigFile: async (evaluatorId: string, file: File) => {
+  uploadEvaluatorConfigFile: (evaluatorId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const url = `${BASE_URL}/api/v1/evaluators/${evaluatorId}/config-files`;
-    const response = await fetch(url, { method: 'POST', body: formData });
-    if (!response.ok) {
-      const errorBody = (await response.json().catch(() => ({
-        type: 'about:blank',
-        title: 'Upload failed',
-        status: response.status,
-        detail: response.statusText,
-        instance: url,
-      }))) as ApiError;
-      throw new ApiClientError(response.status, errorBody);
-    }
-    return response.json() as Promise<{ filename: string; size: number }>;
+    return request<{ filename: string; size: number }>(
+      `/api/v1/evaluators/${evaluatorId}/config-files`,
+      { method: 'POST', body: formData },
+    );
   },
   deleteEvaluatorConfigFile: (evaluatorId: string, filename: string) =>
     request<void>(`/api/v1/evaluators/${evaluatorId}/config-files/${filename}`, {
       method: 'DELETE',
     }),
-  getEvaluatorConfigFile: async (evaluatorId: string, filename: string): Promise<string> => {
-    const url = `${BASE_URL}/api/v1/evaluators/${evaluatorId}/config-files/${filename}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      const errorBody = (await response.json().catch(() => ({
-        type: 'about:blank',
-        title: 'Request failed',
-        status: response.status,
-        detail: response.statusText,
-        instance: url,
-      }))) as ApiError;
-      throw new ApiClientError(response.status, errorBody);
-    }
-    return response.text();
-  },
+  getEvaluatorConfigFile: (evaluatorId: string, filename: string) =>
+    request<string>(`/api/v1/evaluators/${evaluatorId}/config-files/${filename}`, { parse: 'text' }),
 
   // Tool Servers
   listToolServers: (params?: { type?: string; enabled?: boolean }) => {
@@ -352,21 +322,8 @@ export const api = {
   getArtifact: (artifactId: string) => request<Artifact>(`/api/v1/artifacts/${artifactId}`),
   getArtifactDownloadUrl: (artifactId: string): string =>
     `${BASE_URL}/api/v1/artifacts/${artifactId}/download`,
-  previewArtifact: async (artifactId: string): Promise<string> => {
-    const url = `${BASE_URL}/api/v1/artifacts/${artifactId}/preview`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      const errorBody = (await response.json().catch(() => ({
-        type: 'about:blank',
-        title: 'Preview failed',
-        status: response.status,
-        detail: response.statusText,
-        instance: url,
-      }))) as ApiError;
-      throw new ApiClientError(response.status, errorBody);
-    }
-    return response.text();
-  },
+  previewArtifact: (artifactId: string) =>
+    request<string>(`/api/v1/artifacts/${artifactId}/preview`, { parse: 'text' }),
   deleteArtifact: (artifactId: string) =>
     request<void>(`/api/v1/artifacts/${artifactId}`, { method: 'DELETE' }),
 
