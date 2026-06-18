@@ -96,14 +96,16 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    structured = [{"loc": list(e["loc"]), "msg": e["msg"], "type": e["type"]} for e in exc.errors()]
     return JSONResponse(
         status_code=422,
         content=ProblemDetail(
             type="about:blank",
             title="Validation Error",
             status=422,
-            detail=str(exc.errors()),
+            detail="Request validation failed",
             instance=str(request.url),
+            errors=structured,
         ).model_dump(),
     )
 

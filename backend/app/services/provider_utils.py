@@ -4,11 +4,15 @@ Extracts the model/key/base/proxy resolution logic that is used by both
 eval_runner (Q/A mode) and agent_chat_service (interactive mode).
 """
 
+import asyncio
+import hashlib
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+import httpx
 import litellm
+from openai import AsyncOpenAI
 
 from app.adapters.base import JudgeConfigParams
 from app.core.config import settings
@@ -194,20 +198,82 @@ def apply_llm_params(litellm_kwargs: dict, params: dict) -> None:
             litellm_kwargs[param] = params[param]
 
 
+_litellm_clients: dict[str, AsyncOpenAI] = {}
+
+
+def _client_cache_key(
+    proxy: str | None,
+    ssl_cert_path: str | None,
+    ssl_client_key: str | None,
+    api_key: str | None,
+    api_base: str | None,
+) -> str:
+    raw = f"{proxy}|{ssl_cert_path}|{ssl_client_key}|{api_key}|{api_base}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def get_litellm_client(
+    proxy: str | None,
+    ssl_cert_path: str | None = None,
+    ssl_client_key: str | None = None,
+    api_key: str | None = None,
+    api_base: str | None = None,
+) -> AsyncOpenAI | None:
+    """Return a per-provider AsyncOpenAI client with proxy/SSL baked in.
+
+    Returns None when no proxy or SSL is configured (let litellm use its
+    default client path).  Clients are cached by connection parameters so
+    concurrent calls with the same provider share one httpx connection pool.
+    """
+    if not proxy and not ssl_cert_path:
+        return None
+
+    key = _client_cache_key(proxy, ssl_cert_path, ssl_client_key, api_key, api_base)
+    if key in _litellm_clients:
+        return _litellm_clients[key]
+
+    mtls_mode = bool(ssl_cert_path and ssl_client_key)
+    if mtls_mode:
+        for path, label in [(ssl_cert_path, "ssl_cert_path"), (ssl_client_key, "ssl_client_key")]:
+            if not os.path.isfile(path):
+                raise FileNotFoundError(f"{label} not found: {path}")
+
+    http_client = httpx.AsyncClient(
+        proxy=proxy,
+        verify=ssl_cert_path if (ssl_cert_path and not mtls_mode) else True,
+        cert=(ssl_cert_path, ssl_client_key) if mtls_mode else None,
+    )
+
+    client = AsyncOpenAI(
+        http_client=http_client,
+        api_key=api_key or "no-key",
+        base_url=api_base,
+    )
+    _litellm_clients[key] = client
+    return client
+
+
+_proxy_env_lock = asyncio.Lock()
+
+
 @contextmanager
 def proxy_env(proxy: str | None, ssl_cert_path: str | None = None, ssl_client_key: str | None = None):
     """Temporarily configure proxy and SSL for LiteLLM calls.
 
+    .. deprecated::
+        Prefer ``get_litellm_client()`` which injects a per-provider
+        ``AsyncOpenAI`` client via the ``client=`` kwarg — no global
+        mutation.  This context manager remains only for call sites
+        that cannot use the client kwarg (e.g. ``test_connection``).
+        It is guarded by ``_proxy_env_lock`` to prevent concurrent
+        interleaving.
+
     Two modes:
+
     - **CA-only** (ssl_cert_path without ssl_client_key): sets SSL_CERT_FILE,
       REQUESTS_CA_BUNDLE, and CURL_CA_BUNDLE for server certificate verification.
     - **mTLS** (ssl_cert_path + ssl_client_key): sets ``litellm.ssl_certificate``
       to a ``(cert, key)`` tuple for mutual TLS client authentication.
-      LiteLLM passes this directly to httpx's ``cert=`` parameter.
-
-    Note: both env vars and litellm.ssl_certificate are process-global.
-    For concurrent calls with different providers this could race.
-    Acceptable for MVP.
     """
     import litellm as _litellm
 
@@ -298,6 +364,15 @@ async def call_model(
     if extra_params:
         apply_llm_params(litellm_kwargs, extra_params)
 
-    with proxy_env(resolved.proxy, resolved.ssl_cert_path, resolved.ssl_client_key):
-        response = await litellm.acompletion(**litellm_kwargs)
+    client = get_litellm_client(
+        resolved.proxy,
+        resolved.ssl_cert_path,
+        resolved.ssl_client_key,
+        resolved.api_key,
+        resolved.api_base,
+    )
+    if client is not None:
+        litellm_kwargs["client"] = client
+
+    response = await litellm.acompletion(**litellm_kwargs)
     return response.choices[0].message.content or ""

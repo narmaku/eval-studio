@@ -161,10 +161,11 @@ async def test_extra_params_do_not_override_explicit_kwargs():
 
 
 @pytest.mark.asyncio
-async def test_proxy_env_called_during_judge_call():
-    """proxy_env context manager is activated with adapter's proxy/SSL settings."""
+async def test_litellm_client_used_for_proxy_ssl():
+    """get_litellm_client is called with adapter's proxy/SSL settings."""
     adapter = LiteLLMJudgeAdapter(
         model="judge-model",
+        api_key="key-1",
         proxy="http://proxy:8080",
         ssl_cert_path="/tmp/ca.pem",
     )
@@ -174,15 +175,19 @@ async def test_proxy_env_called_during_judge_call():
     mock_response.choices = [MagicMock()]
     mock_response.choices[0].message.content = '{"score": 0.9, "reasoning": "ok"}'
 
+    sentinel_client = MagicMock()
+
     with (
         patch(
             "app.adapters.litellm_judge.litellm.acompletion",
             new_callable=AsyncMock,
             return_value=mock_response,
-        ),
-        patch("app.adapters.litellm_judge.proxy_env") as mock_proxy,
+        ) as mock_acompletion,
+        patch(
+            "app.adapters.litellm_judge.get_litellm_client",
+            return_value=sentinel_client,
+        ) as mock_get_client,
     ):
-        mock_proxy.return_value.__enter__ = MagicMock(return_value=None)
-        mock_proxy.return_value.__exit__ = MagicMock(return_value=False)
         await adapter.evaluate_qa(question="q", expected_answer="a", actual_answer="a", judge_config=judge_config)
-        mock_proxy.assert_called_once_with("http://proxy:8080", "/tmp/ca.pem", None)
+        mock_get_client.assert_called_once_with("http://proxy:8080", "/tmp/ca.pem", None, "key-1", None)
+        assert mock_acompletion.call_args.kwargs.get("client") is sentinel_client
