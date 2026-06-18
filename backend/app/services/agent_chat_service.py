@@ -59,6 +59,143 @@ def _serialize_tool_arguments(arguments: object) -> str:
     return "{}"
 
 
+async def _append_to_transcript(db: AsyncSession, session: Session, entry: dict) -> None:
+    """Persist a single entry to the session transcript (refresh → copy → append → commit)."""
+    await db.refresh(session)
+    transcript = list(session.transcript or [])
+    transcript.append(entry)
+    session.transcript = transcript
+    await db.commit()
+
+
+def _transcript_to_llm_messages(transcript: list[dict]) -> list[dict]:
+    """Convert stored transcript entries to the OpenAI messages format for LLM calls.
+
+    Handles three entry shapes: assistant with tool_calls, tool results, and
+    plain user/system/assistant messages.
+    """
+    messages: list[dict] = []
+    for entry in transcript:
+        role = entry["role"]
+        if role == "assistant" and entry.get("tool_calls"):
+            msg: dict = {"role": "assistant", "content": entry.get("content") or None}
+            msg["tool_calls"] = [
+                {
+                    "id": tc.get("id", ""),
+                    "type": "function",
+                    "function": {
+                        "name": tc.get("tool_name", tc.get("name", "")),
+                        "arguments": _serialize_tool_arguments(tc.get("arguments", {})),
+                    },
+                }
+                for tc in entry["tool_calls"]
+            ]
+            messages.append(msg)
+        elif role == "tool":
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": entry.get("tool_call_id", ""),
+                    "content": entry.get("content", ""),
+                }
+            )
+        else:
+            messages.append({"role": role, "content": entry.get("content", "")})
+    return messages
+
+
+def _build_tool_calls(accumulated: dict[int, dict]) -> list[dict]:
+    """Build tool-call envelope dicts from chunk-accumulated raw tool calls."""
+    tool_calls = []
+    for _idx, tc_data in sorted(accumulated.items()):
+        try:
+            arguments = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+        except json.JSONDecodeError:
+            arguments = {"raw": tc_data["arguments"]}
+
+        tool_calls.append(
+            {
+                "id": tc_data["id"],
+                "tool_name": tc_data["name"],
+                "arguments": arguments,
+                "result": None,
+                "duration_ms": None,
+                "timestamp": _iso_now(),
+                "status": "pending",
+            }
+        )
+    return tool_calls
+
+
+async def _execute_tool_calls(
+    manager,
+    tool_calls: list[dict],
+    messages_for_llm: list[dict],
+    session: Session,
+    db: AsyncSession,
+    session_id: str,
+) -> AsyncGenerator[dict, None]:
+    """Execute tool calls, persist results, and yield WS envelopes.
+
+    For each tool call: yields a tool_executing envelope, runs the tool,
+    updates the tool_call envelope in-place with the result, yields a
+    tool_result envelope, appends the result to messages_for_llm, and
+    persists the tool result to the transcript.
+    """
+    for tc_envelope in tool_calls:
+        tool_call_id = tc_envelope["id"]
+        tool_name = tc_envelope["tool_name"]
+
+        yield ToolExecutingMsg(
+            data=ToolExecutingData(tool_call_id=tool_call_id, tool_name=tool_name),
+            sender="system",
+            session_id=session_id,
+        ).model_dump()
+
+        try:
+            tool_result = await manager.call_tool(tool_name, tc_envelope["arguments"])
+            result_text = tool_result.result
+            is_error = tool_result.is_error
+            duration_ms = tool_result.duration_ms
+        except Exception as exc:
+            logger.exception("agent_chat.tool_call_error", session_id=session_id, tool_name=tool_name)
+            result_text = f"Error executing tool: {sanitize_error_for_client(exc)}"
+            is_error = True
+            duration_ms = 0
+
+        tc_envelope["result"] = result_text
+        tc_envelope["duration_ms"] = duration_ms
+        tc_envelope["status"] = "error" if is_error else "completed"
+
+        yield ToolResultMsg(
+            data=ToolResultData(
+                tool_call_id=tool_call_id,
+                tool_name=tool_name,
+                result=result_text,
+                is_error=is_error,
+                duration_ms=duration_ms,
+            ),
+            sender="system",
+            session_id=session_id,
+        ).model_dump()
+
+        messages_for_llm.append({"role": "tool", "tool_call_id": tool_call_id, "content": result_text})
+
+        await _append_to_transcript(
+            db,
+            session,
+            {
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "tool_name": tool_name,
+                "content": result_text,
+                "is_error": is_error,
+                "duration_ms": duration_ms,
+                "timestamp": _iso_now(),
+            },
+        )
+
+
 async def process_user_message(
     session_id: str,
     content: str,
@@ -71,12 +208,7 @@ async def process_user_message(
     The loop continues until the LLM returns text only (no tool_calls) or
     the maximum number of tool rounds is reached.
 
-    Yields typed JSON envelope dicts suitable for WebSocket transmission:
-    - {"type": "message_chunk", ...}    for each streamed content token
-    - {"type": "tool_call", ...}        for each tool call in the response
-    - {"type": "tool_executing", ...}   when a tool call begins execution
-    - {"type": "tool_result", ...}      when a tool call completes
-    - {"type": "message_complete", ...} when the full response is assembled
+    Yields typed JSON envelope dicts suitable for WebSocket transmission.
 
     Args:
         session_id: The session to process the message for.
@@ -104,10 +236,8 @@ async def process_user_message(
                 yield envelope
             return
 
-    # 3. Resolve provider from agent_config and create backend adapter (builtin path)
+    # 3. Create backend adapter + set up MCP servers
     adapter = create_agent_backend(agent_config)
-
-    # 4. Set up MCP servers if configured
     tool_server_ids = agent_config.get("tool_server_ids", [])
     openai_tools: list[dict] | None = None
 
@@ -115,87 +245,42 @@ async def process_user_message(
         manager = get_or_create_manager(session_id)
         openai_tools = await manager.start_servers(tool_server_ids)
         if not openai_tools:
-            openai_tools = None  # No tools available, proceed without
-
+            openai_tools = None
         logger.info(
             "agent_chat.tools_loaded",
             session_id=session_id,
             tool_count=len(openai_tools) if openai_tools else 0,
         )
 
-    # 5. Build messages array from transcript + new user message
+    # 4. Build LLM messages from transcript
     transcript = list(session.transcript or [])
-    messages_for_llm: list[dict] = []
+    messages_for_llm = _transcript_to_llm_messages(transcript)
 
-    # System prompt is passed separately to the adapter
     system_prompt = agent_config.get("system_prompt")
-    has_system_in_transcript = any(e.get("role") == "system" for e in transcript)
-    if has_system_in_transcript:
+    if any(e.get("role") == "system" for e in transcript):
         system_prompt = None
 
-    for entry in transcript:
-        role = entry["role"]
-        if role == "assistant" and entry.get("tool_calls"):
-            msg: dict = {"role": "assistant", "content": entry.get("content") or None}
-            msg["tool_calls"] = [
-                {
-                    "id": tc.get("id", ""),
-                    "type": "function",
-                    "function": {
-                        "name": tc.get("tool_name", tc.get("name", "")),
-                        "arguments": _serialize_tool_arguments(tc.get("arguments", {})),
-                    },
-                }
-                for tc in entry["tool_calls"]
-            ]
-            messages_for_llm.append(msg)
-        elif role == "tool":
-            messages_for_llm.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": entry.get("tool_call_id", ""),
-                    "content": entry.get("content", ""),
-                }
-            )
-        else:
-            messages_for_llm.append({"role": role, "content": entry.get("content", "")})
-
-    # Append the new user message
-    user_message = {
-        "role": "user",
-        "content": content,
-        "timestamp": _iso_now(),
-    }
+    # 5. Append user message to LLM context and persist
     messages_for_llm.append({"role": "user", "content": content})
+    await _append_to_transcript(db, session, {"role": "user", "content": content, "timestamp": _iso_now()})
 
-    # 6. Persist user message to transcript
-    transcript.append(user_message)
-    session.transcript = transcript
-    await db.commit()
+    logger.info("agent_chat.llm_call", session_id=session_id, model=adapter.model, message_count=len(messages_for_llm))
 
-    logger.info(
-        "agent_chat.llm_call",
-        session_id=session_id,
-        model=adapter.model,
-        message_count=len(messages_for_llm),
-    )
-
-    # 7. Agentic loop
+    # 6. Agentic loop
     round_count = 0
-    all_tool_calls_for_complete: list[dict] = []
+    all_tool_calls: list[dict] = []
     final_content = ""
     turn_message_id = new_message_id()
+    final_message_persisted = False
 
     while True:
-        # Stream the response via adapter
+        # Stream one round — accumulate content and tool-call chunks
         full_content = ""
         accumulated_tool_calls: dict[int, dict] = {}
 
         async for chunk in adapter.send_message(messages_for_llm, system_prompt, tools=openai_tools):
             if chunk.done:
                 break
-
-            # Content tokens
             if chunk.content:
                 full_content += chunk.content
                 yield MessageChunk(
@@ -203,8 +288,6 @@ async def process_user_message(
                     sender="agent",
                     session_id=session_id,
                 ).model_dump()
-
-            # Tool call chunks (accumulated across multiple chunks)
             if chunk.tool_call_chunk:
                 tc = chunk.tool_call_chunk
                 idx = tc["index"]
@@ -222,207 +305,83 @@ async def process_user_message(
                     if tc.get("arguments"):
                         accumulated_tool_calls[idx]["arguments"] += tc["arguments"]
 
-        # After first round, don't re-send the system prompt
         system_prompt = None
-
-        # Build tool_calls list
-        tool_calls_list = []
-        for _idx, tc_data in sorted(accumulated_tool_calls.items()):
-            try:
-                arguments = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
-            except json.JSONDecodeError:
-                arguments = {"raw": tc_data["arguments"]}
-
-            tc_envelope = {
-                "id": tc_data["id"],
-                "tool_name": tc_data["name"],
-                "arguments": arguments,
-                "result": None,
-                "duration_ms": None,
-                "timestamp": _iso_now(),
-                "status": "pending",
-            }
-            tool_calls_list.append(tc_envelope)
+        tool_calls_list = _build_tool_calls(accumulated_tool_calls)
 
         if tool_calls_list and openai_tools and tool_server_ids:
-            # Yield tool_call envelopes (status: pending)
             for tc_envelope in tool_calls_list:
-                yield ToolCallMsg(
-                    data=tc_envelope,
-                    sender="agent",
-                    session_id=session_id,
-                ).model_dump()
+                yield ToolCallMsg(data=tc_envelope, sender="agent", session_id=session_id).model_dump()
 
-            # Persist assistant message with tool_calls to transcript
-            assistant_msg_for_transcript: dict = {
-                "role": "assistant",
-                "content": full_content,
-                "timestamp": _iso_now(),
-                "tool_calls": tool_calls_list,
-            }
-            await db.refresh(session)
-            transcript = list(session.transcript or [])
-            transcript.append(assistant_msg_for_transcript)
-            session.transcript = transcript
-            await db.commit()
+            # Persist assistant message with tool_calls
+            await _append_to_transcript(
+                db,
+                session,
+                {"role": "assistant", "content": full_content, "timestamp": _iso_now(), "tool_calls": tool_calls_list},
+            )
+            final_message_persisted = True
 
-            # Build assistant message for LLM context (OpenAI format)
-            assistant_msg_for_llm: dict = {
-                "role": "assistant",
-                "content": full_content or None,
-                "tool_calls": [
-                    {
-                        "id": tc["id"],
-                        "type": "function",
-                        "function": {
-                            "name": tc["tool_name"],
-                            "arguments": _serialize_tool_arguments(tc["arguments"]),
-                        },
-                    }
-                    for tc in tool_calls_list
-                ],
-            }
-            messages_for_llm.append(assistant_msg_for_llm)
+            # Add assistant message to LLM context (OpenAI format)
+            messages_for_llm.append(
+                {
+                    "role": "assistant",
+                    "content": full_content or None,
+                    "tool_calls": [
+                        {
+                            "id": tc["id"],
+                            "type": "function",
+                            "function": {
+                                "name": tc["tool_name"],
+                                "arguments": _serialize_tool_arguments(tc["arguments"]),
+                            },
+                        }
+                        for tc in tool_calls_list
+                    ],
+                }
+            )
 
-            # Execute each tool call
-            manager = get_or_create_manager(session_id)
-            for tc_envelope in tool_calls_list:
-                tool_call_id = tc_envelope["id"]
-                tool_name = tc_envelope["tool_name"]
+            # Execute tools — yields tool_executing/tool_result envelopes
+            tool_manager = get_or_create_manager(session_id)
+            async for envelope in _execute_tool_calls(
+                tool_manager, tool_calls_list, messages_for_llm, session, db, session_id
+            ):
+                yield envelope
 
-                # Yield tool_executing
-                yield ToolExecutingMsg(
-                    data=ToolExecutingData(tool_call_id=tool_call_id, tool_name=tool_name),
-                    sender="system",
-                    session_id=session_id,
-                ).model_dump()
+            all_tool_calls.extend(tool_calls_list)
 
-                # Execute the tool
-                try:
-                    tool_result = await manager.call_tool(tool_name, tc_envelope["arguments"])
-                    result_text = tool_result.result
-                    is_error = tool_result.is_error
-                    duration_ms = tool_result.duration_ms
-                except Exception as exc:
-                    logger.exception(
-                        "agent_chat.tool_call_error",
-                        session_id=session_id,
-                        tool_name=tool_name,
-                    )
-                    result_text = f"Error executing tool: {sanitize_error_for_client(exc)}"
-                    is_error = True
-                    duration_ms = 0
-
-                # Update the tc_envelope with results
-                tc_envelope["result"] = result_text
-                tc_envelope["duration_ms"] = duration_ms
-                tc_envelope["status"] = "error" if is_error else "completed"
-
-                # Yield tool_result
-                yield ToolResultMsg(
-                    data=ToolResultData(
-                        tool_call_id=tool_call_id,
-                        tool_name=tool_name,
-                        result=result_text,
-                        is_error=is_error,
-                        duration_ms=duration_ms,
-                    ),
-                    sender="system",
-                    session_id=session_id,
-                ).model_dump()
-
-                # Add tool result message for LLM context
-                messages_for_llm.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        "content": result_text,
-                    }
-                )
-
-                # Persist tool result to transcript
-                await db.refresh(session)
-                transcript = list(session.transcript or [])
-                transcript.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        "tool_name": tool_name,
-                        "content": result_text,
-                        "is_error": is_error,
-                        "duration_ms": duration_ms,
-                        "timestamp": _iso_now(),
-                    }
-                )
-                session.transcript = transcript
-                await db.commit()
-
-            all_tool_calls_for_complete.extend(tool_calls_list)
-
-            # Check max rounds
             round_count += 1
             if round_count >= MAX_TOOL_ROUNDS:
-                logger.warning(
-                    "agent_chat.max_rounds_reached",
-                    session_id=session_id,
-                    max_rounds=MAX_TOOL_ROUNDS,
-                )
-                # Yield message_complete with whatever we have
+                logger.warning("agent_chat.max_rounds_reached", session_id=session_id, max_rounds=MAX_TOOL_ROUNDS)
                 final_content = full_content
                 break
-
-            # Continue loop — let LLM process the tool results
             continue
 
         else:
-            # No tool calls — text-only response, break the loop
             final_content = full_content
-
-            # Also yield any tool_call envelopes if present but no MCP servers configured
             if tool_calls_list:
                 for tc_envelope in tool_calls_list:
-                    yield ToolCallMsg(
-                        data=tc_envelope,
-                        sender="agent",
-                        session_id=session_id,
-                    ).model_dump()
-                all_tool_calls_for_complete.extend(tool_calls_list)
-
+                    yield ToolCallMsg(data=tc_envelope, sender="agent", session_id=session_id).model_dump()
+                all_tool_calls.extend(tool_calls_list)
             break
 
-    # 8. Yield message_complete
+    # 7. Yield message_complete
     yield MessageComplete(
-        data=MessageCompleteData(
-            content=final_content,
-            message_id=turn_message_id,
-            tool_calls=all_tool_calls_for_complete,
-        ),
+        data=MessageCompleteData(content=final_content, message_id=turn_message_id, tool_calls=all_tool_calls),
         sender="agent",
         session_id=session_id,
     ).model_dump()
 
-    # 9. Persist final assistant message to transcript (only if we broke out with text)
-    if not (tool_calls_list and openai_tools and tool_server_ids):
-        # The last response was text-only, persist it
-        assistant_message: dict = {
-            "role": "assistant",
-            "content": final_content,
-            "timestamp": _iso_now(),
-        }
-        if all_tool_calls_for_complete:
-            assistant_message["tool_calls"] = all_tool_calls_for_complete
-
-        await db.refresh(session)
-        transcript = list(session.transcript or [])
-        transcript.append(assistant_message)
-        session.transcript = transcript
-        await db.commit()
+    # 8. Persist final assistant message (only when the text-only exit path didn't persist)
+    if not final_message_persisted:
+        assistant_entry: dict = {"role": "assistant", "content": final_content, "timestamp": _iso_now()}
+        if all_tool_calls:
+            assistant_entry["tool_calls"] = all_tool_calls
+        await _append_to_transcript(db, session, assistant_entry)
 
     logger.info(
         "agent_chat.message_complete",
         session_id=session_id,
         content_length=len(final_content),
-        tool_call_count=len(all_tool_calls_for_complete),
+        tool_call_count=len(all_tool_calls),
         tool_rounds=round_count,
     )
 
