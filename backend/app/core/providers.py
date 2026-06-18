@@ -1,28 +1,30 @@
 """Inference provider profiles loaded from YAML configuration."""
 
 import os
-from dataclasses import dataclass, field
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import settings
 from app.core.registry_base import YAMLBackedRegistry, resolve_registry_config_path
 
 
-@dataclass
-class ProviderProfile:
+class ProviderProfile(BaseModel):
     """A named inference endpoint with optional proxy and API key configuration."""
+
+    model_config = ConfigDict(extra="ignore")
 
     id: str
     name: str
-    default_model: str
+    default_model: str = ""
     api_base: str | None = None
     api_key_env: str | None = None
     proxy: str | None = None
     ssl_cert_path: str | None = None
     ssl_client_key: str | None = None
-    tags: list[str] = field(default_factory=list)
-    default_params: dict | None = None  # e.g. {"max_tokens": 2048, "temperature": 0.7}
-    provider_type: str = "litellm"  # "litellm" (default) or "custom"
-    endpoint_url: str | None = None  # Full URL for custom providers (e.g. "https://host/api/v1/infer")
+    tags: list[str] = Field(default_factory=list)
+    default_params: dict | None = None
+    provider_type: str = "litellm"
+    endpoint_url: str | None = None
     request_body_template: str | None = None
     response_json_path: str = "choices.0.message.content"
     single_model: bool = False
@@ -44,50 +46,14 @@ class ProviderRegistry(YAMLBackedRegistry[ProviderProfile]):
         return "providers"
 
     def _parse_item(self, raw: dict) -> ProviderProfile | None:
-        return ProviderProfile(
-            id=raw["id"],
-            name=raw["name"],
-            default_model=raw.get("default_model", ""),
-            api_base=raw.get("api_base"),
-            api_key_env=raw.get("api_key_env"),
-            proxy=raw.get("proxy"),
-            ssl_cert_path=raw.get("ssl_cert_path"),
-            ssl_client_key=raw.get("ssl_client_key"),
-            tags=raw.get("tags", []),
-            default_params=raw.get("default_params"),
-            provider_type=raw.get("provider_type", "litellm"),
-            endpoint_url=raw.get("endpoint_url"),
-            request_body_template=raw.get("request_body_template"),
-            response_json_path=raw.get("response_json_path", "choices.0.message.content"),
-            single_model=raw.get("single_model", not raw.get("default_model", "")),
-            rate_limited=raw.get("rate_limited", False),
-            rate_limits=raw.get("rate_limits"),
-        )
+        if "single_model" not in raw:
+            raw = {**raw, "single_model": not raw.get("default_model", "")}
+        return ProviderProfile.model_validate(raw)
 
     def _serialize_item(self, item: ProviderProfile) -> dict:
-        return {
-            "id": item.id,
-            "name": item.name,
-            **({"default_model": item.default_model} if item.default_model else {}),
-            **({"api_base": item.api_base} if item.api_base else {}),
-            **({"api_key_env": item.api_key_env} if item.api_key_env else {}),
-            **({"proxy": item.proxy} if item.proxy else {}),
-            **({"ssl_cert_path": item.ssl_cert_path} if item.ssl_cert_path else {}),
-            **({"ssl_client_key": item.ssl_client_key} if item.ssl_client_key else {}),
-            **({"tags": item.tags} if item.tags else {}),
-            **({"default_params": item.default_params} if item.default_params else {}),
-            **({"provider_type": item.provider_type} if item.provider_type != "litellm" else {}),
-            **({"endpoint_url": item.endpoint_url} if item.endpoint_url else {}),
-            **({"request_body_template": item.request_body_template} if item.request_body_template else {}),
-            **(
-                {"response_json_path": item.response_json_path}
-                if item.response_json_path != "choices.0.message.content"
-                else {}
-            ),
-            "single_model": item.single_model,
-            **({"rate_limited": item.rate_limited} if item.rate_limited else {}),
-            **({"rate_limits": item.rate_limits} if item.rate_limits else {}),
-        }
+        data = item.model_dump(exclude_defaults=True)
+        data["single_model"] = item.single_model
+        return data
 
     def _get_item_id(self, item: ProviderProfile) -> str:
         return item.id
