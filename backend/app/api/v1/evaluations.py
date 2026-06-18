@@ -36,6 +36,34 @@ router = APIRouter(prefix="/evaluations", tags=["evaluations"], dependencies=[De
 _running_tasks: dict[str, asyncio.Task] = {}
 
 
+async def _create_validated_evaluation(payload: EvaluationCreate | RunRequest, db: AsyncSession) -> Evaluation:
+    """Validate inputs and create an Evaluation row (shared by create and run_and_wait)."""
+    if payload.dataset_id:
+        result = await db.execute(select(Dataset).where(Dataset.id == payload.dataset_id))
+        if not result.scalar_one_or_none():
+            raise NotFoundException("Dataset", payload.dataset_id)
+
+    _validate_evaluator_id(payload.config)
+
+    if payload.mode == EvaluationMode.ARENA:
+        contestants = payload.config.get("contestants", [])
+        if not contestants or len(contestants) < 2:
+            raise ValidationException("Arena evaluations require at least 2 contestants in config.contestants.")
+
+    evaluation = Evaluation(
+        name=payload.name,
+        mode=payload.mode.value,
+        status=EvaluationStatus.PENDING,
+        dataset_id=payload.dataset_id,
+        judge_config_id=payload.judge_config_id,
+        config=payload.config,
+    )
+    db.add(evaluation)
+    await db.commit()
+    await db.refresh(evaluation)
+    return evaluation
+
+
 def _launch_evaluation(evaluation_id: str, coro: object) -> asyncio.Task:
     """Launch an evaluation as a background task, tracked by evaluation_id.
 
@@ -87,32 +115,8 @@ def _validate_evaluator_id(config: dict) -> None:
 @router.post("", response_model=EvaluationResponse, status_code=201)
 async def create_evaluation(payload: EvaluationCreate, db: AsyncSession = Depends(get_db)) -> EvaluationResponse:
     """Create a new evaluation."""
-    # Validate dataset exists if provided
-    if payload.dataset_id:
-        result = await db.execute(select(Dataset).where(Dataset.id == payload.dataset_id))
-        if not result.scalar_one_or_none():
-            raise NotFoundException("Dataset", payload.dataset_id)
-
-    _validate_evaluator_id(payload.config)
-
-    # Arena-specific validation: must have at least 2 contestants
-    if payload.mode == EvaluationMode.ARENA:
-        contestants = payload.config.get("contestants", [])
-        if not contestants or len(contestants) < 2:
-            raise ValidationException("Arena evaluations require at least 2 contestants in config.contestants.")
-
-    evaluation = Evaluation(
-        name=payload.name,
-        mode=payload.mode.value,
-        status=EvaluationStatus.PENDING,
-        dataset_id=payload.dataset_id,
-        judge_config_id=payload.judge_config_id,
-        config=payload.config,
-    )
-    db.add(evaluation)
-    await db.commit()
-    await db.refresh(evaluation)
-    logger.info("evaluation.created", id=evaluation.id, name=evaluation.name, mode=payload.mode.value)
+    evaluation = await _create_validated_evaluation(payload, db)
+    logger.info("evaluation.created", id=evaluation.id, name=evaluation.name, mode=evaluation.mode)
     return EvaluationResponse.model_validate(evaluation)
 
 
@@ -213,31 +217,7 @@ async def run_and_wait(
             f"Timeout {effective_timeout}s exceeds maximum allowed value of {settings.run_timeout_max}s."
         )
 
-    # Validate dataset exists
-    ds_result = await db.execute(select(Dataset).where(Dataset.id == payload.dataset_id))
-    if not ds_result.scalar_one_or_none():
-        raise NotFoundException("Dataset", payload.dataset_id)
-
-    _validate_evaluator_id(payload.config)
-
-    # Arena-specific validation: must have at least 2 contestants
-    if payload.mode == EvaluationMode.ARENA:
-        contestants = payload.config.get("contestants", [])
-        if not contestants or len(contestants) < 2:
-            raise ValidationException("Arena evaluations require at least 2 contestants in config.contestants.")
-
-    # Create the evaluation
-    evaluation = Evaluation(
-        name=payload.name,
-        mode=payload.mode.value,
-        status=EvaluationStatus.PENDING,
-        dataset_id=payload.dataset_id,
-        judge_config_id=payload.judge_config_id,
-        config=payload.config,
-    )
-    db.add(evaluation)
-    await db.commit()
-    await db.refresh(evaluation)
+    evaluation = await _create_validated_evaluation(payload, db)
     evaluation_id = evaluation.id
 
     logger.info("evaluation.run_and_wait.created", id=evaluation_id, mode=payload.mode.value, async_mode=async_mode)

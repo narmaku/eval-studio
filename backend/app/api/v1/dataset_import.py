@@ -10,8 +10,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.exceptions import AppException, NotFoundException
 from app.core.security import require_auth
-from app.models.dataset import Dataset, DatasetItem
-from app.schemas.dataset import DatasetDetailResponse, DatasetItemResponse
+from app.schemas.dataset import DatasetDetailResponse
 from app.schemas.dataset_import import (
     AnalyzeResponse,
     FileAnalysisResult,
@@ -29,6 +28,7 @@ from app.services.dataset_import_service import (
     get_session,
     suggest_mapping,
 )
+from app.services.dataset_service import create_dataset_with_items, to_detail_response
 
 logger = structlog.get_logger()
 
@@ -180,145 +180,44 @@ async def import_dataset(payload: ImportRequest, db: AsyncSession = Depends(get_
         if af.schema and af.rows:
             all_rows_by_file.append((af.filename, af.rows))
 
+    # Build (name, mapped_items) pairs: one pair for "single", one per file for "separate"
+    mapping_kwargs = {
+        "question_field": payload.mapping.question_field,
+        "answer_field": payload.mapping.answer_field,
+        "metadata_fields": payload.mapping.metadata_fields or None,
+    }
+
     if payload.merge_mode == "single":
-        # Merge all files into a single dataset
         merged_rows: list[dict] = []
         for _, rows in all_rows_by_file:
             merged_rows.extend(rows)
+        name_items_pairs = [(payload.name, apply_mapping(merged_rows, **mapping_kwargs))]
+    else:
+        name_items_pairs = []
+        for filename, rows in all_rows_by_file:
+            stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+            name_items_pairs.append((f"{payload.name} - {stem}", apply_mapping(rows, **mapping_kwargs)))
 
-        items_data = apply_mapping(
-            merged_rows,
-            question_field=payload.mapping.question_field,
-            answer_field=payload.mapping.answer_field,
-            metadata_fields=payload.mapping.metadata_fields or None,
-        )
-
-        dataset = Dataset(
-            name=payload.name,
+    results: list[DatasetDetailResponse] = []
+    for ds_name, items_data in name_items_pairs:
+        dataset, db_items = await create_dataset_with_items(
+            db,
+            name=ds_name,
             description=payload.description,
             format="qa_pairs",
             version=payload.version,
             tags=payload.tags,
             source_type="import",
-            item_count=len(items_data),
+            items=items_data,
         )
-        db.add(dataset)
-        await db.flush()
+        results.append(to_detail_response(dataset, db_items))
 
-        db_items = []
-        for idx, item in enumerate(items_data):
-            db_item = DatasetItem(
-                dataset_id=dataset.id,
-                question=item["question"],
-                expected_answer=item.get("expected_answer"),
-                metadata_=item.get("metadata"),
-                order_index=idx,
-            )
-            db.add(db_item)
-            db_items.append(db_item)
+    delete_session(payload.analysis_id)
 
-        await db.commit()
-        await db.refresh(dataset)
-
-        # Clean up session
-        delete_session(payload.analysis_id)
-
-        item_responses = [
-            DatasetItemResponse(
-                id=it.id,
-                question=it.question,
-                expected_answer=it.expected_answer,
-                metadata=it.metadata_,
-                order_index=it.order_index,
-            )
-            for it in db_items
-        ]
-
-        logger.info("import.completed", dataset_id=dataset.id, item_count=len(items_data))
-        return DatasetDetailResponse(
-            id=dataset.id,
-            name=dataset.name,
-            description=dataset.description,
-            format=dataset.format,
-            version=dataset.version,
-            tags=dataset.tags or [],
-            source_type=dataset.source_type,
-            item_count=dataset.item_count,
-            created_at=dataset.created_at,
-            updated_at=dataset.updated_at,
-            items=item_responses,
-        )
-
+    if payload.merge_mode == "single":
+        logger.info("import.completed", dataset_id=results[0].id, item_count=results[0].item_count)
+        return results[0]
     else:
-        # Separate mode: one dataset per file
-        results: list[DatasetDetailResponse] = []
-        for filename, rows in all_rows_by_file:
-            items_data = apply_mapping(
-                rows,
-                question_field=payload.mapping.question_field,
-                answer_field=payload.mapping.answer_field,
-                metadata_fields=payload.mapping.metadata_fields or None,
-            )
-
-            # Derive name from filename
-            stem = filename.rsplit(".", 1)[0] if "." in filename else filename
-            ds_name = f"{payload.name} - {stem}"
-
-            dataset = Dataset(
-                name=ds_name,
-                description=payload.description,
-                format="qa_pairs",
-                version=payload.version,
-                tags=payload.tags,
-                source_type="import",
-                item_count=len(items_data),
-            )
-            db.add(dataset)
-            await db.flush()
-
-            db_items = []
-            for idx, item in enumerate(items_data):
-                db_item = DatasetItem(
-                    dataset_id=dataset.id,
-                    question=item["question"],
-                    expected_answer=item.get("expected_answer"),
-                    metadata_=item.get("metadata"),
-                    order_index=idx,
-                )
-                db.add(db_item)
-                db_items.append(db_item)
-
-            await db.commit()
-            await db.refresh(dataset)
-
-            item_responses = [
-                DatasetItemResponse(
-                    id=it.id,
-                    question=it.question,
-                    expected_answer=it.expected_answer,
-                    metadata=it.metadata_,
-                    order_index=it.order_index,
-                )
-                for it in db_items
-            ]
-
-            results.append(
-                DatasetDetailResponse(
-                    id=dataset.id,
-                    name=dataset.name,
-                    description=dataset.description,
-                    format=dataset.format,
-                    version=dataset.version,
-                    tags=dataset.tags or [],
-                    source_type=dataset.source_type,
-                    item_count=dataset.item_count,
-                    created_at=dataset.created_at,
-                    updated_at=dataset.updated_at,
-                    items=item_responses,
-                )
-            )
-
-        delete_session(payload.analysis_id)
         logger.info("import.completed_separate", dataset_count=len(results))
         return results
 
