@@ -61,7 +61,7 @@ export function ArtifactsList({ evaluationId }: ArtifactsListProps) {
       try {
         const data = await api.listArtifacts(evaluationId);
         if (!cancelled) {
-          setArtifacts(data);
+          setArtifacts(data.items);
           setError(null);
         }
       } catch (err: unknown) {

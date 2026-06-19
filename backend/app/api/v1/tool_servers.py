@@ -5,8 +5,9 @@ import uuid
 import structlog
 from fastapi import APIRouter, Depends, Query, Response
 
+from app.api.v1._registry_helpers import registry_write, validate_allowlisted_command
 from app.core.config import settings
-from app.core.exceptions import AppException, NotFoundException, ValidationException, sanitize_error_for_client
+from app.core.exceptions import NotFoundException
 from app.core.security import require_auth
 from app.core.subprocess_validation import CommandNotAllowedError, load_allowed_commands, validate_command
 from app.core.tool_servers import StandaloneToolDef, ToolServerProfile, tool_server_registry
@@ -23,14 +24,9 @@ def _validate_tool_server_command(command: str | None, server_type: str) -> None
     Only mcp_stdio servers have commands that spawn subprocesses.
     Standalone servers define tools inline and never execute commands.
     """
-    if server_type != "mcp_stdio" or not command:
+    if server_type != "mcp_stdio":
         return
-
-    allowed = load_allowed_commands(settings.tool_server_allowed_commands)
-    try:
-        validate_command(command, allowed, context="tool server command")
-    except (CommandNotAllowedError, ValueError) as exc:
-        raise ValidationException(str(exc)) from exc
+    validate_allowlisted_command(command, settings.tool_server_allowed_commands, "tool server command")
 
 
 def _to_response(s: ToolServerProfile) -> ToolServerResponse:
@@ -86,10 +82,7 @@ async def create_tool_server(payload: ToolServerCreate) -> ToolServerResponse:
         tags=payload.tags,
         enabled=payload.enabled,
     )
-    try:
-        tool_server_registry.add_tool_server(profile)
-    except RuntimeError as exc:
-        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
+    registry_write(tool_server_registry.add_tool_server, profile)
     logger.info("tool_server.created", id=profile.id, name=profile.name)
     return _to_response(profile)
 
@@ -112,10 +105,7 @@ async def update_tool_server(tool_server_id: str, payload: ToolServerUpdate) -> 
             StandaloneToolDef(name=t["name"], description=t.get("description", ""), parameters=t.get("parameters", {}))
             for t in update_data["tools"]
         ]
-    try:
-        updated = tool_server_registry.update_tool_server(tool_server_id, update_data)
-    except RuntimeError as exc:
-        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
+    updated = registry_write(tool_server_registry.update_tool_server, tool_server_id, update_data)
     if not updated:
         raise NotFoundException("Tool Server", tool_server_id)
     logger.info("tool_server.updated", id=tool_server_id)
@@ -124,10 +114,7 @@ async def update_tool_server(tool_server_id: str, payload: ToolServerUpdate) -> 
 
 @router.delete("/{tool_server_id}", status_code=204)
 async def delete_tool_server(tool_server_id: str) -> Response:
-    try:
-        deleted = tool_server_registry.delete_tool_server(tool_server_id)
-    except RuntimeError as exc:
-        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
+    deleted = registry_write(tool_server_registry.delete_tool_server, tool_server_id)
     if not deleted:
         raise NotFoundException("Tool Server", tool_server_id)
     logger.info("tool_server.deleted", id=tool_server_id)

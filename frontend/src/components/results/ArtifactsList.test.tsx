@@ -4,6 +4,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ArtifactsList } from './ArtifactsList';
 import type { Artifact } from '@/types';
 
+function paginated(items: Artifact[]) {
+  return { items, total: items.length, page: 1, page_size: 100, pages: 1 };
+}
+
 const mockArtifacts: Artifact[] = [
   {
     id: 'art-1',
@@ -53,7 +57,7 @@ describe('ArtifactsList', () => {
   });
 
   it('renders nothing when no artifacts exist', async () => {
-    mockListArtifacts.mockResolvedValue([]);
+    mockListArtifacts.mockResolvedValue(paginated([]));
     const { container } = render(<ArtifactsList evaluationId="eval-1" />);
     await waitFor(() => {
       expect(mockListArtifacts).toHaveBeenCalledWith('eval-1');
@@ -62,7 +66,7 @@ describe('ArtifactsList', () => {
   });
 
   it('renders artifact list with correct data', async () => {
-    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockListArtifacts.mockResolvedValue(paginated(mockArtifacts));
     render(<ArtifactsList evaluationId="eval-1" />);
 
     await waitFor(() => {
@@ -88,7 +92,7 @@ describe('ArtifactsList', () => {
   });
 
   it('formats file sizes correctly', async () => {
-    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockListArtifacts.mockResolvedValue(paginated(mockArtifacts));
     render(<ArtifactsList evaluationId="eval-1" />);
 
     await waitFor(() => {
@@ -99,7 +103,7 @@ describe('ArtifactsList', () => {
   });
 
   it('shows preview button only for text/json artifacts', async () => {
-    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockListArtifacts.mockResolvedValue(paginated(mockArtifacts));
     render(<ArtifactsList evaluationId="eval-1" />);
 
     await waitFor(() => {
@@ -117,7 +121,7 @@ describe('ArtifactsList', () => {
 
   it('opens preview dialog when preview button is clicked', async () => {
     const user = userEvent.setup();
-    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockListArtifacts.mockResolvedValue(paginated(mockArtifacts));
     mockPreviewArtifact.mockResolvedValue('{"key": "value"}');
     render(<ArtifactsList evaluationId="eval-1" />);
 
@@ -139,7 +143,7 @@ describe('ArtifactsList', () => {
 
   it('calls download URL when download button is clicked', async () => {
     const user = userEvent.setup();
-    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockListArtifacts.mockResolvedValue(paginated(mockArtifacts));
     mockGetArtifactDownloadUrl.mockReturnValue('/api/v1/artifacts/art-1/download');
 
     const mockOpen = vi.fn();
@@ -168,7 +172,7 @@ describe('ArtifactsList', () => {
   });
 
   it('displays dashes for null descriptions', async () => {
-    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockListArtifacts.mockResolvedValue(paginated(mockArtifacts));
     render(<ArtifactsList evaluationId="eval-1" />);
 
     await waitFor(() => {
@@ -200,7 +204,7 @@ describe('ArtifactsList', () => {
         created_at: '2026-01-15T10:00:00Z',
       },
     ];
-    mockListArtifacts.mockResolvedValue(csvArtifact);
+    mockListArtifacts.mockResolvedValue(paginated(csvArtifact));
     render(<ArtifactsList evaluationId="eval-1" />);
 
     await waitFor(() => {
@@ -222,7 +226,7 @@ describe('ArtifactsList', () => {
         created_at: '2026-01-15T10:00:00Z',
       },
     ];
-    mockListArtifacts.mockResolvedValue(mdArtifact);
+    mockListArtifacts.mockResolvedValue(paginated(mdArtifact));
     render(<ArtifactsList evaluationId="eval-1" />);
 
     await waitFor(() => {
@@ -244,7 +248,7 @@ describe('ArtifactsList', () => {
         created_at: '2026-01-15T10:00:00Z',
       },
     ];
-    mockListArtifacts.mockResolvedValue(htmlArtifact);
+    mockListArtifacts.mockResolvedValue(paginated(htmlArtifact));
     render(<ArtifactsList evaluationId="eval-1" />);
 
     await waitFor(() => {
@@ -259,7 +263,7 @@ describe('ArtifactsList', () => {
 
   it('shows error in preview dialog when preview API fails', async () => {
     const user = userEvent.setup();
-    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockListArtifacts.mockResolvedValue(paginated(mockArtifacts));
     mockPreviewArtifact.mockRejectedValue(new Error('Server error'));
     render(<ArtifactsList evaluationId="eval-1" />);
 
@@ -277,7 +281,7 @@ describe('ArtifactsList', () => {
 
   it('shows non-Error preview failure message', async () => {
     const user = userEvent.setup();
-    mockListArtifacts.mockResolvedValue(mockArtifacts);
+    mockListArtifacts.mockResolvedValue(paginated(mockArtifacts));
     mockPreviewArtifact.mockRejectedValue('string error');
     render(<ArtifactsList evaluationId="eval-1" />);
 
@@ -314,7 +318,7 @@ describe('ArtifactsList', () => {
         created_at: '2026-01-15T10:00:00Z',
       },
     ];
-    mockListArtifacts.mockResolvedValue(zeroByteArtifact);
+    mockListArtifacts.mockResolvedValue(paginated(zeroByteArtifact));
     render(<ArtifactsList evaluationId="eval-1" />);
 
     await waitFor(() => {
@@ -334,7 +338,7 @@ describe('ArtifactsList', () => {
         created_at: '2026-01-15T10:00:00Z',
       },
     ];
-    mockListArtifacts.mockResolvedValue(gbArtifact);
+    mockListArtifacts.mockResolvedValue(paginated(gbArtifact));
     render(<ArtifactsList evaluationId="eval-1" />);
 
     await waitFor(() => {

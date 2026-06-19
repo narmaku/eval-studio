@@ -6,7 +6,12 @@ T = TypeVar("T")
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
-    """Generic paginated response envelope."""
+    """Generic paginated response envelope.
+
+    Convention: DB-backed collections use ``PaginatedResponse``; bounded
+    config/registry collections (providers, harnesses, tool-servers,
+    evaluators, judge presets) return bare JSON arrays.
+    """
 
     items: list[T]
     total: int

@@ -6,10 +6,10 @@ import uuid
 import structlog
 from fastapi import APIRouter, Depends, Query, Response
 
+from app.api.v1._registry_helpers import registry_write, validate_allowlisted_command
 from app.core.config import settings
-from app.core.exceptions import AppException, NotFoundException, ValidationException, sanitize_error_for_client
+from app.core.exceptions import NotFoundException
 from app.core.security import require_auth
-from app.core.subprocess_validation import load_allowed_commands, validate_command
 from app.harnesses.registry import HarnessProfile, harness_registry
 from app.schemas.harness import HarnessCreate, HarnessResponse, HarnessUpdate
 
@@ -24,14 +24,9 @@ def _validate_binary_path(binary_path: str | None, harness_type: str) -> None:
     Raises ValidationException (422) if the binary is not permitted.
     Builtin harnesses are not checked.
     """
-    if harness_type != "subprocess" or not binary_path:
+    if harness_type != "subprocess":
         return
-
-    try:
-        allowed = load_allowed_commands(settings.harness_allowed_binaries)
-        validate_command(binary_path, allowed, context="harness binary")
-    except ValueError as exc:
-        raise ValidationException(str(exc)) from exc
+    validate_allowlisted_command(binary_path, settings.harness_allowed_binaries, "harness binary")
 
 
 def _to_response(h: HarnessProfile) -> HarnessResponse:
@@ -89,10 +84,7 @@ async def create_harness(payload: HarnessCreate) -> HarnessResponse:
         default=payload.default,
         enabled=payload.enabled,
     )
-    try:
-        harness_registry.add_harness(profile)
-    except RuntimeError as exc:
-        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
+    registry_write(harness_registry.add_harness, profile)
     logger.info("harness.created", id=profile.id, name=profile.name)
     return _to_response(profile)
 
@@ -110,10 +102,7 @@ async def update_harness(harness_id: str, payload: HarnessUpdate) -> HarnessResp
     _validate_binary_path(effective_binary, effective_type)
 
     update_data = payload.model_dump(exclude_unset=True)
-    try:
-        updated = harness_registry.update_harness(harness_id, update_data)
-    except RuntimeError as exc:
-        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
+    updated = registry_write(harness_registry.update_harness, harness_id, update_data)
     if not updated:
         raise NotFoundException("Harness", harness_id)
     logger.info("harness.updated", id=harness_id)
@@ -123,10 +112,7 @@ async def update_harness(harness_id: str, payload: HarnessUpdate) -> HarnessResp
 @router.delete("/{harness_id}", status_code=204)
 async def delete_harness(harness_id: str) -> Response:
     """Delete a harness profile."""
-    try:
-        deleted = harness_registry.delete_harness(harness_id)
-    except RuntimeError as exc:
-        raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
+    deleted = registry_write(harness_registry.delete_harness, harness_id)
     if not deleted:
         raise NotFoundException("Harness", harness_id)
     logger.info("harness.deleted", id=harness_id)
