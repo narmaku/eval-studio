@@ -1,5 +1,6 @@
 """API endpoints for evaluator discovery and config file management."""
 
+import asyncio
 import importlib
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -149,7 +150,7 @@ async def upload_config_file(evaluator_id: str, file: UploadFile) -> ConfigFileI
     if len(content) > MAX_CONFIG_FILE_SIZE:
         max_mb = MAX_CONFIG_FILE_SIZE // (1024 * 1024)
         raise AppException(400, "Bad Request", f"File too large. Maximum size is {max_mb} MB")
-    target_path.write_bytes(content)
+    await asyncio.to_thread(target_path.write_bytes, content)
 
     logger.info("evaluator_config.uploaded", evaluator_id=evaluator_id, filename=filename, size=len(content))
     return ConfigFileInfo(filename=filename, size=len(content))
@@ -187,7 +188,7 @@ async def get_config_file(evaluator_id: str, filename: str) -> PlainTextResponse
     if not target_path.exists():
         raise NotFoundException("Config file", sanitized)
 
-    content = target_path.read_text()
+    content = await asyncio.to_thread(target_path.read_text)
     return PlainTextResponse(content)
 
 

@@ -4,17 +4,28 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.websocket.progress import _connections, _lock, broadcast_log, broadcast_progress, broadcast_status
+from app.websocket.progress import (
+    _broadcast,
+    _connections,
+    _lock,
+    _replay,
+    _replay_buffers,
+    broadcast_log,
+    broadcast_progress,
+    broadcast_status,
+)
 
 
 @pytest.fixture(autouse=True)
 async def _clear_connections():
-    """Ensure connection state is clean for each test."""
+    """Ensure connection and buffer state is clean for each test."""
     async with _lock:
         _connections.clear()
+    _replay_buffers.clear()
     yield
     async with _lock:
         _connections.clear()
+    _replay_buffers.clear()
 
 
 @pytest.mark.asyncio
@@ -368,3 +379,54 @@ async def test_broadcast_status_multiple_subscribers():
     msg2 = ws2.send_json.call_args[0][0]
     assert msg1["status"] == "completed"
     assert msg2["status"] == "completed"
+
+
+# ── replay buffer tests ──
+
+
+@pytest.mark.asyncio
+async def test_replay_sends_buffered_messages_in_order():
+    """Connecting after broadcasts replays all buffered messages."""
+    await broadcast_log("eval-replay", "info", "first")
+    await broadcast_log("eval-replay", "info", "second")
+    await broadcast_progress("eval-replay", 1, 2, "item-1")
+
+    ws = AsyncMock()
+    await _replay("eval-replay", ws)
+
+    assert ws.send_json.call_count == 3
+    msgs = [c[0][0] for c in ws.send_json.call_args_list]
+    assert msgs[0]["message"] == "first"
+    assert msgs[1]["message"] == "second"
+    assert msgs[2]["type"] == "progress"
+
+
+@pytest.mark.asyncio
+async def test_replay_empty_when_no_broadcasts():
+    """Replay sends nothing for an evaluation with no history."""
+    ws = AsyncMock()
+    await _replay("no-history", ws)
+    ws.send_json.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_broadcast_buffers_messages():
+    """_broadcast stores messages in the replay buffer."""
+    msg = {"type": "status", "evaluation_id": "buf-1", "status": "running"}
+    await _broadcast("buf-1", msg)
+
+    assert "buf-1" in _replay_buffers
+    assert len(_replay_buffers["buf-1"]) == 1
+    assert _replay_buffers["buf-1"][0] == msg
+
+
+@pytest.mark.asyncio
+async def test_replay_buffer_caps_at_max_size():
+    """Buffer evicts oldest messages when full."""
+    from app.websocket.progress import _REPLAY_BUFFER_SIZE
+
+    for i in range(_REPLAY_BUFFER_SIZE + 10):
+        await _broadcast("cap-test", {"seq": i})
+
+    assert len(_replay_buffers["cap-test"]) == _REPLAY_BUFFER_SIZE
+    assert _replay_buffers["cap-test"][0]["seq"] == 10

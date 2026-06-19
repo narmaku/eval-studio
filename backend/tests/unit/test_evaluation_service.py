@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -290,3 +291,35 @@ async def test_run_evaluation_already_running(db_session: AsyncSession, evaluati
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "running"  # unchanged
+
+
+@pytest.mark.asyncio
+async def test_concurrent_run_only_one_executes(db_session: AsyncSession, evaluation_with_dataset):
+    """BUG-016: two concurrent run_evaluation calls → exactly one set of Results."""
+    evaluation, _dataset, _items = evaluation_with_dataset
+
+    call_count = 0
+
+    async def counting_call_model(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return "answer"
+
+    mock_evaluate_qa = AsyncMock(return_value=Score(value=1.0, passed=True, reasoning="ok"))
+
+    with (
+        patch("app.services.eval_runner.call_model", side_effect=counting_call_model),
+        patch("app.services.eval_runner.create_adapter_from_config") as mock_factory,
+        patch("app.services.eval_runner.broadcast_progress", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_status", new_callable=AsyncMock),
+        patch("app.services.eval_runner.broadcast_log", new_callable=AsyncMock),
+        patch("app.services.eval_runner.generate_evaluation_artifacts", new_callable=AsyncMock),
+    ):
+        mock_factory.return_value.evaluate_qa = mock_evaluate_qa
+        await asyncio.gather(
+            run_evaluation(evaluation.id, db_session),
+            run_evaluation(evaluation.id, db_session),
+        )
+
+    results = (await db_session.execute(select(Result).where(Result.evaluation_id == evaluation.id))).scalars().all()
+    assert len(results) == 2  # exactly 2 items, not 4 (double-execution)

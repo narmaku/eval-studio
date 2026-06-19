@@ -7,26 +7,44 @@ from app.core.exceptions import AppException, ValidationException
 
 
 class TestRegistryWrite:
-    def test_returns_function_result(self):
-        result = registry_write(lambda x: x * 2, 5)
+    @pytest.mark.asyncio
+    async def test_returns_function_result(self):
+        result = await registry_write(lambda x: x * 2, 5)
         assert result == 10
 
-    def test_converts_runtime_error_to_500(self):
+    @pytest.mark.asyncio
+    async def test_runs_in_thread(self):
+        """Verify the callable runs off the event loop via to_thread."""
+        import threading
+
+        main_thread = threading.current_thread()
+        call_threads: list[threading.Thread] = []
+
+        def capture_thread():
+            call_threads.append(threading.current_thread())
+
+        await registry_write(capture_thread)
+        assert len(call_threads) == 1
+        assert call_threads[0] is not main_thread
+
+    @pytest.mark.asyncio
+    async def test_converts_runtime_error_to_500(self):
         def explode():
             raise RuntimeError("Failed to write /etc/secret.yaml: Permission denied")
 
         with pytest.raises(AppException) as exc_info:
-            registry_write(explode)
+            await registry_write(explode)
         assert exc_info.value.status_code == 500
         assert "Permission denied" not in exc_info.value.detail
         assert "Internal Server Error" in exc_info.value.title
 
-    def test_propagates_other_exceptions(self):
+    @pytest.mark.asyncio
+    async def test_propagates_other_exceptions(self):
         def explode():
             raise ValueError("not a runtime error")
 
         with pytest.raises(ValueError, match="not a runtime error"):
-            registry_write(explode)
+            await registry_write(explode)
 
 
 class TestValidateAllowlistedCommand:

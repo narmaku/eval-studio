@@ -99,26 +99,20 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
   createAndRunEvaluation: async (request: CreateEvaluationRequest) => {
     set({ isLoading: true, error: null });
     try {
-      // Step 1: Create the evaluation (status=pending, no background task yet)
       const evaluation = await api.createEvaluation(request);
       set({ currentEvaluation: evaluation, isLoading: false });
 
-      // Step 2: Persist to sessionStorage
       get().persistRunningEvaluation({
         id: evaluation.id,
         name: evaluation.name,
         mode: evaluation.mode,
       });
 
-      // Step 3: Connect WebSocket BEFORE triggering the background task
-      get().connectToEvaluation(evaluation.id);
-
-      // Step 4: Brief delay to let WebSocket connect, then trigger run
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // Step 5: Now start the background task — WS is ready for first log
-      const runningEvaluation = await api.rerunEvaluation(evaluation.id);
+      const runningEvaluation = await api.runEvaluation(evaluation.id);
       set({ currentEvaluation: runningEvaluation });
+
+      // WS connects after run — replay buffer ensures no messages are lost
+      get().connectToEvaluation(evaluation.id);
 
       return runningEvaluation;
     } catch (err) {

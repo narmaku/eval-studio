@@ -1,3 +1,4 @@
+import asyncio
 import math
 
 import structlog
@@ -142,7 +143,7 @@ async def preview_artifact(
     if not file_path.exists():
         raise NotFoundException("Artifact file", artifact_id)
 
-    content = file_path.read_text(encoding="utf-8", errors="replace")
+    content = await asyncio.to_thread(file_path.read_text, encoding="utf-8", errors="replace")
     logger.info("artifact.preview", id=artifact_id, filename=artifact.filename)
     # Always serve previews as text/plain to prevent stored XSS via HTML/XML content
     return StreamingResponse(

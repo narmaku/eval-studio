@@ -84,7 +84,7 @@ async def create_harness(payload: HarnessCreate) -> HarnessResponse:
         default=payload.default,
         enabled=payload.enabled,
     )
-    registry_write(harness_registry.add_harness, profile)
+    await registry_write(harness_registry.add_harness, profile)
     logger.info("harness.created", id=profile.id, name=profile.name)
     return _to_response(profile)
 
@@ -102,7 +102,7 @@ async def update_harness(harness_id: str, payload: HarnessUpdate) -> HarnessResp
     _validate_binary_path(effective_binary, effective_type)
 
     update_data = payload.model_dump(exclude_unset=True)
-    updated = registry_write(harness_registry.update_harness, harness_id, update_data)
+    updated = await registry_write(harness_registry.update_harness, harness_id, update_data)
     if not updated:
         raise NotFoundException("Harness", harness_id)
     logger.info("harness.updated", id=harness_id)
@@ -112,7 +112,7 @@ async def update_harness(harness_id: str, payload: HarnessUpdate) -> HarnessResp
 @router.delete("/{harness_id}", status_code=204)
 async def delete_harness(harness_id: str) -> Response:
     """Delete a harness profile."""
-    deleted = registry_write(harness_registry.delete_harness, harness_id)
+    deleted = await registry_write(harness_registry.delete_harness, harness_id)
     if not deleted:
         raise NotFoundException("Harness", harness_id)
     logger.info("harness.deleted", id=harness_id)

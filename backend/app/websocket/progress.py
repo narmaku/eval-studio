@@ -1,4 +1,5 @@
 import asyncio
+from collections import deque
 from typing import Any
 
 import structlog
@@ -13,6 +14,10 @@ router = APIRouter()
 # In-memory tracking of active WebSocket connections per evaluation
 _connections: dict[str, set[WebSocket]] = {}
 _lock = asyncio.Lock()
+
+_REPLAY_BUFFER_SIZE = 100
+_REPLAY_MAX_EVALUATIONS = 50
+_replay_buffers: dict[str, deque[dict]] = {}
 
 
 async def _add_connection(evaluation_id: str, ws: WebSocket) -> None:
@@ -30,8 +35,32 @@ async def _remove_connection(evaluation_id: str, ws: WebSocket) -> None:
                 del _connections[evaluation_id]
 
 
+def _buffer_message(evaluation_id: str, message: dict) -> None:
+    """Append to the replay buffer, evicting the oldest evaluation if at capacity."""
+    if evaluation_id not in _replay_buffers:
+        if len(_replay_buffers) >= _REPLAY_MAX_EVALUATIONS:
+            oldest = next(iter(_replay_buffers))
+            del _replay_buffers[oldest]
+        _replay_buffers[evaluation_id] = deque(maxlen=_REPLAY_BUFFER_SIZE)
+    _replay_buffers[evaluation_id].append(message)
+
+
+async def _replay(evaluation_id: str, ws: WebSocket) -> None:
+    """Send buffered messages to a newly-connected client."""
+    buf = _replay_buffers.get(evaluation_id)
+    if not buf:
+        return
+    for msg in list(buf):
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            break
+
+
 async def _broadcast(evaluation_id: str, message: dict) -> None:
-    """Send a message to all connected clients and sweep dead connections."""
+    """Buffer and send a message to all connected clients; sweep dead connections."""
+    _buffer_message(evaluation_id, message)
+
     async with _lock:
         websockets = _connections.get(evaluation_id, set()).copy()
 
@@ -113,8 +142,8 @@ async def progress_websocket(
 
     await _add_connection(evaluation_id, websocket)
     try:
+        await _replay(evaluation_id, websocket)
         while True:
-            # Keep connection alive; client can send pings
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass

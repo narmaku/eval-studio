@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import EvaluationAdapter, JudgeConfigParams, Score
@@ -84,19 +84,23 @@ async def run_evaluation(evaluation_id: str, db: AsyncSession) -> None:
     """Single orchestrator for Q&A, Arena, and RAG evaluation modes."""
     runner: ModeRunner | None = None
     try:
-        # 1. Load evaluation
+        # 1. Atomically claim: pending → running (compare-and-set)
+        cas = await db.execute(
+            update(Evaluation)
+            .where(Evaluation.id == evaluation_id, Evaluation.status == EvaluationStatus.PENDING)
+            .values(status=EvaluationStatus.RUNNING)
+        )
+        await db.commit()
+        if cas.rowcount == 0:
+            logger.warning("evaluation.already_claimed", evaluation_id=evaluation_id)
+            return
+
+        # 2. Load the now-running evaluation
         eval_result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
         evaluation = eval_result.scalar_one_or_none()
         if not evaluation:
             logger.error("evaluation.not_found", evaluation_id=evaluation_id)
             return
-        if evaluation.status != EvaluationStatus.PENDING:
-            logger.warning("evaluation.skipped", evaluation_id=evaluation_id, status=evaluation.status)
-            return
-
-        # 2. Set running
-        evaluation.status = EvaluationStatus.RUNNING
-        await db.commit()
 
         # 3. Resolve mode runner
         runner_cls = MODE_RUNNERS.get(evaluation.mode)
