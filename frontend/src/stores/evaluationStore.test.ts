@@ -6,6 +6,7 @@ vi.mock('@/services/api', () => ({
     listEvaluations: vi.fn(),
     getEvaluation: vi.fn(),
     createEvaluation: vi.fn(),
+    runEvaluation: vi.fn(),
     rerunEvaluation: vi.fn(),
   },
   getWsAuthParam: vi.fn(() => ''),
@@ -393,10 +394,8 @@ describe('evaluationStore', () => {
         callOrder.push('createEvaluation');
         return pendingEval;
       });
-      mockedApi.rerunEvaluation.mockImplementation(async () => {
-        callOrder.push('rerunEvaluation');
-        // Verify WS was connected before this call
-        expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+      mockedApi.runEvaluation.mockImplementation(async () => {
+        callOrder.push('runEvaluation');
         return runningEval;
       });
 
@@ -410,12 +409,11 @@ describe('evaluationStore', () => {
         },
       });
 
-      // Advance past the 200ms delay
-      await vi.advanceTimersByTimeAsync(300);
       const result = await promise;
 
-      expect(callOrder).toEqual(['createEvaluation', 'rerunEvaluation']);
+      expect(callOrder).toEqual(['createEvaluation', 'runEvaluation']);
       expect(result.status).toBe('running');
+      // WS connected after run (replay buffer ensures no messages lost)
       expect(MockWebSocket.instances).toHaveLength(1);
       expect(useEvaluationStore.getState()._connectedEvaluationId).toBe('eval-new');
 

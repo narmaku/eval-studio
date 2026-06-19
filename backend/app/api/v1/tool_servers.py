@@ -82,7 +82,7 @@ async def create_tool_server(payload: ToolServerCreate) -> ToolServerResponse:
         tags=payload.tags,
         enabled=payload.enabled,
     )
-    registry_write(tool_server_registry.add_tool_server, profile)
+    await registry_write(tool_server_registry.add_tool_server, profile)
     logger.info("tool_server.created", id=profile.id, name=profile.name)
     return _to_response(profile)
 
@@ -105,7 +105,7 @@ async def update_tool_server(tool_server_id: str, payload: ToolServerUpdate) -> 
             StandaloneToolDef(name=t["name"], description=t.get("description", ""), parameters=t.get("parameters", {}))
             for t in update_data["tools"]
         ]
-    updated = registry_write(tool_server_registry.update_tool_server, tool_server_id, update_data)
+    updated = await registry_write(tool_server_registry.update_tool_server, tool_server_id, update_data)
     if not updated:
         raise NotFoundException("Tool Server", tool_server_id)
     logger.info("tool_server.updated", id=tool_server_id)
@@ -114,7 +114,7 @@ async def update_tool_server(tool_server_id: str, payload: ToolServerUpdate) -> 
 
 @router.delete("/{tool_server_id}", status_code=204)
 async def delete_tool_server(tool_server_id: str) -> Response:
-    deleted = registry_write(tool_server_registry.delete_tool_server, tool_server_id)
+    deleted = await registry_write(tool_server_registry.delete_tool_server, tool_server_id)
     if not deleted:
         raise NotFoundException("Tool Server", tool_server_id)
     logger.info("tool_server.deleted", id=tool_server_id)

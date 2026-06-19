@@ -1,5 +1,6 @@
 """Shared helpers for YAML-backed registry CRUD routers."""
 
+import asyncio
 from collections.abc import Callable
 from typing import Any
 
@@ -7,15 +8,14 @@ from app.core.exceptions import AppException, ValidationException, sanitize_erro
 from app.core.subprocess_validation import CommandNotAllowedError, load_allowed_commands, validate_command
 
 
-def registry_write(fn: Callable[..., Any], *args: Any) -> Any:
-    """Call *fn* and convert ``RuntimeError`` into a sanitised 500 response.
+async def registry_write(fn: Callable[..., Any], *args: Any) -> Any:
+    """Call *fn* in a thread and convert ``RuntimeError`` into a sanitised 500.
 
-    Every registry mutation (add/update/delete) can raise ``RuntimeError``
-    when the underlying YAML write fails.  Wrapping them here ensures
-    consistent error handling across all three registry routers.
+    Registry mutations perform synchronous YAML file I/O; running them in
+    a thread keeps the event loop free for concurrent WS streaming.
     """
     try:
-        return fn(*args)
+        return await asyncio.to_thread(fn, *args)
     except RuntimeError as exc:
         raise AppException(500, "Internal Server Error", sanitize_error_for_client(exc)) from exc
 

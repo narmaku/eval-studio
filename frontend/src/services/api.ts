@@ -125,6 +125,8 @@ export const api = {
     request<Evaluation>('/api/v1/evaluations', { method: 'POST', body: JSON.stringify(data) }),
   deleteEvaluation: (id: string) =>
     request<void>(`/api/v1/evaluations/${id}`, { method: 'DELETE' }),
+  runEvaluation: (id: string) =>
+    request<Evaluation>(`/api/v1/evaluations/${id}/run`, { method: 'POST' }),
   rerunEvaluation: (id: string) =>
     request<Evaluation>(`/api/v1/evaluations/${id}/rerun`, { method: 'POST' }),
   cancelEvaluation: (id: string) =>
