@@ -1,5 +1,7 @@
 """Integration tests for the providers API endpoints (YAML-backed CRUD)."""
 
+from unittest.mock import patch
+
 import pytest
 
 from app.core.providers import ProviderProfile, provider_registry
@@ -177,3 +179,42 @@ async def test_proxy_field(client):
 async def test_proxy_null_when_not_configured(client):
     response = await client.get("/api/v1/providers/test-model")
     assert response.json()["proxy"] is None
+
+
+# ── RuntimeError handling (DUP-009 gap fix) ──
+
+
+@pytest.mark.asyncio
+async def test_create_returns_500_on_persist_failure(client):
+    """POST returns sanitized 500 when YAML persistence fails."""
+    with patch(
+        "app.core.registry_base.YAMLBackedRegistry._persist_yaml",
+        side_effect=RuntimeError("Permission denied: /etc/providers.yaml"),
+    ):
+        payload = {"name": "Doomed", "default_model": "gpt-4"}
+        response = await client.post("/api/v1/providers", json=payload)
+        assert response.status_code == 500
+        data = response.json()
+        assert "Permission denied" not in data["detail"]
+
+
+@pytest.mark.asyncio
+async def test_update_returns_500_on_persist_failure(client):
+    """PUT returns sanitized 500 when YAML persistence fails."""
+    with patch(
+        "app.core.registry_base.YAMLBackedRegistry._persist_yaml",
+        side_effect=RuntimeError("Disk full"),
+    ):
+        response = await client.put("/api/v1/providers/test-model", json={"name": "Updated"})
+        assert response.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_delete_returns_500_on_persist_failure(client):
+    """DELETE returns sanitized 500 when YAML persistence fails."""
+    with patch(
+        "app.core.registry_base.YAMLBackedRegistry._persist_yaml",
+        side_effect=RuntimeError("Disk full"),
+    ):
+        response = await client.delete("/api/v1/providers/test-model")
+        assert response.status_code == 500

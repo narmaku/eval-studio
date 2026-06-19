@@ -317,8 +317,10 @@ export const api = {
     }),
 
   // --- Artifacts ---
-  listArtifacts: (evaluationId: string) =>
-    request<Artifact[]>(`/api/v1/artifacts?evaluation_id=${encodeURIComponent(evaluationId)}`),
+  listArtifacts: (evaluationId: string, page = 1, pageSize = 100) =>
+    request<PaginatedResponse<Artifact>>(
+      `/api/v1/artifacts?evaluation_id=${encodeURIComponent(evaluationId)}&page=${page}&page_size=${pageSize}`,
+    ),
   getArtifact: (artifactId: string) => request<Artifact>(`/api/v1/artifacts/${artifactId}`),
   getArtifactDownloadUrl: (artifactId: string): string =>
     `${BASE_URL}/api/v1/artifacts/${artifactId}/download`,

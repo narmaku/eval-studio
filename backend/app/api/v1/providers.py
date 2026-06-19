@@ -10,6 +10,7 @@ import litellm
 import structlog
 from fastapi import APIRouter, Depends, Response
 
+from app.api.v1._registry_helpers import registry_write
 from app.core.exceptions import NotFoundException
 from app.core.providers import ProviderProfile, provider_registry
 from app.core.security import require_auth
@@ -190,7 +191,7 @@ async def get_provider(provider_id: str) -> ProviderResponse:
 async def create_provider(payload: ProviderCreate) -> ProviderResponse:
     """Create a new provider (persisted to YAML)."""
     profile = ProviderProfile(id=str(uuid.uuid4()), **payload.model_dump())
-    provider_registry.add_provider(profile)
+    registry_write(provider_registry.add_provider, profile)
     logger.info("provider.created", id=profile.id, name=profile.name)
     return ProviderResponse.from_profile(profile)
 
@@ -199,7 +200,7 @@ async def create_provider(payload: ProviderCreate) -> ProviderResponse:
 async def update_provider(provider_id: str, payload: ProviderUpdate) -> ProviderResponse:
     """Update an existing provider (persisted to YAML)."""
     update_data = payload.model_dump(exclude_unset=True)
-    updated = provider_registry.update_provider(provider_id, update_data)
+    updated = registry_write(provider_registry.update_provider, provider_id, update_data)
     if not updated:
         raise NotFoundException("Provider", provider_id)
     logger.info("provider.updated", id=provider_id)
@@ -209,7 +210,7 @@ async def update_provider(provider_id: str, payload: ProviderUpdate) -> Provider
 @router.delete("/{provider_id}", status_code=204)
 async def delete_provider(provider_id: str) -> Response:
     """Delete a provider (persisted to YAML)."""
-    if not provider_registry.delete_provider(provider_id):
+    if not registry_write(provider_registry.delete_provider, provider_id):
         raise NotFoundException("Provider", provider_id)
     logger.info("provider.deleted", id=provider_id)
     return Response(status_code=204)

@@ -11,7 +11,7 @@ from app.core.tool_servers import StandaloneToolDef, ToolServerProfile, tool_ser
 def _bypass_command_validation():
     """Bypass command validation for integration tests focused on CRUD behavior."""
     with patch(
-        "app.api.v1.tool_servers.validate_command",
+        "app.api.v1._registry_helpers.validate_command",
         side_effect=lambda cmd, allowed, **kw: cmd,
     ):
         yield

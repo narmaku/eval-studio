@@ -44,16 +44,20 @@ def _use_tmp_artifacts_dir(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_list_artifacts_empty(client, db_session):
-    """GET /artifacts?evaluation_id=... returns empty list when no artifacts."""
+    """GET /artifacts?evaluation_id=... returns paginated envelope with empty items."""
     eval_id = await _create_evaluation(db_session)
     response = await client.get("/api/v1/artifacts", params={"evaluation_id": eval_id})
     assert response.status_code == 200
-    assert response.json() == []
+    data = response.json()
+    assert data["items"] == []
+    assert data["total"] == 0
+    assert data["page"] == 1
+    assert data["pages"] == 1
 
 
 @pytest.mark.asyncio
 async def test_list_artifacts_with_data(client, db_session):
-    """GET /artifacts?evaluation_id=... returns artifacts for that evaluation."""
+    """GET /artifacts?evaluation_id=... returns artifacts in paginated envelope."""
     eval_id = await _create_evaluation(db_session)
     await _create_artifact(db_session, eval_id, settings.artifacts_dir, filename="report.json")
     await _create_artifact(db_session, eval_id, settings.artifacts_dir, filename="log.txt", content_type="text/plain")
@@ -61,8 +65,9 @@ async def test_list_artifacts_with_data(client, db_session):
     response = await client.get("/api/v1/artifacts", params={"evaluation_id": eval_id})
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2
-    filenames = {a["filename"] for a in data}
+    assert data["total"] == 2
+    assert len(data["items"]) == 2
+    filenames = {a["filename"] for a in data["items"]}
     assert "report.json" in filenames
     assert "log.txt" in filenames
 
@@ -78,8 +83,8 @@ async def test_list_artifacts_filters_by_evaluation(client, db_session):
     response = await client.get("/api/v1/artifacts", params={"evaluation_id": eval_id_1})
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]["filename"] == "report1.json"
+    assert data["total"] == 1
+    assert data["items"][0]["filename"] == "report1.json"
 
 
 @pytest.mark.asyncio
@@ -507,6 +512,43 @@ async def test_preview_file_missing_on_disk(client, db_session):
 
 
 # --- List endpoint edge cases ---
+
+
+@pytest.mark.asyncio
+async def test_list_artifacts_pagination(client, db_session):
+    """GET /artifacts respects page and page_size parameters."""
+    eval_id = await _create_evaluation(db_session)
+    for i in range(5):
+        await _create_artifact(db_session, eval_id, settings.artifacts_dir, filename=f"file{i}.json")
+
+    response = await client.get(
+        "/api/v1/artifacts",
+        params={"evaluation_id": eval_id, "page": 1, "page_size": 2},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 5
+    assert len(data["items"]) == 2
+    assert data["page"] == 1
+    assert data["page_size"] == 2
+    assert data["pages"] == 3
+
+    # Second page
+    response2 = await client.get(
+        "/api/v1/artifacts",
+        params={"evaluation_id": eval_id, "page": 2, "page_size": 2},
+    )
+    data2 = response2.json()
+    assert len(data2["items"]) == 2
+    assert data2["page"] == 2
+
+    # Last page (partial)
+    response3 = await client.get(
+        "/api/v1/artifacts",
+        params={"evaluation_id": eval_id, "page": 3, "page_size": 2},
+    )
+    data3 = response3.json()
+    assert len(data3["items"]) == 1
 
 
 @pytest.mark.asyncio

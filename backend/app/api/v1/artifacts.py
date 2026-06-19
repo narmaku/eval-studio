@@ -1,7 +1,9 @@
+import math
+
 import structlog
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -10,6 +12,7 @@ from app.core.exceptions import AppException, NotFoundException
 from app.core.security import require_auth
 from app.models.artifact import Artifact
 from app.schemas.artifact import ArtifactResponse
+from app.schemas.common import PaginatedResponse
 from app.services.artifact_service import delete_artifact_file, get_artifact_path
 
 logger = structlog.get_logger()
@@ -30,17 +33,32 @@ def _is_previewable(content_type: str) -> bool:
     return content_type in PREVIEWABLE_TYPES
 
 
-@router.get("", response_model=list[ArtifactResponse])
+@router.get("", response_model=PaginatedResponse[ArtifactResponse])
 async def list_artifacts(
     evaluation_id: str = Query(..., description="Evaluation ID to list artifacts for"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-) -> list[ArtifactResponse]:
-    """List all artifacts for a given evaluation."""
-    query = select(Artifact).where(Artifact.evaluation_id == evaluation_id).order_by(Artifact.created_at.desc())
+) -> PaginatedResponse[ArtifactResponse]:
+    """List artifacts for a given evaluation with pagination."""
+    where = Artifact.evaluation_id == evaluation_id
+
+    total_result = await db.execute(select(func.count(Artifact.id)).where(where))
+    total = total_result.scalar_one()
+
+    query = select(Artifact).where(where).order_by(Artifact.created_at.desc())
+    query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     artifacts = result.scalars().all()
-    logger.info("artifacts.listed", evaluation_id=evaluation_id, count=len(artifacts))
-    return [ArtifactResponse.model_validate(a) for a in artifacts]
+
+    logger.info("artifacts.listed", evaluation_id=evaluation_id, count=len(artifacts), total=total)
+    return PaginatedResponse(
+        items=[ArtifactResponse.model_validate(a) for a in artifacts],
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=max(1, math.ceil(total / page_size)),
+    )
 
 
 @router.get("/{artifact_id}", response_model=ArtifactResponse)

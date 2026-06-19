@@ -864,7 +864,8 @@ curl -s http://localhost:8000/api/v1/health | jq .
 
 ### Pagination
 
-All list endpoints return a paginated response envelope:
+**DB-backed collections** (evaluations, datasets, results, sessions, rubrics,
+API keys, artifacts) return a paginated response envelope:
 
 ```json
 {
@@ -878,6 +879,10 @@ All list endpoints return a paginated response envelope:
 
 Use `page` and `page_size` query parameters to navigate through results.
 Pages are 1-based.
+
+**Config/registry collections** (providers, harnesses, tool-servers,
+evaluators, judge presets) return bare JSON arrays. These collections are
+bounded by nature (O(10) entries) and do not require pagination.
 
 ### Error responses
 
