@@ -1,5 +1,4 @@
 import math
-from datetime import UTC, datetime
 
 import structlog
 from fastapi import APIRouter, Depends
@@ -70,34 +69,6 @@ async def list_judges(
         page_size=page_size,
         pages=max(1, math.ceil(total / page_size)),
     )
-
-
-@router.get("/presets", response_model=list[JudgeConfigResponse])
-async def get_judge_presets() -> list[JudgeConfigResponse]:
-    """Get available judge presets.
-
-    Any provider can be used as a judge — the role is decided at evaluation config time.
-    """
-    from app.core.providers import provider_registry
-
-    now = datetime.now(UTC)
-    judge_providers = provider_registry.list_providers()
-    return [
-        JudgeConfigResponse(
-            id=f"provider-{p.id}",
-            name=p.name,
-            preset=None,
-            model=p.default_model,
-            temperature=0.0,
-            prompt_template=None,
-            pass_threshold=0.7,
-            dimensions=None,
-            aggregation=None,
-            created_at=now,
-            updated_at=now,
-        )
-        for p in judge_providers
-    ]
 
 
 @router.get("/{judge_id}", response_model=JudgeConfigResponse)

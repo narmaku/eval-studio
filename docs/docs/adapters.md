@@ -13,5 +13,5 @@ the `EnvironmentProvider` ABC in `backend/app/environments/base.py`.
     Detailed API documentation for the adapter interfaces, including method
     signatures, configuration schemas, and implementation examples, will be
     added as the backend foundation is built. See the
-    [CONTRIBUTING.md](https://github.com/eval-studio/eval-studio/blob/main/CONTRIBUTING.md)
+    [CONTRIBUTING.md](https://github.com/narmaku/eval-studio/blob/main/CONTRIBUTING.md)
     for a quick guide on adding new adapters.
