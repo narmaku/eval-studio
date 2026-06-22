@@ -291,7 +291,10 @@ function handleWsMessage(
     case 'tool_call': {
       const toolMsg = envelope as unknown as WsToolCallMessage;
       set((state) => ({
-        toolCalls: [...state.toolCalls, { ...toolMsg.data, status: toolMsg.data.status ?? 'pending' }],
+        toolCalls: [
+          ...state.toolCalls,
+          { ...toolMsg.data, status: toolMsg.data.status ?? 'pending' },
+        ],
       }));
       break;
     }

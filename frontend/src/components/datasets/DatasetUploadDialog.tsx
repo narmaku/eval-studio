@@ -258,10 +258,7 @@ export function DatasetUploadDialog({ open, onOpenChange }: DatasetUploadDialogP
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Format</label>
-            <Select
-              value={format}
-              onValueChange={(value: DatasetFormat) => setFormat(value)}
-            >
+            <Select value={format} onValueChange={(value: DatasetFormat) => setFormat(value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select format" />
               </SelectTrigger>

@@ -1,0 +1,42 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.5
+    hooks:
+      - id: ruff
+        name: ruff linter
+        args: [--fix]
+      - id: ruff
+        name: ruff sort imports
+        args: ["check", "--select", "I", "--fix"]
+      - id: ruff-format
+        name: ruff formatter
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-toml
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: https://gitlab.cee.redhat.com/infosec-public/developer-workbench/tools.git
+    rev: rh-pre-commit-2.3.2
+    hooks:
+      - id: rh-pre-commit
+      - id: rh-pre-commit.commit-msg
+
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/src/.*\.(ts|tsx)$
+        pass_filenames: false
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd frontend && npm run format:check'
+        language: system
+        files: ^frontend/src/.*\.(ts|tsx)$
+        pass_filenames: false

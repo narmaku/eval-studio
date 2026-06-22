@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help check-deps dev test test-backend test-frontend lint format build clean docker-build docker-up docker-down docs-serve docs-build
+.PHONY: help check-deps dev test test-backend test-frontend lint format build clean docker-build docker-up docker-down docs-serve docs-build pre-commit-install pre-commit-run
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -58,3 +58,10 @@ docs-serve: ## Serve documentation locally (MkDocs)
 
 docs-build: ## Build documentation site
 	cd docs && uv run mkdocs build
+
+pre-commit-install: ## Install pre-commit hooks into .git/hooks
+	pre-commit install
+	pre-commit install --hook-type commit-msg
+
+pre-commit-run: ## Run all pre-commit hooks on all files
+	pre-commit run --all-files

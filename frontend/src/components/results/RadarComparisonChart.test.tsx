@@ -23,9 +23,7 @@ describe('RadarComparisonChart', () => {
   });
 
   it('renders with default title when not provided', () => {
-    const series = [
-      { name: 'model-a', data: { accuracy: 0.8, fluency: 0.7 } },
-    ];
+    const series = [{ name: 'model-a', data: { accuracy: 0.8, fluency: 0.7 } }];
 
     render(<RadarComparisonChart series={series} />);
 
@@ -33,9 +31,7 @@ describe('RadarComparisonChart', () => {
   });
 
   it('returns null when fewer than 2 metrics', () => {
-    const series = [
-      { name: 'model-a', data: { only_one: 0.5 } },
-    ];
+    const series = [{ name: 'model-a', data: { only_one: 0.5 } }];
 
     const { container } = render(<RadarComparisonChart series={series} />);
 
@@ -50,9 +46,7 @@ describe('RadarComparisonChart', () => {
   });
 
   it('renders with exactly 2 metrics (minimum for radar)', () => {
-    const series = [
-      { name: 'model-a', data: { metric1: 0.5, metric2: 0.8 } },
-    ];
+    const series = [{ name: 'model-a', data: { metric1: 0.5, metric2: 0.8 } }];
 
     render(<RadarComparisonChart series={series} />);
 

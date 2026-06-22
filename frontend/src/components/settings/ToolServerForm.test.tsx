@@ -60,9 +60,7 @@ describe('ToolServerForm', () => {
     await user.type(screen.getByLabelText(/command/i), 'echo');
     await user.click(screen.getByRole('button', { name: /save/i }));
 
-    expect(
-      screen.getByText('Failed to save tool server. Please try again.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Failed to save tool server. Please try again.')).toBeInTheDocument();
   });
 
   it('displays generic fallback for non-Error rejections', async () => {
@@ -75,9 +73,7 @@ describe('ToolServerForm', () => {
     await user.type(screen.getByLabelText(/command/i), 'echo');
     await user.click(screen.getByRole('button', { name: /save/i }));
 
-    expect(
-      screen.getByText('Failed to save tool server. Please try again.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Failed to save tool server. Please try again.')).toBeInTheDocument();
   });
 
   it('displays backend error message when update fails in edit mode', async () => {
@@ -100,22 +96,14 @@ describe('ToolServerForm', () => {
       tool_count: null,
     };
 
-    render(
-      <ToolServerForm
-        open={true}
-        onOpenChange={vi.fn()}
-        toolServer={existing}
-      />,
-    );
+    render(<ToolServerForm open={true} onOpenChange={vi.fn()} toolServer={existing} />);
 
     await user.clear(screen.getByLabelText(/name/i));
     await user.type(screen.getByLabelText(/name/i), 'Updated Name');
     await user.click(screen.getByRole('button', { name: /save/i }));
 
     expect(
-      screen.getByText(
-        'An internal error occurred. Check server logs for details.',
-      ),
+      screen.getByText('An internal error occurred. Check server logs for details.'),
     ).toBeInTheDocument();
   });
 });

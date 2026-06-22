@@ -259,9 +259,7 @@ export function SmartImportDialog({ open, onOpenChange }: SmartImportDialogProps
           ? String(row[mapping.answer_field] ?? '')
           : '',
       metadata: Object.entries(row)
-        .filter(
-          ([key]) => key !== mapping.question_field && key !== mapping.answer_field,
-        )
+        .filter(([key]) => key !== mapping.question_field && key !== mapping.answer_field)
         .reduce(
           (acc, [key, value]) => {
             acc[key] = value;
@@ -326,7 +324,9 @@ export function SmartImportDialog({ open, onOpenChange }: SmartImportDialogProps
               role="button"
               tabIndex={0}
               className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                dragOver
+                  ? 'border-primary bg-primary/5'
+                  : 'border-muted-foreground/25 hover:border-muted-foreground/50'
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}

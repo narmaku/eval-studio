@@ -57,9 +57,7 @@ function ExpandedArenaDetail({
       {datasetItem?.expected_answer && (
         <div>
           <p className="font-medium">Expected Answer</p>
-          <p className="text-muted-foreground whitespace-pre-line">
-            {datasetItem.expected_answer}
-          </p>
+          <p className="text-muted-foreground whitespace-pre-line">{datasetItem.expected_answer}</p>
         </div>
       )}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -200,12 +198,13 @@ export function ArenaResultsGrid({ results, contestants, datasetId }: ArenaResul
 
                 return (
                   <Fragment key={datasetItemId}>
-                    <TableRow
-                      className="cursor-pointer"
-                      onClick={() => toggleRow(datasetItemId)}
-                    >
+                    <TableRow className="cursor-pointer" onClick={() => toggleRow(datasetItemId)}>
                       <TableCell className="p-1">
-                        <button type="button" className="p-1" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
+                        <button
+                          type="button"
+                          className="p-1"
+                          aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                        >
                           {isExpanded ? (
                             <ChevronDown className="size-4" />
                           ) : (
@@ -213,9 +212,7 @@ export function ArenaResultsGrid({ results, contestants, datasetId }: ArenaResul
                           )}
                         </button>
                       </TableCell>
-                      <TableCell className="font-medium text-sm">
-                        {questionPreview}
-                      </TableCell>
+                      <TableCell className="font-medium text-sm">{questionPreview}</TableCell>
                       {contestants.map((model) => {
                         const result = byContestant.get(model);
                         if (!result) {
@@ -250,10 +247,7 @@ export function ArenaResultsGrid({ results, contestants, datasetId }: ArenaResul
                     </TableRow>
                     {isExpanded && (
                       <TableRow>
-                        <TableCell
-                          colSpan={contestants.length + 2}
-                          className="bg-muted/30 p-4"
-                        >
+                        <TableCell colSpan={contestants.length + 2} className="bg-muted/30 p-4">
                           <ExpandedArenaDetail
                             group={{ datasetItemId, byContestant }}
                             contestants={contestants}

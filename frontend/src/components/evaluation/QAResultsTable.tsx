@@ -221,7 +221,9 @@ function ExpandedRowDetail({ result, datasetItem }: { result: Result; datasetIte
       </div>
       <div>
         <p className="font-medium">Expected Answer</p>
-        <p className="text-muted-foreground whitespace-pre-line">{datasetItem?.expected_answer ?? 'N/A'}</p>
+        <p className="text-muted-foreground whitespace-pre-line">
+          {datasetItem?.expected_answer ?? 'N/A'}
+        </p>
       </div>
       <div>
         <p className="font-medium">Actual Answer</p>

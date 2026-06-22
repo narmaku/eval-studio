@@ -83,10 +83,10 @@ export function EvaluationProgress({ evaluationId, onComplete }: EvaluationProgr
         {status === 'running' && hasProgress && (
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">
-              <span className="font-medium">{progress.completed} / {progress.total}</span>
-              {progress.currentItem && (
-                <span className="ml-2">— {progress.currentItem}</span>
-              )}
+              <span className="font-medium">
+                {progress.completed} / {progress.total}
+              </span>
+              {progress.currentItem && <span className="ml-2">— {progress.currentItem}</span>}
             </p>
             {progress.contestantModel && (
               <p className="text-xs text-muted-foreground">
