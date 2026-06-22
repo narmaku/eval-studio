@@ -115,8 +115,16 @@ jobs:
             fi
           done
 
-          # Verify frontend is served (INFRA-001)
+          # Verify frontend is served with correct Content-Type (INFRA-001)
           echo "Checking frontend at /"
+          CONTENT_TYPE=$(curl -sf -o /dev/null -w '%{content_type}' http://localhost:8000/)
+          echo "$CONTENT_TYPE" | grep -qi "text/html" || {
+            echo "Frontend Content-Type check failed: got '$CONTENT_TYPE', expected text/html"
+            docker logs eval-studio-smoke
+            exit 1
+          }
+          echo "Frontend Content-Type check passed: $CONTENT_TYPE"
+
           curl -sf http://localhost:8000/ | grep -qi "<!doctype html" || {
             echo "Frontend check failed: / did not return HTML"
             docker logs eval-studio-smoke
@@ -133,6 +141,68 @@ jobs:
           }
           echo "SPA fallback check passed"
 
+      - name: Authenticated mode boot
+        run: |
+          # Start a second container with auth ENABLED
+          docker run -d --name eval-studio-auth \
+            -p 8001:8000 \
+            -e DATABASE_URL=sqlite+aiosqlite:///./data/eval_studio_auth.db \
+            -e AUTH_DISABLED=false \
+            -e LOG_LEVEL=WARNING \
+            eval-studio:ci
+
+          # Wait for container to be ready
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8001/api/v1/health > /dev/null 2>&1; then
+              echo "Auth container health check passed"
+              break
+            fi
+            echo "Waiting for auth container... ($i/30)"
+            sleep 2
+            if [ "$i" = "30" ]; then
+              echo "Auth container health check failed"
+              docker logs eval-studio-auth
+              exit 1
+            fi
+          done
+
+          # Health endpoint should work without auth
+          curl -sf http://localhost:8001/api/v1/health | grep -q "healthy" || {
+            echo "Health check failed on auth-enabled container"
+            docker logs eval-studio-auth
+            exit 1
+          }
+          echo "Health endpoint accessible without auth"
+
+          # Protected endpoint should return 401 without a key
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8001/api/v1/evaluations)
+          if [ "$HTTP_CODE" != "401" ]; then
+            echo "Expected 401 on protected endpoint without auth, got $HTTP_CODE"
+            docker logs eval-studio-auth
+            exit 1
+          fi
+          echo "Protected endpoint correctly returns 401 without auth"
+
+          # Bootstrap: create first API key (no auth needed when no keys exist)
+          KEY_RESPONSE=$(curl -sf -X POST http://localhost:8001/api/v1/api-keys \
+            -H 'Content-Type: application/json' \
+            -d '{"name": "smoke-test-key"}')
+          RAW_KEY=$(echo "$KEY_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['raw_key'])")
+          echo "Bootstrap API key created: ${RAW_KEY:0:12}..."
+
+          # Authenticated request should succeed
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $RAW_KEY" \
+            http://localhost:8001/api/v1/evaluations)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Expected 200 on authenticated request, got $HTTP_CODE"
+            docker logs eval-studio-auth
+            exit 1
+          fi
+          echo "Authenticated request succeeded"
+
       - name: Cleanup
         if: always()
-        run: docker rm -f eval-studio-smoke || true
+        run: |
+          docker rm -f eval-studio-smoke || true
+          docker rm -f eval-studio-auth || true

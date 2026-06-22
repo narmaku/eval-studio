@@ -1,0 +1,444 @@
+{
+  "ConnectedMsg": {
+    "properties": {
+      "timestamp": {
+        "title": "Timestamp",
+        "type": "string"
+      },
+      "sender": {
+        "enum": [
+          "user",
+          "agent",
+          "system",
+          "judge"
+        ],
+        "title": "Sender",
+        "type": "string"
+      },
+      "session_id": {
+        "title": "Session Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "connected",
+        "default": "connected",
+        "title": "Type",
+        "type": "string"
+      },
+      "data": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Data",
+        "type": "object"
+      }
+    },
+    "required": [
+      "sender",
+      "session_id",
+      "data"
+    ],
+    "title": "ConnectedMsg",
+    "type": "object"
+  },
+  "MessageChunk": {
+    "$defs": {
+      "MessageChunkData": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "message_id": {
+            "title": "Message Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "message_id"
+        ],
+        "title": "MessageChunkData",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "timestamp": {
+        "title": "Timestamp",
+        "type": "string"
+      },
+      "sender": {
+        "enum": [
+          "user",
+          "agent",
+          "system",
+          "judge"
+        ],
+        "title": "Sender",
+        "type": "string"
+      },
+      "session_id": {
+        "title": "Session Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "message_chunk",
+        "default": "message_chunk",
+        "title": "Type",
+        "type": "string"
+      },
+      "data": {
+        "$ref": "#/$defs/MessageChunkData"
+      }
+    },
+    "required": [
+      "sender",
+      "session_id",
+      "data"
+    ],
+    "title": "MessageChunk",
+    "type": "object"
+  },
+  "MessageComplete": {
+    "$defs": {
+      "MessageCompleteData": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "message_id": {
+            "title": "Message Id",
+            "type": "string"
+          },
+          "tool_calls": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Tool Calls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "content",
+          "message_id"
+        ],
+        "title": "MessageCompleteData",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "timestamp": {
+        "title": "Timestamp",
+        "type": "string"
+      },
+      "sender": {
+        "enum": [
+          "user",
+          "agent",
+          "system",
+          "judge"
+        ],
+        "title": "Sender",
+        "type": "string"
+      },
+      "session_id": {
+        "title": "Session Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "message_complete",
+        "default": "message_complete",
+        "title": "Type",
+        "type": "string"
+      },
+      "data": {
+        "$ref": "#/$defs/MessageCompleteData"
+      }
+    },
+    "required": [
+      "sender",
+      "session_id",
+      "data"
+    ],
+    "title": "MessageComplete",
+    "type": "object"
+  },
+  "ToolCallMsg": {
+    "properties": {
+      "timestamp": {
+        "title": "Timestamp",
+        "type": "string"
+      },
+      "sender": {
+        "enum": [
+          "user",
+          "agent",
+          "system",
+          "judge"
+        ],
+        "title": "Sender",
+        "type": "string"
+      },
+      "session_id": {
+        "title": "Session Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "tool_call",
+        "default": "tool_call",
+        "title": "Type",
+        "type": "string"
+      },
+      "data": {
+        "additionalProperties": true,
+        "title": "Data",
+        "type": "object"
+      }
+    },
+    "required": [
+      "sender",
+      "session_id",
+      "data"
+    ],
+    "title": "ToolCallMsg",
+    "type": "object"
+  },
+  "ToolExecutingMsg": {
+    "$defs": {
+      "ToolExecutingData": {
+        "properties": {
+          "tool_call_id": {
+            "title": "Tool Call Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_call_id",
+          "tool_name"
+        ],
+        "title": "ToolExecutingData",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "timestamp": {
+        "title": "Timestamp",
+        "type": "string"
+      },
+      "sender": {
+        "enum": [
+          "user",
+          "agent",
+          "system",
+          "judge"
+        ],
+        "title": "Sender",
+        "type": "string"
+      },
+      "session_id": {
+        "title": "Session Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "tool_executing",
+        "default": "tool_executing",
+        "title": "Type",
+        "type": "string"
+      },
+      "data": {
+        "$ref": "#/$defs/ToolExecutingData"
+      }
+    },
+    "required": [
+      "sender",
+      "session_id",
+      "data"
+    ],
+    "title": "ToolExecutingMsg",
+    "type": "object"
+  },
+  "ToolResultMsg": {
+    "$defs": {
+      "ToolResultData": {
+        "properties": {
+          "tool_call_id": {
+            "title": "Tool Call Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "result": {
+            "title": "Result",
+            "type": "string"
+          },
+          "is_error": {
+            "title": "Is Error",
+            "type": "boolean"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tool_call_id",
+          "tool_name",
+          "result",
+          "is_error",
+          "duration_ms"
+        ],
+        "title": "ToolResultData",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "timestamp": {
+        "title": "Timestamp",
+        "type": "string"
+      },
+      "sender": {
+        "enum": [
+          "user",
+          "agent",
+          "system",
+          "judge"
+        ],
+        "title": "Sender",
+        "type": "string"
+      },
+      "session_id": {
+        "title": "Session Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "tool_result",
+        "default": "tool_result",
+        "title": "Type",
+        "type": "string"
+      },
+      "data": {
+        "$ref": "#/$defs/ToolResultData"
+      }
+    },
+    "required": [
+      "sender",
+      "session_id",
+      "data"
+    ],
+    "title": "ToolResultMsg",
+    "type": "object"
+  },
+  "SessionEndedMsg": {
+    "properties": {
+      "timestamp": {
+        "title": "Timestamp",
+        "type": "string"
+      },
+      "sender": {
+        "enum": [
+          "user",
+          "agent",
+          "system",
+          "judge"
+        ],
+        "title": "Sender",
+        "type": "string"
+      },
+      "session_id": {
+        "title": "Session Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "session_ended",
+        "default": "session_ended",
+        "title": "Type",
+        "type": "string"
+      },
+      "data": {
+        "additionalProperties": true,
+        "title": "Data",
+        "type": "object"
+      }
+    },
+    "required": [
+      "sender",
+      "session_id",
+      "data"
+    ],
+    "title": "SessionEndedMsg",
+    "type": "object"
+  },
+  "ErrorMsg": {
+    "$defs": {
+      "ErrorData": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Code"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "ErrorData",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "timestamp": {
+        "title": "Timestamp",
+        "type": "string"
+      },
+      "sender": {
+        "enum": [
+          "user",
+          "agent",
+          "system",
+          "judge"
+        ],
+        "title": "Sender",
+        "type": "string"
+      },
+      "session_id": {
+        "title": "Session Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "error",
+        "default": "error",
+        "title": "Type",
+        "type": "string"
+      },
+      "data": {
+        "$ref": "#/$defs/ErrorData"
+      }
+    },
+    "required": [
+      "sender",
+      "session_id",
+      "data"
+    ],
+    "title": "ErrorMsg",
+    "type": "object"
+  }
+}
