@@ -63,12 +63,9 @@ vi.mock('@/stores/evaluationStore', () => ({
 }));
 
 vi.mock('@/stores/evaluatorStore', () => ({
-  useEvaluatorStore: Object.assign(
-    () => ({ selectedEvaluatorId: 'eval-1' }),
-    {
-      getState: () => ({ resetSelection: vi.fn() }),
-    },
-  ),
+  useEvaluatorStore: Object.assign(() => ({ selectedEvaluatorId: 'eval-1' }), {
+    getState: () => ({ resetSelection: vi.fn() }),
+  }),
 }));
 
 // Mock WebSocket
@@ -254,6 +251,5 @@ describe('AgentEvaluation — scoring phase', () => {
       });
       expect(screen.getByText('New Session')).toBeInTheDocument();
     });
-
   });
 });

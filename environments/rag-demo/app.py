@@ -329,7 +329,9 @@ def _build_index() -> None:
     dim = embeddings.shape[1]
     state.index = faiss.IndexFlatIP(dim)
     state.index.add(embeddings)
-    logger.info("FAISS index built with %d vectors of dimension %d", state.index.ntotal, dim)
+    logger.info(
+        "FAISS index built with %d vectors of dimension %d", state.index.ntotal, dim
+    )
 
     state.ready = True
 

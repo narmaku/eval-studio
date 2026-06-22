@@ -56,11 +56,7 @@ function SessionErrorBanner({ error }: { error: string }) {
                 className="mt-1 flex items-center gap-1 text-xs font-medium text-destructive/70 hover:text-destructive"
                 onClick={() => setExpanded(!expanded)}
               >
-                {expanded ? (
-                  <ChevronUp className="h-3 w-3" />
-                ) : (
-                  <ChevronDown className="h-3 w-3" />
-                )}
+                {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 {expanded ? 'Hide details' : 'Show details'}
               </button>
               {expanded && (
@@ -296,10 +292,7 @@ export default function AgentEvaluation() {
       {phase === 'configure' && (
         <>
           <EvaluatorSelector mode="agent" />
-          <HarnessSelector
-            value={selectedHarnessId}
-            onChange={handleHarnessChange}
-          />
+          <HarnessSelector value={selectedHarnessId} onChange={handleHarnessChange} />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-4">
               {!isSubprocessHarness && (

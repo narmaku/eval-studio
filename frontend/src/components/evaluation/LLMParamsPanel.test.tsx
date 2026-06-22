@@ -49,12 +49,7 @@ describe('LLMParamsPanel', () => {
 
   it('displays existing values', async () => {
     const user = userEvent.setup();
-    render(
-      <LLMParamsPanel
-        value={{ max_tokens: 2048, temperature: 0.7 }}
-        onChange={vi.fn()}
-      />,
-    );
+    render(<LLMParamsPanel value={{ max_tokens: 2048, temperature: 0.7 }} onChange={vi.fn()} />);
 
     // Badge should show "2 set"
     expect(screen.getByText('2 set')).toBeInTheDocument();

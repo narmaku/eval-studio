@@ -473,10 +473,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
                   className="w-20"
                   aria-label={`Rate limit value ${index + 1}`}
                 />
-                <Select
-                  value={rl.unit}
-                  onValueChange={(v) => updateRateLimit(index, 'unit', v)}
-                >
+                <Select value={rl.unit} onValueChange={(v) => updateRateLimit(index, 'unit', v)}>
                   <SelectTrigger className="w-28" aria-label={`Rate limit unit ${index + 1}`}>
                     <SelectValue />
                   </SelectTrigger>
@@ -486,10 +483,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
                   </SelectContent>
                 </Select>
                 <span className="text-sm text-muted-foreground">/</span>
-                <Select
-                  value={rl.per}
-                  onValueChange={(v) => updateRateLimit(index, 'per', v)}
-                >
+                <Select value={rl.per} onValueChange={(v) => updateRateLimit(index, 'per', v)}>
                   <SelectTrigger className="w-28" aria-label={`Rate limit per ${index + 1}`}>
                     <SelectValue />
                   </SelectTrigger>
@@ -512,12 +506,7 @@ function ProviderFormInner({ provider, onSaved, onClose }: ProviderFormInnerProp
                 </Button>
               </div>
             ))}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addRateLimit}
-              type="button"
-            >
+            <Button variant="outline" size="sm" onClick={addRateLimit} type="button">
               <Plus className="mr-1 h-3 w-3" />
               Add Limit
             </Button>

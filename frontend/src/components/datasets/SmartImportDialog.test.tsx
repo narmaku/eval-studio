@@ -10,9 +10,7 @@ const mockClearAnalysis = vi.fn();
 const mockFetchDatasets = vi.fn();
 const mockOnOpenChange = vi.fn();
 
-const makeAnalysisResult = (
-  overrides: Partial<AnalyzeResponse> = {},
-): AnalyzeResponse => ({
+const makeAnalysisResult = (overrides: Partial<AnalyzeResponse> = {}): AnalyzeResponse => ({
   analysis_id: 'analysis-1',
   files: [
     {
@@ -180,9 +178,7 @@ describe('SmartImportDialog', () => {
     mockAnalyzeFiles.mockResolvedValue(undefined);
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     // Upload file and click analyze
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
@@ -210,9 +206,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     // Navigate to step 2
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
@@ -236,9 +230,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
     const input = screen.getByTestId('file-input');
@@ -259,9 +251,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
     const input = screen.getByTestId('file-input');
@@ -280,9 +270,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
     const input = screen.getByTestId('file-input');
@@ -301,9 +289,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     // Go to step 2
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
@@ -329,9 +315,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     // Navigate to step 2
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
@@ -360,9 +344,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     // Navigate to step 2
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
@@ -396,9 +378,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     // Navigate through steps
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
@@ -451,9 +431,7 @@ describe('SmartImportDialog', () => {
   });
 
   it('resets state on close', () => {
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     // Close the dialog
     rerender(<SmartImportDialog open={false} onOpenChange={mockOnOpenChange} />);
@@ -482,9 +460,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     const file = new File(['content'], 'bad.csv', { type: 'text/csv' });
     const input = screen.getByTestId('file-input');
@@ -528,9 +504,7 @@ describe('SmartImportDialog', () => {
     storeState = { ...defaultStoreState, analysisResult };
 
     const user = userEvent.setup();
-    const { rerender } = render(
-      <SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />,
-    );
+    const { rerender } = render(<SmartImportDialog open={true} onOpenChange={mockOnOpenChange} />);
 
     const file = new File(['content'], 'test.yaml', { type: 'application/x-yaml' });
     const input = screen.getByTestId('file-input');

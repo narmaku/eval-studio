@@ -1,7 +1,14 @@
 import { useState, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronDown, MessageSquare, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import {
+  ChevronRight,
+  ChevronDown,
+  MessageSquare,
+  Loader2,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { ToolCall } from '@/types';
 

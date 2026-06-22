@@ -62,8 +62,7 @@ export default function ArenaComparison() {
   const [judgeParams, setJudgeParams] = useState<LLMParams>({});
   const [leaderboard, setLeaderboard] = useState<ArenaLeaderboardResponse | null>(null);
 
-  const { currentEvaluation, createAndRunEvaluation, isLoading } =
-    useEvaluationStore();
+  const { currentEvaluation, createAndRunEvaluation, isLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults } = useResultStore();
 
@@ -193,8 +192,16 @@ export default function ArenaComparison() {
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <LLMParamsPanel label="Model Parameters" value={modelParams} onChange={setModelParams} />
-            <LLMParamsPanel label="Judge Parameters" value={judgeParams} onChange={setJudgeParams} />
+            <LLMParamsPanel
+              label="Model Parameters"
+              value={modelParams}
+              onChange={setModelParams}
+            />
+            <LLMParamsPanel
+              label="Judge Parameters"
+              value={judgeParams}
+              onChange={setJudgeParams}
+            />
           </div>
           <Button
             className="w-full"
@@ -237,8 +244,7 @@ export default function ArenaComparison() {
 
           {leaderboard &&
             leaderboard.contestants.some(
-              (c) =>
-                c.average_breakdown && Object.keys(c.average_breakdown).length >= 2,
+              (c) => c.average_breakdown && Object.keys(c.average_breakdown).length >= 2,
             ) && (
               <RadarComparisonChart
                 series={leaderboard.contestants

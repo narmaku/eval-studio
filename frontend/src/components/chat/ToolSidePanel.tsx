@@ -23,11 +23,7 @@ export function ToolSidePanel({ toolCalls }: ToolSidePanelProps) {
           onClick={() => setIsOpen((prev) => !prev)}
           aria-label={isOpen ? 'Collapse tool panel' : 'Expand tool panel'}
         >
-          {isOpen ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
+          {isOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
         {!isOpen && toolCalls.length > 0 && (
           <div className="mt-2 flex flex-col items-center gap-1">

@@ -15,7 +15,14 @@ import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
 import { api } from '@/services/api';
-import type { ModelEndpoint, JudgeReference, Result, CreateEvaluationRequest, LLMParams, DatasetItem } from '@/types';
+import type {
+  ModelEndpoint,
+  JudgeReference,
+  Result,
+  CreateEvaluationRequest,
+  LLMParams,
+  DatasetItem,
+} from '@/types';
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
@@ -117,7 +124,8 @@ export default function QAEvaluation() {
       void fetchResults(evaluation.id);
       void fetchAggregateMetrics(evaluation.id);
       if (selectedDatasetId) {
-        api.getDataset(selectedDatasetId)
+        api
+          .getDataset(selectedDatasetId)
           .then((detail) => setDatasetItems(detail.items))
           .catch(() => setDatasetItems([]));
       }
@@ -189,8 +197,16 @@ export default function QAEvaluation() {
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <LLMParamsPanel label="Model Parameters" value={modelParams} onChange={setModelParams} />
-            <LLMParamsPanel label="Judge Parameters" value={judgeParams} onChange={setJudgeParams} />
+            <LLMParamsPanel
+              label="Model Parameters"
+              value={modelParams}
+              onChange={setModelParams}
+            />
+            <LLMParamsPanel
+              label="Judge Parameters"
+              value={judgeParams}
+              onChange={setJudgeParams}
+            />
           </div>
           <Button
             className="w-full"
@@ -224,11 +240,19 @@ export default function QAEvaluation() {
       {/* Complete Phase */}
       {phase === 'complete' && (
         <>
-          <QAResultsTable results={results} datasetItems={datasetItems} onRowClick={handleRowClick} />
+          <QAResultsTable
+            results={results}
+            datasetItems={datasetItems}
+            onRowClick={handleRowClick}
+          />
 
           <ResultDetailDrawer
             result={selectedResult}
-            datasetItem={selectedResult?.dataset_item_id ? itemMap.get(selectedResult.dataset_item_id) : undefined}
+            datasetItem={
+              selectedResult?.dataset_item_id
+                ? itemMap.get(selectedResult.dataset_item_id)
+                : undefined
+            }
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
           />

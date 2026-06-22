@@ -229,7 +229,9 @@ export function RAGEndpointConfig({ value, onChange, disabled }: RAGEndpointConf
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="rag-generator-api-key-env">Generator API Key Env Var (optional)</Label>
+              <Label htmlFor="rag-generator-api-key-env">
+                Generator API Key Env Var (optional)
+              </Label>
               <Input
                 id="rag-generator-api-key-env"
                 placeholder="GENERATOR_API_KEY"

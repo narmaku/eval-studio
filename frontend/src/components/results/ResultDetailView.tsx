@@ -10,14 +10,7 @@ import {
   type ExpandedState,
 } from '@tanstack/react-table';
 import { Link } from 'react-router-dom';
-import {
-  ArrowLeft,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  FileDown,
-  Loader2,
-} from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, FileDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -513,8 +506,15 @@ export function ResultDetailView({
             </CardContent>
           </Card>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2" ref={chartsRef}>
-            <div data-chart><ScoreDistributionChart distribution={metrics.score_distribution} /></div>
-            <div data-chart><PassFailChart passedItems={metrics.passed_items} failedItems={metrics.failed_items} /></div>
+            <div data-chart>
+              <ScoreDistributionChart distribution={metrics.score_distribution} />
+            </div>
+            <div data-chart>
+              <PassFailChart
+                passedItems={metrics.passed_items}
+                failedItems={metrics.failed_items}
+              />
+            </div>
           </div>
         </>
       )}

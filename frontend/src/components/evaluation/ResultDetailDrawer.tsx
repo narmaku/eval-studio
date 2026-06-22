@@ -68,7 +68,9 @@ export function ResultDetailDrawer({
           {/* Expected Answer */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Expected Answer</h3>
-            <p className="text-sm text-muted-foreground whitespace-pre-line">{datasetItem?.expected_answer ?? 'N/A'}</p>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">
+              {datasetItem?.expected_answer ?? 'N/A'}
+            </p>
           </div>
 
           <Separator />
@@ -76,7 +78,9 @@ export function ResultDetailDrawer({
           {/* Actual Answer */}
           <div className="space-y-1">
             <h3 className="text-sm font-medium">Actual Answer</h3>
-            <p className="text-sm text-muted-foreground whitespace-pre-line">{result.actual_answer || 'N/A'}</p>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">
+              {result.actual_answer || 'N/A'}
+            </p>
           </div>
 
           <Separator />

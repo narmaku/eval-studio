@@ -113,7 +113,6 @@ describe('Sessions page', () => {
       ]);
       expect(screen.getByText('Scored')).toBeInTheDocument();
     });
-
   });
 
   describe('score column', () => {

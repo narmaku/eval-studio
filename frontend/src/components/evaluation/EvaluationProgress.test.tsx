@@ -61,9 +61,7 @@ describe('EvaluationProgress', () => {
   });
 
   it('disconnects from WebSocket on unmount', () => {
-    const { unmount } = render(
-      <EvaluationProgress evaluationId="eval-123" onComplete={vi.fn()} />,
-    );
+    const { unmount } = render(<EvaluationProgress evaluationId="eval-123" onComplete={vi.fn()} />);
 
     unmount();
 

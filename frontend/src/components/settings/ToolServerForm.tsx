@@ -76,7 +76,8 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
   const validate = (): boolean => {
     const newErrors: string[] = [];
     if (!name.trim()) newErrors.push('Name is required');
-    if (type === 'mcp_stdio' && !command.trim()) newErrors.push('Command is required for MCP servers');
+    if (type === 'mcp_stdio' && !command.trim())
+      newErrors.push('Command is required for MCP servers');
     if (type === 'standalone') {
       try {
         const parsed = JSON.parse(toolsJson);
@@ -95,9 +96,10 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
     if (!validate()) return;
     setIsSaving(true);
     try {
-      const args = argsInput
-        .match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)
-        ?.map((a) => a.replace(/^["']|["']$/g, '')) ?? [];
+      const args =
+        argsInput
+          .match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)
+          ?.map((a) => a.replace(/^["']|["']$/g, '')) ?? [];
       const tags = tagsInput
         .split(',')
         .map((t) => t.trim())
@@ -162,7 +164,12 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
 
       <div className="space-y-2">
         <Label htmlFor="ts-name">Name</Label>
-        <Input id="ts-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Filesystem Tools" />
+        <Input
+          id="ts-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g., Filesystem Tools"
+        />
       </div>
 
       <div className="space-y-2">
@@ -182,10 +189,17 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
         <>
           <div className="space-y-2">
             <Label htmlFor="ts-command">Command</Label>
-            <Input id="ts-command" value={command} onChange={(e) => setCommand(e.target.value)} placeholder="e.g., npx" />
+            <Input
+              id="ts-command"
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              placeholder="e.g., npx"
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ts-args">Arguments (space-separated, use quotes for values with spaces)</Label>
+            <Label htmlFor="ts-args">
+              Arguments (space-separated, use quotes for values with spaces)
+            </Label>
             <Input
               id="ts-args"
               value={argsInput}
@@ -199,7 +213,7 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
               id="ts-env"
               value={envInput}
               onChange={(e) => setEnvInput(e.target.value)}
-              placeholder={"API_KEY=your-key\nDEBUG=true"}
+              placeholder={'API_KEY=your-key\nDEBUG=true'}
               rows={3}
             />
           </div>
@@ -213,7 +227,9 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
             id="ts-tools"
             value={toolsJson}
             onChange={(e) => setToolsJson(e.target.value)}
-            placeholder={'[\n  {"name": "my_tool", "description": "...", "parameters": {"type": "object"}}\n]'}
+            placeholder={
+              '[\n  {"name": "my_tool", "description": "...", "parameters": {"type": "object"}}\n]'
+            }
             rows={8}
             className="font-mono text-xs"
           />
@@ -222,17 +238,30 @@ function ToolServerFormInner({ toolServer, onSaved, onClose }: InnerProps) {
 
       <div className="space-y-2">
         <Label htmlFor="ts-description">Description (optional)</Label>
-        <Input id="ts-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this tool server provides" />
+        <Input
+          id="ts-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="What this tool server provides"
+        />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="ts-tags">Tags (optional, comma-separated)</Label>
-        <Input id="ts-tags" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="e.g., filesystem, readonly" />
+        <Input
+          id="ts-tags"
+          value={tagsInput}
+          onChange={(e) => setTagsInput(e.target.value)}
+          placeholder="e.g., filesystem, readonly"
+        />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="ts-enabled">Status</Label>
-        <Select value={enabled ? 'enabled' : 'disabled'} onValueChange={(v) => setEnabled(v === 'enabled')}>
+        <Select
+          value={enabled ? 'enabled' : 'disabled'}
+          onValueChange={(v) => setEnabled(v === 'enabled')}
+        >
           <SelectTrigger className="w-full" id="ts-enabled">
             <SelectValue />
           </SelectTrigger>

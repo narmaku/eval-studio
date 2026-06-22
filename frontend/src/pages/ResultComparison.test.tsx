@@ -40,9 +40,7 @@ describe('ResultComparison', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams = new URLSearchParams('ids=e1&ids=e2&ref=e1');
-    mockedUseResultStore.mockImplementation((selector: SelectorFn) =>
-      selector(defaultStoreState),
-    );
+    mockedUseResultStore.mockImplementation((selector: SelectorFn) => selector(defaultStoreState));
   });
 
   it('calls fetchComparison on mount with URL params', () => {

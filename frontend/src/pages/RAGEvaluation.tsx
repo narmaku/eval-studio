@@ -17,7 +17,13 @@ import { useResultStore } from '@/stores/resultStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
 import { api } from '@/services/api';
-import type { JudgeReference, Result, CreateEvaluationRequest, LLMParams, DatasetItem } from '@/types';
+import type {
+  JudgeReference,
+  Result,
+  CreateEvaluationRequest,
+  LLMParams,
+  DatasetItem,
+} from '@/types';
 
 type PagePhase = 'configure' | 'running' | 'complete';
 
@@ -59,8 +65,7 @@ export default function RAGEvaluation() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
 
-  const { currentEvaluation, createAndRunEvaluation, isLoading } =
-    useEvaluationStore();
+  const { currentEvaluation, createAndRunEvaluation, isLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchResults, fetchAggregateMetrics } = useResultStore();
 
@@ -145,7 +150,8 @@ export default function RAGEvaluation() {
       void fetchResults(evaluation.id);
       void fetchAggregateMetrics(evaluation.id);
       if (selectedDatasetId) {
-        api.getDataset(selectedDatasetId)
+        api
+          .getDataset(selectedDatasetId)
           .then((detail) => setDatasetItems(detail.items))
           .catch(() => setDatasetItems([]));
       }
@@ -251,11 +257,19 @@ export default function RAGEvaluation() {
       {/* Complete Phase */}
       {phase === 'complete' && (
         <>
-          <RAGResultsTable results={results} datasetItems={datasetItems} onRowClick={handleRowClick} />
+          <RAGResultsTable
+            results={results}
+            datasetItems={datasetItems}
+            onRowClick={handleRowClick}
+          />
 
           <RAGResultDetailDrawer
             result={selectedResult}
-            datasetItem={selectedResult?.dataset_item_id ? itemMap.get(selectedResult.dataset_item_id) : undefined}
+            datasetItem={
+              selectedResult?.dataset_item_id
+                ? itemMap.get(selectedResult.dataset_item_id)
+                : undefined
+            }
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
           />

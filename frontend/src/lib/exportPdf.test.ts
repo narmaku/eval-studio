@@ -1,15 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { PdfExportData } from './exportPdf';
 
-const { mockHtml2canvas, mockSave, mockAddImage, mockAddPage, mockAutoTable } = vi.hoisted(
-  () => ({
-    mockSave: vi.fn(),
-    mockAddImage: vi.fn(),
-    mockAddPage: vi.fn(),
-    mockAutoTable: vi.fn(),
-    mockHtml2canvas: vi.fn(),
-  }),
-);
+const { mockHtml2canvas, mockSave, mockAddImage, mockAddPage, mockAutoTable } = vi.hoisted(() => ({
+  mockSave: vi.fn(),
+  mockAddImage: vi.fn(),
+  mockAddPage: vi.fn(),
+  mockAutoTable: vi.fn(),
+  mockHtml2canvas: vi.fn(),
+}));
 
 vi.mock('html2canvas-pro', () => ({
   default: mockHtml2canvas,

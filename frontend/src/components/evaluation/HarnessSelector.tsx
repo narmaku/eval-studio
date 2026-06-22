@@ -70,13 +70,11 @@ export function HarnessSelector({ value, onChange, disabled }: HarnessSelectorPr
           </SelectTrigger>
           <SelectContent>
             {harnesses.map((harness) => (
-              <SelectItem
-                key={harness.id}
-                value={harness.id}
-                disabled={!harness.enabled}
-              >
+              <SelectItem key={harness.id} value={harness.id} disabled={!harness.enabled}>
                 <span className="flex items-center gap-2">
-                  <span className={`font-medium ${!harness.enabled ? 'text-muted-foreground' : ''}`}>
+                  <span
+                    className={`font-medium ${!harness.enabled ? 'text-muted-foreground' : ''}`}
+                  >
                     {harness.name}
                   </span>
                   <Badge

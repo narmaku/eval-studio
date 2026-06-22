@@ -289,7 +289,9 @@ export const api = {
       method: 'DELETE',
     }),
   getEvaluatorConfigFile: (evaluatorId: string, filename: string) =>
-    request<string>(`/api/v1/evaluators/${evaluatorId}/config-files/${filename}`, { parse: 'text' }),
+    request<string>(`/api/v1/evaluators/${evaluatorId}/config-files/${filename}`, {
+      parse: 'text',
+    }),
 
   // Tool Servers
   listToolServers: (params?: { type?: string; enabled?: boolean }) => {

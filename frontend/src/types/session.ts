@@ -153,4 +153,3 @@ export interface WsErrorMessage {
   type: 'error';
   data: { message: string; code?: string };
 }
-

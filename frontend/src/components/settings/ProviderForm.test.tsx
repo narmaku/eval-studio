@@ -396,9 +396,7 @@ describe('ProviderForm', () => {
         rate_limits: [{ value: 100, unit: 'tokens', per: 'hour' }],
       });
 
-      render(
-        <ProviderForm open={true} onOpenChange={vi.fn()} provider={rateLimitedProvider} />,
-      );
+      render(<ProviderForm open={true} onOpenChange={vi.fn()} provider={rateLimitedProvider} />);
 
       // Checkbox should be checked
       const checkbox = screen.getByLabelText(/this provider is rate-limited/i);
