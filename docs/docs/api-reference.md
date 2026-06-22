@@ -881,7 +881,7 @@ Use `page` and `page_size` query parameters to navigate through results.
 Pages are 1-based.
 
 **Config/registry collections** (providers, harnesses, tool-servers,
-evaluators, judge presets) return bare JSON arrays. These collections are
+evaluators) return bare JSON arrays. These collections are
 bounded by nature (O(10) entries) and do not require pagination.
 
 ### Error responses

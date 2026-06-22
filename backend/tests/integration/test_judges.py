@@ -131,16 +131,3 @@ async def test_update_judge_not_found(client):
     """PUT /judges/nonexistent returns 404."""
     response = await client.put("/api/v1/judges/nonexistent-id", json={"name": "Fail"})
     assert response.status_code == 404
-
-
-@pytest.mark.asyncio
-async def test_get_judge_presets(client):
-    """GET /judges/presets returns presets based on configured judge providers."""
-    response = await client.get("/api/v1/judges/presets")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) >= 1
-    for preset in data:
-        assert "id" in preset
-        assert "name" in preset
-        assert preset["id"].startswith("provider-")

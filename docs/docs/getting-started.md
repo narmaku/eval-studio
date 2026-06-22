@@ -18,7 +18,7 @@ This guide walks you through setting up eval-studio for local development.
 
 ```bash
 # Clone the repository
-git clone https://github.com/eval-studio/eval-studio.git
+git clone https://github.com/narmaku/eval-studio.git
 cd eval-studio
 
 # Copy environment configuration
@@ -32,6 +32,14 @@ make check-deps
 make dev
 ```
 
+Database schema migrations run automatically on startup — no manual
+`alembic` step needed. To run migrations explicitly (e.g. against a custom
+`DATABASE_URL`):
+
+```bash
+cd backend && uv run alembic upgrade head
+```
+
 This starts:
 
 - **Backend** at [http://localhost:8000](http://localhost:8000) -- FastAPI with auto-reload
@@ -41,7 +49,7 @@ This starts:
 
 ```bash
 # Clone and configure
-git clone https://github.com/eval-studio/eval-studio.git
+git clone https://github.com/narmaku/eval-studio.git
 cd eval-studio
 cp .env.example .env
 

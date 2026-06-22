@@ -25,7 +25,7 @@ make check-deps
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/eval-studio/eval-studio.git
+   git clone https://github.com/narmaku/eval-studio.git
    cd eval-studio
    ```
 
@@ -57,6 +57,29 @@ make check-deps
 | `environments/`  | Docker Compose templates, TMT plans, Ansible playbooks, scenario definitions |
 | `docs/`          | MkDocs Material documentation site                   |
 | `examples/`      | Sample datasets, judge configurations                |
+
+## Database Migrations
+
+Schema migrations run automatically on startup. The migration chain was
+squashed to a single initial revision (pre-1.0, no external deployments).
+
+If you have an existing local database from before the squash, delete it
+and let the app recreate it:
+
+```bash
+rm -f backend/data/eval_studio.db*
+make dev   # auto-migration creates a fresh DB
+```
+
+Alternatively, stamp the existing database without replaying migrations:
+
+```bash
+cd backend && uv run alembic stamp head
+```
+
+**Policy:** migration squashes are acceptable before the first tagged
+release. After that, every schema change must be a forward-compatible
+Alembic revision.
 
 ## Development Workflow
 

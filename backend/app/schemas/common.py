@@ -10,7 +10,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
     Convention: DB-backed collections use ``PaginatedResponse``; bounded
     config/registry collections (providers, harnesses, tool-servers,
-    evaluators, judge presets) return bare JSON arrays.
+    evaluators) return bare JSON arrays.
     """
 
     items: list[T]

@@ -18,7 +18,6 @@ import type {
   SendMessageRequest,
   Judge,
   CreateJudgeRequest,
-  JudgePreset,
   Provider,
   CreateProviderRequest,
   UpdateProviderRequest,
@@ -194,8 +193,6 @@ export const api = {
     request<Judge>('/api/v1/judges', { method: 'POST', body: JSON.stringify(data) }),
   updateJudge: (id: string, data: Partial<CreateJudgeRequest>) =>
     request<Judge>(`/api/v1/judges/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  listJudgePresets: () => request<JudgePreset[]>('/api/v1/judges/presets'),
-
   // --- Results ---
   listResults: (params?: { evaluation_id?: string; page?: number; page_size?: number }) => {
     const query = new URLSearchParams();

@@ -33,13 +33,6 @@ export interface JudgeDimension {
   weight: number;
 }
 
-export interface JudgePreset {
-  id: string;
-  name: string;
-  description: string;
-  judge: Judge;
-}
-
 export interface CreateJudgeRequest {
   name: string;
   panel: JudgePanelMember[];
