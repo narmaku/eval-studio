@@ -5,7 +5,7 @@ FROM node:22-slim AS build-frontend
 
 WORKDIR /build
 
-COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/package.json frontend/package-lock.json frontend/.npmrc ./
 RUN npm ci --silent
 
 COPY frontend/ .
