@@ -101,13 +101,31 @@ def _normalize_simple_dimensions(raw_dims: list[dict]) -> list[dict]:
     return dims
 
 
-def _convert_rubric_kit_dims_and_criteria(raw_dims: list[dict], raw_criteria: list[dict]) -> list[dict]:
+def _extract_dim_name_and_desc(d: dict) -> tuple[str, str]:
+    """Extract dimension name and description from a rubric-kit dimension entry.
+
+    rubric-kit format: {dim_name: description, grading_type: ..., scores: ...}
+    The dimension name is the first key that isn't a reserved field.
+    """
+    reserved = {"grading_type", "scores", "name", "description"}
+    for key, val in d.items():
+        if key not in reserved and isinstance(val, str):
+            return key, val
+    return d.get("name", "unnamed"), d.get("description", "unnamed")
+
+
+def _convert_rubric_kit_dims_and_criteria(raw_dims: list[dict], raw_criteria: list | dict) -> list[dict]:
     """Convert rubric-kit format (dimensions + criteria) to internal weighted dimensions."""
+    # Criteria can be a dict of dicts (keyed by criterion name) or a list
+    criteria_items: list[dict] = []
+    if isinstance(raw_criteria, dict):
+        criteria_items = [v for v in raw_criteria.values() if isinstance(v, dict)]
+    elif isinstance(raw_criteria, list):
+        criteria_items = [c for c in raw_criteria if isinstance(c, dict)]
+
     # Aggregate criteria weights per dimension
     dim_weights: dict[str, float] = {}
-    for c in raw_criteria:
-        if not isinstance(c, dict):
-            continue
+    for c in criteria_items:
         dim_name = c.get("dimension", "")
         weight = c.get("weight", 1)
         if isinstance(weight, str):
@@ -120,13 +138,13 @@ def _convert_rubric_kit_dims_and_criteria(raw_dims: list[dict], raw_criteria: li
     for d in raw_dims:
         if not isinstance(d, dict):
             continue
-        name = d.get("name", "unnamed")
+        name, description = _extract_dim_name_and_desc(d)
         raw_w = dim_weights.get(name, 1.0)
         dims.append(
             {
                 "name": name,
                 "weight": round(raw_w / total_weight, 4),
-                "description": d.get("description", name),
+                "description": description,
             }
         )
 
