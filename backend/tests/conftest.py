@@ -2,6 +2,7 @@ from contextlib import ExitStack
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.adapters.registry import evaluator_registry
@@ -31,6 +32,13 @@ def _disable_auth():
 @pytest.fixture
 async def async_engine():
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine

@@ -6,9 +6,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import ConflictException, NotFoundException
 from app.core.security import require_auth
 from app.models.dataset import Dataset
+from app.models.evaluation import Evaluation
 from app.schemas.common import PaginatedResponse
 from app.schemas.dataset import (
     DatasetCreate,
@@ -113,6 +114,14 @@ async def delete_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)) ->
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise NotFoundException("Dataset", dataset_id)
+
+    ref_result = await db.execute(select(func.count(Evaluation.id)).where(Evaluation.dataset_id == dataset_id))
+    ref_count = ref_result.scalar_one()
+    if ref_count > 0:
+        raise ConflictException(
+            f"Cannot delete dataset: {ref_count} evaluation(s) reference it. "
+            "Delete or reassign those evaluations first."
+        )
 
     await db.delete(dataset)
     await db.commit()

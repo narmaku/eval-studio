@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, String, Text
+from sqlalchemy import JSON, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, TZDateTime
 from app.core.database import utcnow as _utcnow
 
 
@@ -15,16 +15,22 @@ class Evaluation(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     config: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
-    dataset_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    judge_config_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+    dataset_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("datasets.id", ondelete="RESTRICT"), nullable=True
+    )
+    judge_config_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("judge_configs.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(TZDateTime, default=_utcnow, onupdate=_utcnow)
 
     results: Mapped[list["Result"]] = relationship(
-        "Result", back_populates="evaluation", cascade="all, delete-orphan", lazy="selectin"
+        "Result", back_populates="evaluation", cascade="all, delete-orphan", passive_deletes=True, lazy="raise"
     )
-    sessions: Mapped[list["Session"]] = relationship("Session", back_populates="evaluation", lazy="selectin")
+    sessions: Mapped[list["Session"]] = relationship(
+        "Session", back_populates="evaluation", passive_deletes=True, lazy="raise"
+    )
     artifacts: Mapped[list["Artifact"]] = relationship(
-        "Artifact", back_populates="evaluation", cascade="all, delete-orphan", lazy="selectin"
+        "Artifact", back_populates="evaluation", cascade="all, delete-orphan", passive_deletes=True, lazy="raise"
     )
 
 
@@ -39,7 +45,7 @@ class JudgeConfig(Base):
     pass_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
     dimensions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     aggregation: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TZDateTime, default=_utcnow, onupdate=_utcnow)
 
 
 # Avoid circular import: import at module level after class definitions

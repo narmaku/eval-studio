@@ -7,7 +7,9 @@ from app.core.database import Base
 class Artifact(Base):
     __tablename__ = "artifacts"
 
-    evaluation_id: Mapped[str] = mapped_column(String(36), ForeignKey("evaluations.id"), nullable=False, index=True)
+    evaluation_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("evaluations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)

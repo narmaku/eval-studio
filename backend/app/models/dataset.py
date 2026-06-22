@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, TZDateTime
 from app.core.database import utcnow as _utcnow
 
 
@@ -17,7 +17,7 @@ class Dataset(Base):
     tags: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="upload")
     item_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TZDateTime, default=_utcnow, onupdate=_utcnow)
 
     items: Mapped[list["DatasetItem"]] = relationship(
         "DatasetItem", back_populates="dataset", cascade="all, delete-orphan", lazy="selectin"

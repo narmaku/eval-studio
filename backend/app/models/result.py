@@ -7,7 +7,9 @@ from app.core.database import Base
 class Result(Base):
     __tablename__ = "results"
 
-    evaluation_id: Mapped[str] = mapped_column(String(36), ForeignKey("evaluations.id"), nullable=False, index=True)
+    evaluation_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("evaluations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     dataset_item_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("dataset_items.id"), nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("sessions.id"), nullable=True)
     contestant_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
