@@ -106,8 +106,6 @@ async def require_auth(
 
     now = datetime.now(UTC)
     last = api_key.last_used_at
-    if last is not None and last.tzinfo is None:
-        last = last.replace(tzinfo=UTC)
     if last is None or (now - last).total_seconds() > LAST_USED_THROTTLE_SECONDS:
         api_key.last_used_at = now
         await db.commit()
