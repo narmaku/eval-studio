@@ -1,0 +1,9 @@
+[allowlist]
+description = "eval-studio false positive allowlist"
+commits = [
+  "936324ad05b911fdec7e020643b24e40ac70b94e",
+]
+paths = [
+  '''clients/tests/test_async_client\.py''',
+  '''clients/tests/test_client\.py''',
+]
