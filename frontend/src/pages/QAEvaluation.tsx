@@ -1,5 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
+import { useState, useMemo, useCallback } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
@@ -9,10 +8,9 @@ import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { QAResultsTable } from '@/components/evaluation/QAResultsTable';
 import { ResultDetailDrawer } from '@/components/evaluation/ResultDetailDrawer';
-import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
-import { useNotificationStore } from '@/stores/notificationStore';
+import { useEvaluationRun } from '@/hooks/useEvaluationRun';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
 import { api } from '@/services/api';
 import type {
@@ -24,37 +22,7 @@ import type {
   DatasetItem,
 } from '@/types';
 
-type PagePhase = 'configure' | 'running' | 'complete';
-
-function getInitialPhase(): PagePhase {
-  try {
-    const stored = sessionStorage.getItem('runningEvaluation');
-    if (stored) {
-      const running = JSON.parse(stored) as { mode: string };
-      if (running.mode === 'qa') return 'running';
-    }
-  } catch {
-    // ignore
-  }
-  return 'configure';
-}
-
 export default function QAEvaluation() {
-  const [phase, setPhase] = useState<PagePhase>(getInitialPhase);
-
-  // Auto-resume running evaluation from sessionStorage
-  const { getRunningEvaluation, setCurrentEvaluation: setCurrentEval } = useEvaluationStore();
-  useEffect(() => {
-    const running = getRunningEvaluation();
-    if (running && running.mode === 'qa') {
-      setCurrentEval({
-        id: running.id,
-        name: running.name,
-        mode: running.mode,
-      } as Parameters<typeof setCurrentEval>[0]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>();
   const [modelEndpoint, setModelEndpoint] = useState<ModelEndpoint>();
   const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
@@ -64,9 +32,24 @@ export default function QAEvaluation() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
 
-  const { currentEvaluation, createAndRunEvaluation, isLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
-  const { results, fetchResults, fetchAggregateMetrics } = useResultStore();
+  const { results, fetchAggregateMetrics } = useResultStore();
+
+  const onCompleted = useCallback(
+    (evaluationId: string) => {
+      void fetchAggregateMetrics(evaluationId);
+      if (selectedDatasetId) {
+        api
+          .getDataset(selectedDatasetId)
+          .then((detail) => setDatasetItems(detail.items))
+          .catch(() => setDatasetItems([]));
+      }
+    },
+    [fetchAggregateMetrics, selectedDatasetId],
+  );
+
+  const { phase, currentEvaluation, isLoading, start, handleComplete, cancel, reset } =
+    useEvaluationRun({ mode: 'qa', onCompleted });
 
   const itemMap = useMemo(() => {
     const map = new Map<string, DatasetItem>();
@@ -94,63 +77,8 @@ export default function QAEvaluation() {
       },
     };
 
-    try {
-      await createAndRunEvaluation(request);
-      toast.success('Evaluation started');
-      setPhase('running');
-    } catch (err) {
-      toast.error('Failed to start evaluation');
-      useNotificationStore.getState().addNotification({
-        type: 'error',
-        title: 'Failed to Start Evaluation',
-        message: err instanceof Error ? err.message : 'An unknown error occurred',
-        details: err instanceof Error ? err.stack : undefined,
-      });
-    }
+    await start(request);
   };
-
-  const handleComplete = useCallback(() => {
-    const evaluation = useEvaluationStore.getState().currentEvaluation;
-    const addNotification = useNotificationStore.getState().addNotification;
-
-    if (evaluation?.status === 'completed') {
-      toast.success('Evaluation completed');
-      addNotification({
-        type: 'success',
-        title: 'Evaluation Completed',
-        message: `"${evaluation.name}" finished successfully`,
-        evaluationId: evaluation.id,
-      });
-      void fetchResults(evaluation.id);
-      void fetchAggregateMetrics(evaluation.id);
-      if (selectedDatasetId) {
-        api
-          .getDataset(selectedDatasetId)
-          .then((detail) => setDatasetItems(detail.items))
-          .catch(() => setDatasetItems([]));
-      }
-      setPhase('complete');
-    } else if (evaluation?.status === 'failed') {
-      const errorMsg = evaluation.error || 'Unknown error';
-      toast.error(`Evaluation failed: ${errorMsg}`);
-      addNotification({
-        type: 'error',
-        title: 'Evaluation Failed',
-        message: `"${evaluation.name}" failed: ${errorMsg}`,
-        evaluationId: evaluation.id,
-      });
-      setPhase('configure');
-    } else if (evaluation?.status === 'cancelled') {
-      toast('Evaluation was cancelled');
-      addNotification({
-        type: 'warning',
-        title: 'Evaluation Cancelled',
-        message: `"${evaluation.name}" was cancelled`,
-        evaluationId: evaluation.id,
-      });
-      setPhase('configure');
-    }
-  }, [fetchResults, fetchAggregateMetrics, selectedDatasetId]);
 
   const handleRowClick = (result: Result) => {
     setSelectedResult(result);
@@ -158,7 +86,7 @@ export default function QAEvaluation() {
   };
 
   const handleNewEvaluation = () => {
-    setPhase('configure');
+    reset();
     setSelectedDatasetId(undefined);
     setModelEndpoint(undefined);
     setJudgeConfig(undefined);
@@ -167,7 +95,6 @@ export default function QAEvaluation() {
     setSelectedResult(null);
     setDrawerOpen(false);
     setDatasetItems([]);
-    useEvaluatorStore.getState().resetSelection();
   };
 
   return (
@@ -180,7 +107,6 @@ export default function QAEvaluation() {
       </div>
       <Separator />
 
-      {/* Configure Phase */}
       {phase === 'configure' && (
         <>
           <EvaluatorSelector mode="qa" />
@@ -218,26 +144,15 @@ export default function QAEvaluation() {
         </>
       )}
 
-      {/* Running Phase */}
       {phase === 'running' && currentEvaluation && (
         <>
           <EvaluationProgress evaluationId={currentEvaluation.id} onComplete={handleComplete} />
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (currentEvaluation?.id) {
-                api.cancelEvaluation(currentEvaluation.id).catch(() => {
-                  toast.error('Failed to cancel evaluation');
-                });
-              }
-            }}
-          >
+          <Button variant="outline" onClick={cancel}>
             Cancel
           </Button>
         </>
       )}
 
-      {/* Complete Phase */}
       {phase === 'complete' && (
         <>
           <QAResultsTable

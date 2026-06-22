@@ -1,5 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
-import { toast } from 'sonner';
+import { useState, useCallback } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
@@ -10,12 +9,11 @@ import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { ArenaLeaderboard } from '@/components/evaluation/ArenaLeaderboard';
 import { ArenaResultsGrid } from '@/components/evaluation/ArenaResultsGrid';
 import { ContestantScoreChart, RadarComparisonChart } from '@/components/results';
-import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
-import { useNotificationStore } from '@/stores/notificationStore';
-import { api } from '@/services/api';
+import { useEvaluationRun } from '@/hooks/useEvaluationRun';
 import { LLMParamsPanel } from '@/components/evaluation/LLMParamsPanel';
+import { api } from '@/services/api';
 import type {
   ModelEndpoint,
   JudgeReference,
@@ -24,37 +22,7 @@ import type {
   LLMParams,
 } from '@/types';
 
-type PagePhase = 'configure' | 'running' | 'complete';
-
-function getInitialPhase(): PagePhase {
-  try {
-    const stored = sessionStorage.getItem('runningEvaluation');
-    if (stored) {
-      const running = JSON.parse(stored) as { mode: string };
-      if (running.mode === 'arena') return 'running';
-    }
-  } catch {
-    // ignore
-  }
-  return 'configure';
-}
-
 export default function ArenaComparison() {
-  const [phase, setPhase] = useState<PagePhase>(getInitialPhase);
-
-  // Auto-resume running evaluation from sessionStorage
-  const { getRunningEvaluation, setCurrentEvaluation: setCurrentEval } = useEvaluationStore();
-  useEffect(() => {
-    const running = getRunningEvaluation();
-    if (running && running.mode === 'arena') {
-      setCurrentEval({
-        id: running.id,
-        name: running.name,
-        mode: running.mode,
-      } as Parameters<typeof setCurrentEval>[0]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [contestants, setContestants] = useState<ModelEndpoint[]>([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>();
   const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
@@ -62,11 +30,21 @@ export default function ArenaComparison() {
   const [judgeParams, setJudgeParams] = useState<LLMParams>({});
   const [leaderboard, setLeaderboard] = useState<ArenaLeaderboardResponse | null>(null);
 
-  const { currentEvaluation, createAndRunEvaluation, isLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
-  const { results, fetchResults } = useResultStore();
+  const { results } = useResultStore();
 
-  // Need at least 2 contestants with valid config (single-model providers don't need default_model)
+  const onCompleted = useCallback((evaluationId: string) => {
+    void api
+      .getArenaLeaderboard(evaluationId)
+      .then(setLeaderboard)
+      .catch(() => {
+        // Leaderboard fetch failed — results will still show
+      });
+  }, []);
+
+  const { phase, currentEvaluation, isLoading, start, handleComplete, cancel, reset } =
+    useEvaluationRun({ mode: 'arena', onCompleted });
+
   const validContestants = contestants.filter((c) => c.name && (c.default_model || c.single_model));
   const isConfigValid = Boolean(
     validContestants.length >= 2 && selectedDatasetId && judgeConfig && selectedEvaluatorId,
@@ -75,8 +53,6 @@ export default function ArenaComparison() {
   const handleStart = async () => {
     if (!selectedDatasetId || !judgeConfig || validContestants.length < 2) return;
 
-    // Use the first contestant as the primary model_endpoint (required by API)
-    // and pass all contestants in the config
     const primaryEndpoint = validContestants[0]!;
 
     const request: CreateEvaluationRequest = {
@@ -93,75 +69,19 @@ export default function ArenaComparison() {
       },
     };
 
-    try {
-      await createAndRunEvaluation(request);
-      toast.success('Arena started');
-      setPhase('running');
-    } catch (err) {
-      toast.error('Failed to start arena');
-      useNotificationStore.getState().addNotification({
-        type: 'error',
-        title: 'Failed to Start Arena',
-        message: err instanceof Error ? err.message : 'An unknown error occurred',
-        details: err instanceof Error ? err.stack : undefined,
-      });
-    }
+    await start(request);
   };
 
-  const handleComplete = useCallback(() => {
-    const evaluation = useEvaluationStore.getState().currentEvaluation;
-    const addNotification = useNotificationStore.getState().addNotification;
-
-    if (evaluation?.status === 'completed') {
-      toast.success('Arena completed');
-      addNotification({
-        type: 'success',
-        title: 'Arena Completed',
-        message: `"${evaluation.name}" finished successfully`,
-        evaluationId: evaluation.id,
-      });
-      void fetchResults(evaluation.id);
-      void api
-        .getArenaLeaderboard(evaluation.id)
-        .then(setLeaderboard)
-        .catch(() => {
-          // Leaderboard fetch failed — results will still show
-        });
-      setPhase('complete');
-    } else if (evaluation?.status === 'failed') {
-      const errorMsg = evaluation.error || 'Unknown error';
-      toast.error(`Arena failed: ${errorMsg}`);
-      addNotification({
-        type: 'error',
-        title: 'Arena Failed',
-        message: `"${evaluation.name}" failed: ${errorMsg}`,
-        evaluationId: evaluation.id,
-      });
-      setPhase('configure');
-    } else if (evaluation?.status === 'cancelled') {
-      toast('Arena was cancelled');
-      addNotification({
-        type: 'warning',
-        title: 'Arena Cancelled',
-        message: `"${evaluation.name}" was cancelled`,
-        evaluationId: evaluation.id,
-      });
-      setPhase('configure');
-    }
-  }, [fetchResults]);
-
   const handleNewArena = () => {
-    setPhase('configure');
+    reset();
     setContestants([]);
     setSelectedDatasetId(undefined);
     setJudgeConfig(undefined);
     setModelParams({});
     setJudgeParams({});
     setLeaderboard(null);
-    useEvaluatorStore.getState().resetSelection();
   };
 
-  // Extract unique contestant model names for the results grid
   const contestantModels = validContestants.map((c) => c.default_model);
 
   return (
@@ -175,7 +95,6 @@ export default function ArenaComparison() {
       </div>
       <Separator />
 
-      {/* Configure Phase */}
       {phase === 'configure' && (
         <>
           <EvaluatorSelector mode="qa" />
@@ -213,26 +132,15 @@ export default function ArenaComparison() {
         </>
       )}
 
-      {/* Running Phase */}
       {phase === 'running' && currentEvaluation && (
         <>
           <EvaluationProgress evaluationId={currentEvaluation.id} onComplete={handleComplete} />
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (currentEvaluation?.id) {
-                api.cancelEvaluation(currentEvaluation.id).catch(() => {
-                  toast.error('Failed to cancel evaluation');
-                });
-              }
-            }}
-          >
+          <Button variant="outline" onClick={cancel}>
             Cancel
           </Button>
         </>
       )}
 
-      {/* Complete Phase */}
       {phase === 'complete' && (
         <>
           {leaderboard && (
