@@ -1,37 +1,14 @@
-// Types aligned with backend DatasetResponse / DatasetDetailResponse schemas.
+import type { components } from './generated/api';
+
+export type Dataset = components['schemas']['DatasetResponse'];
+export type DatasetDetail = components['schemas']['DatasetDetailResponse'];
+export type DatasetItem = components['schemas']['DatasetItemResponse'];
+export type DatasetItemCreate = components['schemas']['DatasetItemCreate'];
+export type FileAnalysisResult = components['schemas']['FileAnalysisResult'];
+export type SuggestedMapping = components['schemas']['SuggestedMappingResponse'];
+export type AnalyzeResponse = components['schemas']['AnalyzeResponse'];
 
 export type DatasetFormat = 'qa_pairs' | 'jsonl' | 'csv';
-
-export interface Dataset {
-  id: string;
-  name: string;
-  description: string | null;
-  format: string;
-  version: string;
-  tags: string[];
-  source_type: string;
-  item_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DatasetItem {
-  id: string;
-  question: string;
-  expected_answer: string | null;
-  metadata: Record<string, unknown> | null;
-  order_index: number;
-}
-
-export interface DatasetDetail extends Dataset {
-  items: DatasetItem[];
-}
-
-export interface DatasetItemCreate {
-  question: string;
-  expected_answer?: string;
-  metadata?: Record<string, unknown>;
-}
 
 export interface CreateDatasetRequest {
   name: string;
@@ -40,34 +17,6 @@ export interface CreateDatasetRequest {
   version?: string;
   tags?: string[];
   items?: DatasetItemCreate[];
-}
-
-// --- Smart Import types (aligned with backend AnalyzeResponse / ImportRequest) ---
-
-export interface FileAnalysisResult {
-  filename: string;
-  format: string;
-  fields: string[];
-  sample_rows: Record<string, unknown>[];
-  total_rows: number;
-  has_header: boolean;
-  nested_paths: string[];
-  error: string | null;
-}
-
-export interface SuggestedMapping {
-  question_field: string | null;
-  answer_field: string | null;
-  metadata_fields: string[];
-  confidence: number;
-}
-
-export interface AnalyzeResponse {
-  analysis_id: string;
-  files: FileAnalysisResult[];
-  merged_fields: string[];
-  suggested_mapping: SuggestedMapping;
-  total_rows: number;
 }
 
 export interface FieldMapping {

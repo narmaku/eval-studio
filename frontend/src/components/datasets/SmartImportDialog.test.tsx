@@ -34,7 +34,7 @@ const makeAnalysisResult = (overrides: Partial<AnalyzeResponse> = {}): AnalyzeRe
     metadata_fields: ['category'],
     confidence: 0.95,
   },
-  total_rows: 10,
+  total_items: 10,
   ...overrides,
 });
 
