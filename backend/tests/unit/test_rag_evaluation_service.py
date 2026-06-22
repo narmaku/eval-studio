@@ -323,7 +323,7 @@ class TestBuildRagAdapterConfig:
         assert "endpoint_url" not in config
 
     def test_url_key_still_works(self):
-        """Backward compat: url key should pass through unchanged."""
+        """The url key passes through unchanged."""
         rag_endpoint = {"url": "http://localhost:8080/api/rag"}
         config = _build_rag_adapter_config(rag_endpoint)
         assert config["url"] == "http://localhost:8080/api/rag"

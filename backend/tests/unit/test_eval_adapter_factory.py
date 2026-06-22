@@ -7,9 +7,9 @@ from app.adapters.litellm_judge import LiteLLMJudgeAdapter
 
 
 def test_create_litellm_adapter():
-    """Factory creates LiteLLMJudgeAdapter for adapter_type='litellm'."""
+    """Factory creates LiteLLMJudgeAdapter via registry."""
     adapter = create_evaluation_adapter(
-        adapter_type="litellm",
+        adapter_type="litellm-judge",
         model="gpt-4",
         api_key="sk-test",
         api_base="http://localhost:8080/v1",
@@ -21,7 +21,7 @@ def test_create_litellm_adapter():
 
 
 def test_create_litellm_adapter_default_type():
-    """Factory defaults to 'litellm' when adapter_type is not specified."""
+    """Factory defaults to 'litellm-judge' when adapter_type is not specified."""
     adapter = create_evaluation_adapter(model="gpt-4")
     assert isinstance(adapter, LiteLLMJudgeAdapter)
     assert adapter.model == "gpt-4"

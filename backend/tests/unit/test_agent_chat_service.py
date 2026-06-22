@@ -378,7 +378,7 @@ class TestTranscriptToLlmMessages:
         assert result == [{"role": "tool", "tool_call_id": "call_1", "content": "72°F"}]
 
     def test_assistant_tool_calls_with_name_key(self):
-        """Handles both 'tool_name' and 'name' keys for backward compatibility."""
+        """Handles both 'tool_name' and 'name' keys (internal envelopes vs harness parsers)."""
         transcript = [
             {
                 "role": "assistant",

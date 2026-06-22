@@ -113,7 +113,7 @@ async def test_create_evaluation_valid_evaluator_id(client):
     payload = {
         "name": "Good Evaluator",
         "mode": "qa",
-        "config": {"model": "test-model", "evaluator_id": "litellm"},
+        "config": {"model": "test-model", "evaluator_id": "litellm-judge"},
     }
     response = await client.post("/api/v1/evaluations", json=payload)
     assert response.status_code == 201

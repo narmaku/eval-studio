@@ -235,7 +235,7 @@ class TestEvaluatorRegistry:
 
 
 class TestFactoryRegistryIntegration:
-    """Tests for factory backward compat and registry integration."""
+    """Tests for factory and registry integration."""
 
     @pytest.fixture(autouse=True)
     def _seed_evaluator_registry(self, tmp_path):
@@ -256,14 +256,8 @@ class TestFactoryRegistryIntegration:
         config_file.write_text(yaml.dump(config))
         evaluator_registry.load_from_yaml(config_file)
 
-    def test_factory_backward_compat_litellm(self):
-        """create_evaluation_adapter(adapter_type='litellm') still works."""
-        adapter = create_evaluation_adapter(adapter_type="litellm", model="gpt-4")
-        assert isinstance(adapter, LiteLLMJudgeAdapter)
-        assert adapter.model == "gpt-4"
-
-    def test_factory_uses_registry_for_known_evaluator(self):
-        """create_evaluation_adapter(adapter_type='litellm-judge') uses registry."""
+    def test_factory_creates_adapter_via_registry(self):
+        """create_evaluation_adapter resolves litellm-judge through registry."""
         adapter = create_evaluation_adapter(adapter_type="litellm-judge", model="gpt-4")
         assert isinstance(adapter, LiteLLMJudgeAdapter)
         assert adapter.model == "gpt-4"

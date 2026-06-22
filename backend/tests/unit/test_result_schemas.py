@@ -22,7 +22,7 @@ def test_result_response_has_contestant_model():
 
 
 def test_result_response_contestant_model_default_none():
-    """ResultResponse contestant_model defaults to None for backward compat."""
+    """ResultResponse contestant_model defaults to None."""
     result = ResultResponse(
         id="r1",
         evaluation_id="e1",
