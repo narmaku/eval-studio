@@ -1,8 +1,8 @@
-// TODO: Consider generating these types from the FastAPI OpenAPI spec
-// using openapi-typescript once the backend is implemented.
+import type { components } from './generated/api';
 
-export type EvaluationMode = 'qa' | 'agent' | 'rag' | 'arena';
-export type EvaluationStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type EvaluationMode = components['schemas']['EvaluationMode'];
+export type EvaluationStatus = components['schemas']['EvaluationStatus'];
+export type ProviderModel = components['schemas']['ProviderModelResponse'];
 
 export interface Evaluation {
   id: string;
@@ -22,13 +22,11 @@ export interface Evaluation {
 
 export interface RAGEndpointSettings {
   backend_type: 'http' | 'pgvector';
-  // HTTP fields
   endpoint_url?: string;
   auth_token_env?: string;
   query_field?: string;
   answer_field?: string;
   chunks_field?: string;
-  // pgvector fields
   connection_string?: string;
   table_name?: string;
   embedding_column?: string;
@@ -52,9 +50,9 @@ export interface EvaluationConfig {
   judge_config: JudgeReference;
   evaluator_id?: string;
   max_turns?: number;
-  contestants?: ModelEndpoint[]; // arena mode
-  rag_endpoint?: RAGEndpointSettings; // rag mode
-  rag_metrics?: string[]; // rag mode
+  contestants?: ModelEndpoint[];
+  rag_endpoint?: RAGEndpointSettings;
+  rag_metrics?: string[];
   model_params?: LLMParams;
   judge_params?: LLMParams;
 }
@@ -95,20 +93,12 @@ export interface Provider {
   rate_limits: RateLimit[] | null;
 }
 
-export interface ProviderModel {
-  id: string;
-  owned_by: string;
-}
-
 export interface JudgeReference {
   judge_id?: string;
   preset?: string;
   provider_id?: string;
 }
 
-// TODO: Backend EvaluationCreate.config is dict[str, Any] (unstructured) while frontend
-// uses the typed EvaluationConfig interface. These should be reconciled once the backend
-// schema is tightened. See https://github.com/narmaku/eval-studio/issues/106.
 export interface CreateEvaluationRequest {
   name: string;
   mode: EvaluationMode;

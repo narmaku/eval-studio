@@ -213,7 +213,7 @@ describe('datasetStore', () => {
         metadata_fields: [],
         confidence: 0.95,
       },
-      total_rows: 5,
+      total_items: 5,
     });
 
     it('sets analysisResult on success', async () => {
@@ -274,7 +274,7 @@ describe('datasetStore', () => {
             metadata_fields: [],
             confidence: 0.9,
           },
-          total_rows: 0,
+          total_items: 0,
         },
       });
 
@@ -327,7 +327,7 @@ describe('datasetStore', () => {
             metadata_fields: [],
             confidence: 0.9,
           },
-          total_rows: 0,
+          total_items: 0,
         },
         isAnalyzing: true,
       });

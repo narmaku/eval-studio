@@ -44,6 +44,10 @@ jobs:
           npm ci --silent
           npm run lint
 
+      - name: Check API types are up to date
+        working-directory: frontend
+        run: npm run gen:api:check
+
   test-backend:
     name: Test Backend
     runs-on: ubuntu-latest

@@ -1,3 +1,4 @@
+export type { components, paths, operations } from './generated/api';
 export * from './artifact';
 export * from './common';
 export * from './evaluation';

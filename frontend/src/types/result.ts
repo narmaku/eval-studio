@@ -1,8 +1,6 @@
-// Types aligned with backend ResultResponse schema
-// TODO: Backend scores_breakdown is dict[str, Any] | None but frontend uses
-// Record<string, number> | null. The frontend relies on numeric values for arithmetic
-// (e.g., value * 100). Widen the backend schema to dict[str, float] or keep the frontend
-// narrow once confirmed. See https://github.com/narmaku/eval-studio/issues/106.
+import type { components } from './generated/api';
+
+export type ScoreBucket = components['schemas']['ScoreBucket'];
 
 export interface RetrievedChunk {
   content: string;
@@ -41,11 +39,6 @@ export interface ArenaLeaderboardResponse {
   evaluation_id: string;
   evaluation_name: string;
   contestants: ArenaContestantSummary[];
-}
-
-export interface ScoreBucket {
-  label: string;
-  count: number;
 }
 
 export interface AggregateMetrics {

@@ -1,10 +1,3 @@
-export interface EvaluatorInfo {
-  id: string;
-  name: string;
-  description: string;
-  modes: string[];
-  builtin: boolean;
-  available: boolean;
-  defaults: Record<string, unknown>;
-  config_schema: Record<string, unknown>;
-}
+import type { components } from './generated/api';
+
+export type EvaluatorInfo = components['schemas']['EvaluatorResponse'];

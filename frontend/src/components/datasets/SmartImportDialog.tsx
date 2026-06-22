@@ -578,7 +578,7 @@ export function SmartImportDialog({ open, onOpenChange }: SmartImportDialogProps
             {previewItems.length > 0 && (
               <div className="space-y-2">
                 <Label>
-                  Preview ({analysisResult?.total_rows ?? 0} total items, showing first{' '}
+                  Preview ({analysisResult?.total_items ?? 0} total items, showing first{' '}
                   {previewItems.length})
                 </Label>
                 <div className="rounded-md border overflow-x-auto">

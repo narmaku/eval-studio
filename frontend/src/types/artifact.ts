@@ -1,9 +1,3 @@
-export interface Artifact {
-  id: string;
-  evaluation_id: string;
-  filename: string;
-  content_type: string;
-  size_bytes: number;
-  description: string | null;
-  created_at: string;
-}
+import type { components } from './generated/api';
+
+export type Artifact = components['schemas']['ArtifactResponse'];

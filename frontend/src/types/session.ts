@@ -1,8 +1,9 @@
-// TODO: Consider generating these types from the FastAPI OpenAPI spec
-// using openapi-typescript once the backend is implemented.
+import type { components } from './generated/api';
 
-export type SessionMode = 'live' | 'simulated';
-export type SessionStatus = 'active' | 'ended' | 'scoring' | 'completed';
+export type SessionMode = components['schemas']['SessionMode'];
+export type SessionStatus = components['schemas']['SessionStatus'];
+export type SendMessageRequest = components['schemas']['SessionMessageRequest'];
+
 export type MessageSender = 'user' | 'agent' | 'system' | 'judge';
 
 export interface SessionScores {
@@ -12,9 +13,6 @@ export interface SessionScores {
   breakdown: Record<string, number> | null;
 }
 
-// TODO: Backend SessionResponse.scores is dict[str, Any] | None (unstructured) while
-// frontend uses the typed SessionScores interface. Reconcile once the backend schema is
-// tightened. See https://github.com/narmaku/eval-studio/issues/106.
 export interface Session {
   id: string;
   evaluation_id: string | null;
@@ -53,15 +51,12 @@ export interface ToolCall {
 }
 
 export interface SessionScore {
-  turn_number: number | null; // null means session-level score
+  turn_number: number | null;
   dimensions: Record<string, number>;
   overall: number;
   judge_reasoning: string;
 }
 
-// TODO: Backend SessionCreate.agent_config and judge_config are dict[str, Any] | None
-// (unstructured) while frontend uses typed inline interfaces. Reconcile once the backend
-// schema is tightened. See https://github.com/narmaku/eval-studio/issues/106.
 export interface CreateSessionRequest {
   evaluation_id?: string;
   name?: string;
@@ -78,10 +73,6 @@ export interface CreateSessionRequest {
   judge_config?: {
     provider_id?: string;
   };
-}
-
-export interface SendMessageRequest {
-  content: string;
 }
 
 // --- WebSocket message types ---
