@@ -93,6 +93,28 @@ Respond with ONLY a JSON object:
 
     _CONVERSATION_DIMENSIONS = ("relevance", "tool_use_accuracy", "resolution", "response_quality")
 
+    DIMENSION_QA_PROMPT_TEMPLATE = """\
+You are evaluating the quality of an AI assistant's response.
+
+## Question
+{question}
+
+## Expected Answer
+{expected_answer}
+
+## Actual Answer
+{actual_answer}
+
+## Scoring Rubric
+
+Score each dimension on a scale of 0.0 to 1.0:
+
+{dimensions_section}
+
+Respond with ONLY a JSON object:
+{{{response_schema}, "reasoning": "<brief explanation>"}}\
+"""
+
     @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
         """Return JSON Schema for configurable fields of the LiteLLM judge adapter."""
@@ -202,6 +224,24 @@ Respond with ONLY a JSON object:
             logger.error("judge.parse_failed", error=str(exc), raw_content=content)
             return None
 
+    @staticmethod
+    def _build_dimensions_prompt(dimensions: list[dict]) -> tuple[str, list[str]]:
+        """Build the scoring rubric section and response schema from rubric dimensions.
+
+        Returns (dimensions_section, dimension_names).
+        """
+        lines = []
+        names = []
+        for i, dim in enumerate(dimensions, 1):
+            name = dim.get("name", f"dimension_{i}")
+            desc = dim.get("description", "")
+            weight = dim.get("weight", 1.0)
+            lines.append(f"{i}. **{name}** (0.0-1.0, weight={weight}): {desc}")
+            names.append(name)
+        section = "\n".join(lines)
+        schema = ", ".join(f'"{n}": <float>' for n in names)
+        return section, schema, names
+
     async def evaluate_qa(
         self,
         question: str,
@@ -209,8 +249,19 @@ Respond with ONLY a JSON object:
         actual_answer: str,
         judge_config: JudgeConfigParams,
     ) -> Score:
-        """Score a single Q&A pair using an LLM judge."""
+        """Score a single Q&A pair using an LLM judge.
+
+        When judge_config.dimensions is non-empty (from a rubric), scores each
+        dimension individually and aggregates by weight. Otherwise uses the
+        single-score default prompt.
+        """
         async with self._semaphore:
+            dimensions = judge_config.dimensions
+            if dimensions:
+                return await self._evaluate_qa_with_dimensions(
+                    question, expected_answer, actual_answer, judge_config, dimensions
+                )
+
             prompt_template = judge_config.prompt_template or self.DEFAULT_PROMPT_TEMPLATE
             prompt = prompt_template.format(
                 question=question,
@@ -224,6 +275,52 @@ Respond with ONLY a JSON object:
             reasoning = result.get("reasoning", "")
             passed = score_value >= (judge_config.pass_threshold or 0.7)
             return Score(value=score_value, passed=passed, reasoning=reasoning)
+
+    async def _evaluate_qa_with_dimensions(
+        self,
+        question: str,
+        expected_answer: str,
+        actual_answer: str,
+        judge_config: JudgeConfigParams,
+        dimensions: list[dict],
+    ) -> Score:
+        """Score a Q&A pair using per-dimension rubric scoring."""
+        dimensions_section, response_schema, _dim_names = self._build_dimensions_prompt(dimensions)
+
+        if judge_config.prompt_template:
+            prompt = judge_config.prompt_template.format(
+                question=question,
+                expected_answer=expected_answer,
+                actual_answer=actual_answer,
+            )
+        else:
+            prompt = self.DIMENSION_QA_PROMPT_TEMPLATE.format(
+                question=question,
+                expected_answer=expected_answer,
+                actual_answer=actual_answer,
+                dimensions_section=dimensions_section,
+                response_schema=response_schema,
+            )
+
+        result = await self._ask_judge(prompt, judge_config, "qa")
+        if result is None:
+            return Score(value=0.0, passed=False, reasoning="LLM returned empty or unparseable response")
+
+        breakdown: dict[str, float] = {}
+        for dim in dimensions:
+            name = dim.get("name", "")
+            breakdown[name] = float(result.get(name, 0.0))
+
+        total_weight = sum(float(d.get("weight", 1.0)) for d in dimensions)
+        if total_weight > 0:
+            weighted_sum = sum(breakdown.get(d.get("name", ""), 0.0) * float(d.get("weight", 1.0)) for d in dimensions)
+            overall = weighted_sum / total_weight
+        else:
+            overall = sum(breakdown.values()) / max(len(breakdown), 1)
+
+        reasoning = result.get("reasoning", "")
+        passed = overall >= (judge_config.pass_threshold or 0.7)
+        return Score(value=overall, passed=passed, reasoning=reasoning, breakdown=breakdown)
 
     @staticmethod
     def _format_chunks(chunks: list[str], max_chunks: int = 20) -> str:

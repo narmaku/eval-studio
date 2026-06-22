@@ -183,3 +183,154 @@ async def test_litellm_client_used_for_proxy_ssl():
         await adapter.evaluate_qa(question="q", expected_answer="a", actual_answer="a", judge_config=judge_config)
         mock_get_client.assert_called_once_with("http://proxy:8080", "/tmp/ca.pem", None, "key-1", None)
         assert mock_acompletion.call_args.kwargs.get("client") is sentinel_client
+
+
+class TestDimensionBasedQAScoring:
+    """Tests for evaluate_qa with rubric dimensions."""
+
+    @pytest.mark.asyncio
+    async def test_dimensions_produce_weighted_score_and_breakdown(self):
+        adapter = LiteLLMJudgeAdapter(model="test-model", max_concurrency=5)
+        dims = [
+            {"name": "accuracy", "weight": 2.0, "description": "Factual accuracy"},
+            {"name": "completeness", "weight": 1.0, "description": "Coverage of key points"},
+        ]
+        judge_config = JudgeConfigParams(
+            model="test-model",
+            temperature=0.0,
+            pass_threshold=0.7,
+            dimensions=dims,
+        )
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[
+            0
+        ].message.content = '{"accuracy": 0.9, "completeness": 0.6, "reasoning": "Good but incomplete"}'
+
+        with patch(
+            "app.adapters.litellm_judge.litellm.acompletion",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ):
+            score = await adapter.evaluate_qa(
+                question="What is RHEL?",
+                expected_answer="Red Hat Enterprise Linux",
+                actual_answer="RHEL is a Linux distro.",
+                judge_config=judge_config,
+            )
+            # Weighted average: (0.9*2 + 0.6*1) / (2+1) = 2.4/3 = 0.8
+            assert abs(score.value - 0.8) < 1e-6
+            assert score.passed is True  # 0.8 >= 0.7
+            assert score.breakdown == {"accuracy": 0.9, "completeness": 0.6}
+            assert score.reasoning == "Good but incomplete"
+
+    @pytest.mark.asyncio
+    async def test_dimensions_failing_threshold(self):
+        adapter = LiteLLMJudgeAdapter(model="test-model", max_concurrency=5)
+        dims = [
+            {"name": "accuracy", "weight": 1.0, "description": "Factual accuracy"},
+            {"name": "clarity", "weight": 1.0, "description": "Clarity of response"},
+        ]
+        judge_config = JudgeConfigParams(
+            model="test-model",
+            temperature=0.0,
+            pass_threshold=0.8,
+            dimensions=dims,
+        )
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = '{"accuracy": 0.5, "clarity": 0.7, "reasoning": "Poor accuracy"}'
+
+        with patch(
+            "app.adapters.litellm_judge.litellm.acompletion",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ):
+            score = await adapter.evaluate_qa(
+                question="q",
+                expected_answer="a",
+                actual_answer="a",
+                judge_config=judge_config,
+            )
+            # Average: (0.5 + 0.7) / 2 = 0.6
+            assert abs(score.value - 0.6) < 1e-6
+            assert score.passed is False  # 0.6 < 0.8
+
+    @pytest.mark.asyncio
+    async def test_dimensions_empty_falls_through_to_default(self):
+        """Empty dimensions list uses single-score default path."""
+        adapter = LiteLLMJudgeAdapter(model="test-model", max_concurrency=5)
+        judge_config = JudgeConfigParams(
+            model="test-model",
+            temperature=0.0,
+            pass_threshold=0.7,
+            dimensions=[],
+        )
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = '{"score": 0.85, "reasoning": "Good"}'
+
+        with patch(
+            "app.adapters.litellm_judge.litellm.acompletion",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ):
+            score = await adapter.evaluate_qa(
+                question="q",
+                expected_answer="a",
+                actual_answer="a",
+                judge_config=judge_config,
+            )
+            assert score.value == 0.85
+            assert score.breakdown is None
+
+    @pytest.mark.asyncio
+    async def test_dimensions_llm_empty_response(self):
+        adapter = LiteLLMJudgeAdapter(model="test-model", max_concurrency=5)
+        judge_config = JudgeConfigParams(
+            model="test-model",
+            dimensions=[{"name": "accuracy", "weight": 1.0, "description": "test"}],
+        )
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = None
+
+        with patch(
+            "app.adapters.litellm_judge.litellm.acompletion",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ):
+            score = await adapter.evaluate_qa(
+                question="q",
+                expected_answer="a",
+                actual_answer="a",
+                judge_config=judge_config,
+            )
+            assert score.value == 0.0
+            assert score.passed is False
+
+
+class TestBuildDimensionsPrompt:
+    """Tests for the _build_dimensions_prompt static method."""
+
+    def test_builds_section_and_schema(self):
+        dims = [
+            {"name": "accuracy", "weight": 2.0, "description": "Factual accuracy"},
+            {"name": "clarity", "weight": 1.0, "description": "Clarity of response"},
+        ]
+        section, schema, names = LiteLLMJudgeAdapter._build_dimensions_prompt(dims)
+        assert "**accuracy**" in section
+        assert "weight=2.0" in section
+        assert '"accuracy": <float>' in schema
+        assert '"clarity": <float>' in schema
+        assert names == ["accuracy", "clarity"]
+
+    def test_single_dimension(self):
+        dims = [{"name": "overall", "weight": 1.0, "description": "Overall quality"}]
+        section, _schema, names = LiteLLMJudgeAdapter._build_dimensions_prompt(dims)
+        assert "**overall**" in section
+        assert names == ["overall"]

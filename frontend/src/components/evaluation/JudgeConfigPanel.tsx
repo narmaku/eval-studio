@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
-import type { JudgeReference, Judge, Provider } from '@/types';
+import type { JudgeReference, Judge, Provider, Rubric } from '@/types';
 
 interface JudgeConfigPanelProps {
   value: JudgeReference | undefined;
@@ -25,11 +25,13 @@ interface JudgeConfigPanelProps {
 export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanelProps) {
   const [judgeProviders, setJudgeProviders] = useState<Provider[]>([]);
   const [judges, setJudges] = useState<Judge[]>([]);
+  const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [advancedLoaded, setAdvancedLoaded] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(
     value?.provider_id,
   );
   const [selectedJudgeId, setSelectedJudgeId] = useState<string | undefined>(value?.judge_id);
+  const [selectedRubricId, setSelectedRubricId] = useState<string | undefined>(value?.rubric_id);
 
   const [customModel, setCustomModel] = useState('');
   const [customTemperature, setCustomTemperature] = useState('0.3');
@@ -41,18 +43,28 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
       .listProviders()
       .then(setJudgeProviders)
       .catch(() => {});
+    api
+      .listRubrics({ page_size: 100 })
+      .then((res) => setRubrics(res.items))
+      .catch(() => {});
   }, []);
 
   const handleProviderSelect = (providerId: string) => {
     setSelectedProviderId(providerId);
     setSelectedJudgeId(undefined);
-    onChange({ provider_id: providerId });
+    onChange({ provider_id: providerId, rubric_id: selectedRubricId });
+  };
+
+  const handleRubricSelect = (rubricId: string) => {
+    const newRubricId = rubricId === 'none' ? undefined : rubricId;
+    setSelectedRubricId(newRubricId);
+    onChange({ ...value, rubric_id: newRubricId });
   };
 
   const handleJudgeSelect = (judgeId: string) => {
     setSelectedJudgeId(judgeId);
     setSelectedProviderId(undefined);
-    onChange({ judge_id: judgeId });
+    onChange({ judge_id: judgeId, rubric_id: selectedRubricId });
   };
 
   const handleTabChange = (tab: string) => {
@@ -90,7 +102,7 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
       });
       setSelectedJudgeId(judge.id);
       setSelectedProviderId(undefined);
-      onChange({ judge_id: judge.id });
+      onChange({ judge_id: judge.id, rubric_id: selectedRubricId });
     } catch {
       // Error creating judge
     }
@@ -98,6 +110,8 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
 
   const effectiveProviderId = value?.provider_id ?? selectedProviderId;
   const effectiveJudgeId = value?.judge_id ?? selectedJudgeId;
+  const effectiveRubricId = value?.rubric_id ?? selectedRubricId;
+  const selectedRubric = rubrics.find((r) => r.id === effectiveRubricId);
 
   return (
     <Card>
@@ -111,7 +125,7 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="simple" className="mt-4">
+          <TabsContent value="simple" className="mt-4 space-y-4">
             {judgeProviders.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {judgeProviders.map((provider) => (
@@ -151,6 +165,48 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
                 <code className="text-xs">config/providers.yaml</code> or via Settings, or use the
                 Advanced tab.
               </p>
+            )}
+
+            {rubrics.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Scoring Rubric (optional)</Label>
+                <Select
+                  value={effectiveRubricId ?? 'none'}
+                  onValueChange={handleRubricSelect}
+                  disabled={disabled}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="No rubric — use default scoring" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No rubric — use default scoring</SelectItem>
+                    {rubrics.map((rubric) => (
+                      <SelectItem key={rubric.id} value={rubric.id}>
+                        {rubric.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedRubric && (
+                  <div className="mt-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">
+                      {selectedRubric.dimensions.length} dimension
+                      {selectedRubric.dimensions.length !== 1 ? 's' : ''}
+                      {' · '}
+                      {selectedRubric.aggregation}
+                      {' · '}
+                      threshold {selectedRubric.pass_threshold}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {selectedRubric.dimensions.map((dim) => (
+                        <Badge key={dim.name} variant="outline" className="text-[10px] px-1.5 py-0">
+                          {dim.name} (w={dim.weight})
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </TabsContent>
 

@@ -4504,6 +4504,18 @@
             "title": "Judge Config Id",
             "description": "ID of the judge configuration for scoring."
           },
+          "rubric_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric Id",
+            "description": "ID of the rubric to use for dimension-based scoring."
+          },
           "config": {
             "additionalProperties": true,
             "type": "object",
@@ -4585,6 +4597,18 @@
             ],
             "title": "Judge Config Id",
             "description": "ID of the judge configuration used for scoring."
+          },
+          "rubric_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric Id",
+            "description": "ID of the rubric used for dimension-based scoring."
           },
           "config": {
             "additionalProperties": true,

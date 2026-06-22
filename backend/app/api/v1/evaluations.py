@@ -16,6 +16,7 @@ from app.models.artifact import Artifact
 from app.models.dataset import Dataset
 from app.models.evaluation import Evaluation
 from app.models.result import Result
+from app.models.rubric import Rubric
 from app.models.session import Session
 from app.schemas.common import PaginatedResponse
 from app.schemas.evaluation import (
@@ -44,6 +45,12 @@ async def _create_validated_evaluation(payload: EvaluationCreate | RunRequest, d
         if not result.scalar_one_or_none():
             raise NotFoundException("Dataset", payload.dataset_id)
 
+    rubric_id = getattr(payload, "rubric_id", None)
+    if rubric_id:
+        result = await db.execute(select(Rubric).where(Rubric.id == rubric_id))
+        if not result.scalar_one_or_none():
+            raise NotFoundException("Rubric", rubric_id)
+
     _validate_evaluator_id(payload.config)
 
     if payload.mode == EvaluationMode.ARENA:
@@ -57,6 +64,7 @@ async def _create_validated_evaluation(payload: EvaluationCreate | RunRequest, d
         status=EvaluationStatus.PENDING,
         dataset_id=payload.dataset_id,
         judge_config_id=payload.judge_config_id,
+        rubric_id=rubric_id,
         config=payload.config,
     )
     db.add(evaluation)

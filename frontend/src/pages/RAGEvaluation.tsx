@@ -89,6 +89,7 @@ export default function RAGEvaluation() {
       name: evalName,
       mode: 'rag',
       dataset_id: selectedDatasetId,
+      rubric_id: judgeConfig.rubric_id,
       config: {
         model_endpoint: {
           name: 'RAG Endpoint',
