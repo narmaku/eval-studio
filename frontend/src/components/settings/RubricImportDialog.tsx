@@ -65,12 +65,12 @@ export function RubricImportDialog({ open, onOpenChange, onImported }: RubricImp
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Import Rubric</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
           <div className="space-y-2">
             <Label htmlFor="yaml-file">Upload YAML file</Label>
             <input
@@ -93,7 +93,7 @@ export function RubricImportDialog({ open, onOpenChange, onImported }: RubricImp
                 setError(null);
               }}
               rows={10}
-              className="font-mono text-sm"
+              className="font-mono text-sm max-h-[40vh] overflow-y-auto resize-y"
             />
           </div>
 
