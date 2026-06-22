@@ -94,14 +94,6 @@ Respond with ONLY a JSON object:
     _CONVERSATION_DIMENSIONS = ("relevance", "tool_use_accuracy", "resolution", "response_quality")
 
     @classmethod
-    def get_default_config(cls) -> dict[str, Any]:
-        """Return default configuration values for the LiteLLM judge adapter."""
-        return {
-            "pass_threshold": 0.7,
-            "temperature": 0.0,
-        }
-
-    @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
         """Return JSON Schema for configurable fields of the LiteLLM judge adapter."""
         return {
@@ -370,21 +362,3 @@ Respond with ONLY a JSON object:
                     reasoning=reasoning,
                 )
             return scores
-
-    def supports_mode(self, mode: str) -> bool:
-        """Check if this adapter supports a given evaluation mode."""
-        return mode in ("qa", "agent", "rag")
-
-    async def get_available_metrics(self) -> list[str]:
-        """List metrics this adapter can compute."""
-        return [
-            "correctness",
-            "relevance",
-            "tool_use_accuracy",
-            "resolution",
-            "response_quality",
-            "context_precision",
-            "context_recall",
-            "faithfulness",
-            "answer_relevance",
-        ]

@@ -222,28 +222,6 @@ async def test_evaluate_rag_truncation():
 
 
 @pytest.mark.asyncio
-async def test_supports_mode_rag():
-    """Adapter supports 'rag' mode."""
-    adapter = _make_adapter()
-    assert adapter.supports_mode("rag") is True
-    assert adapter.supports_mode("qa") is True
-    assert adapter.supports_mode("agent") is True
-    assert adapter.supports_mode("comparison") is False
-
-
-@pytest.mark.asyncio
-async def test_available_metrics_rag():
-    """get_available_metrics() includes RAG metric names."""
-    adapter = _make_adapter()
-    metrics = await adapter.get_available_metrics()
-    for rag_metric in ("context_precision", "context_recall", "faithfulness", "answer_relevance"):
-        assert rag_metric in metrics
-    # Original metrics should also be present
-    assert "correctness" in metrics
-    assert "relevance" in metrics
-
-
-@pytest.mark.asyncio
 async def test_evaluate_rag_api_key_and_base():
     """api_key and api_base are forwarded to LiteLLM when set."""
     adapter = _make_adapter(api_key="sk-test-key", api_base="http://localhost:4000")
