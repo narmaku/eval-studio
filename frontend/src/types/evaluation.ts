@@ -52,7 +52,6 @@ export interface EvaluationConfig {
   judge_config: JudgeReference;
   evaluator_id?: string;
   max_turns?: number;
-  scenario_id?: string;
   contestants?: ModelEndpoint[]; // arena mode
   rag_endpoint?: RAGEndpointSettings; // rag mode
   rag_metrics?: string[]; // rag mode
