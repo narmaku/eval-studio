@@ -1,11 +1,13 @@
 """add_fk_constraints_on_evaluation_columns
 
 Adds ForeignKey constraints to Evaluation.dataset_id (RESTRICT) and
-Evaluation.judge_config_id (SET NULL).  Adds ondelete directives to
-existing FKs on results (CASCADE), artifacts (CASCADE), and sessions
-(SET NULL).  Pre-cleans orphaned references before creating constraints.
+Evaluation.judge_config_id (SET NULL).  Pre-cleans orphaned references
+before creating constraints.
 
-SQLite requires batch_alter_table for column modifications.
+The ORM models also declare ondelete on Result/Artifact/Session FKs, but
+those are not migrated here — SQLite batch mode cannot reliably target
+individual FKs on multi-FK tables.  The app-level delete handles cleanup
+explicitly, and DATA-006 (migration squash) will rebuild all FKs.
 
 Revision ID: 9d2fc61ed930
 Revises: b4de93af30b7
@@ -62,38 +64,8 @@ def upgrade() -> None:
             "fk_evaluations_judge_config_id", "judge_configs", ["judge_config_id"], ["id"], ondelete="SET NULL"
         )
 
-    with op.batch_alter_table("results") as batch_op:
-        batch_op.drop_constraint(None, type_="foreignkey")
-        batch_op.create_foreign_key(
-            "fk_results_evaluation_id", "evaluations", ["evaluation_id"], ["id"], ondelete="CASCADE"
-        )
-
-    with op.batch_alter_table("artifacts") as batch_op:
-        batch_op.drop_constraint(None, type_="foreignkey")
-        batch_op.create_foreign_key(
-            "fk_artifacts_evaluation_id", "evaluations", ["evaluation_id"], ["id"], ondelete="CASCADE"
-        )
-
-    with op.batch_alter_table("sessions") as batch_op:
-        batch_op.drop_constraint(None, type_="foreignkey")
-        batch_op.create_foreign_key(
-            "fk_sessions_evaluation_id", "evaluations", ["evaluation_id"], ["id"], ondelete="SET NULL"
-        )
-
 
 def downgrade() -> None:
-    with op.batch_alter_table("sessions") as batch_op:
-        batch_op.drop_constraint("fk_sessions_evaluation_id", type_="foreignkey")
-        batch_op.create_foreign_key(None, "evaluations", ["evaluation_id"], ["id"])
-
-    with op.batch_alter_table("artifacts") as batch_op:
-        batch_op.drop_constraint("fk_artifacts_evaluation_id", type_="foreignkey")
-        batch_op.create_foreign_key(None, "evaluations", ["evaluation_id"], ["id"])
-
-    with op.batch_alter_table("results") as batch_op:
-        batch_op.drop_constraint("fk_results_evaluation_id", type_="foreignkey")
-        batch_op.create_foreign_key(None, "evaluations", ["evaluation_id"], ["id"])
-
     with op.batch_alter_table("evaluations") as batch_op:
         batch_op.drop_constraint("fk_evaluations_judge_config_id", type_="foreignkey")
         batch_op.drop_constraint("fk_evaluations_dataset_id", type_="foreignkey")
