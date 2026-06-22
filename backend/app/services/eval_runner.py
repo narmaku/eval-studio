@@ -24,6 +24,7 @@ from app.core.rate_limiter import AsyncRateLimiter
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
+from app.models.rubric import Rubric
 from app.rag_backends.factory import create_rag_adapter
 from app.schemas.evaluation import EvaluationStatus
 from app.services.artifact_generation import generate_evaluation_artifacts
@@ -120,7 +121,7 @@ async def run_evaluation(evaluation_id: str, db: AsyncSession) -> None:
             await _fail(evaluation, db, f"Dataset '{evaluation.dataset_id}' not found")
             return
 
-        # 5. Load judge config
+        # 5. Load judge config + rubric
         config = evaluation.config or {}
         judge_config = None
         if evaluation.judge_config_id:
@@ -130,7 +131,12 @@ async def run_evaluation(evaluation_id: str, db: AsyncSession) -> None:
                 await _fail(evaluation, db, "Judge configuration not found")
                 return
 
-        judge_params = to_judge_params(judge_config)
+        rubric = None
+        if evaluation.rubric_id:
+            rubric_result = await db.execute(select(Rubric).where(Rubric.id == evaluation.rubric_id))
+            rubric = rubric_result.scalar_one_or_none()
+
+        judge_params = to_judge_params(judge_config, rubric)
 
         # 6. Mode-specific preparation
         try:

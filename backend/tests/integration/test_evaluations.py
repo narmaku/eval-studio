@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.models.dataset import Dataset, DatasetItem
 from app.models.evaluation import Evaluation, JudgeConfig
 from app.models.result import Result
+from app.models.rubric import Rubric
 
 
 @pytest.mark.asyncio
@@ -316,3 +317,66 @@ async def test_datetime_columns_are_timezone_aware(client, db_session):
 
     created_str = resp.json()["created_at"]
     assert "+" in created_str or created_str.endswith("Z")
+
+
+@pytest.mark.asyncio
+async def test_create_evaluation_with_rubric_id(client, db_session):
+    """POST /evaluations with rubric_id stores and returns rubric_id."""
+    rubric = Rubric(
+        name="Test Rubric",
+        dimensions=[
+            {"name": "accuracy", "weight": 2.0, "description": "Factual accuracy"},
+            {"name": "clarity", "weight": 1.0, "description": "Clarity"},
+        ],
+        pass_threshold=0.8,
+        aggregation="weighted_average",
+    )
+    db_session.add(rubric)
+    await db_session.commit()
+
+    resp = await client.post(
+        "/api/v1/evaluations",
+        json={"name": "Rubric Eval", "mode": "qa", "rubric_id": rubric.id},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["rubric_id"] == rubric.id
+
+    # Verify stored in DB
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == data["id"]))
+    evaluation = result.scalar_one()
+    assert evaluation.rubric_id == rubric.id
+
+
+@pytest.mark.asyncio
+async def test_create_evaluation_with_invalid_rubric_id_returns_404(client):
+    """POST /evaluations with nonexistent rubric_id returns 404."""
+    resp = await client.post(
+        "/api/v1/evaluations",
+        json={"name": "Bad Rubric", "mode": "qa", "rubric_id": "nonexistent-id"},
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_rubric_nullifies_evaluation_fk(client, db_session):
+    """Deleting a rubric sets evaluation.rubric_id to NULL."""
+    rubric = Rubric(
+        name="Deletable Rubric",
+        dimensions=[{"name": "x", "weight": 1, "description": "test"}],
+    )
+    db_session.add(rubric)
+    await db_session.commit()
+
+    resp = await client.post(
+        "/api/v1/evaluations",
+        json={"name": "Rubric FK Test", "mode": "qa", "rubric_id": rubric.id},
+    )
+    eval_id = resp.json()["id"]
+
+    await db_session.delete(rubric)
+    await db_session.commit()
+
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
+    evaluation = result.scalar_one()
+    assert evaluation.rubric_id is None

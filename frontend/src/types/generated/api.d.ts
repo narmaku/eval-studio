@@ -1575,6 +1575,11 @@ export interface components {
        */
       judge_config_id?: string | null;
       /**
+       * Rubric Id
+       * @description ID of the rubric to use for dimension-based scoring.
+       */
+      rubric_id?: string | null;
+      /**
        * Config
        * @description Mode-specific configuration.
        * @default {}
@@ -1622,6 +1627,11 @@ export interface components {
        * @description ID of the judge configuration used for scoring.
        */
       judge_config_id: string | null;
+      /**
+       * Rubric Id
+       * @description ID of the rubric used for dimension-based scoring.
+       */
+      rubric_id?: string | null;
       /**
        * Config
        * @description Mode-specific configuration.

@@ -68,6 +68,7 @@ export default function QAEvaluation() {
       name: `Q&A Eval - ${modelEndpoint.name}`,
       mode: 'qa',
       dataset_id: selectedDatasetId,
+      rubric_id: judgeConfig.rubric_id,
       config: {
         model_endpoint: modelEndpoint,
         judge_config: judgeConfig,

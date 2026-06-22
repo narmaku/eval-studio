@@ -59,6 +59,7 @@ export default function ArenaComparison() {
       name: `Arena - ${validContestants.map((c) => c.name).join(' vs ')}`,
       mode: 'arena',
       dataset_id: selectedDatasetId,
+      rubric_id: judgeConfig.rubric_id,
       config: {
         model_endpoint: primaryEndpoint,
         judge_config: judgeConfig,

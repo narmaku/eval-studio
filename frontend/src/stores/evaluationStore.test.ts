@@ -130,6 +130,7 @@ describe('evaluationStore', () => {
           status: 'completed' as const,
           dataset_id: 'd1',
           judge_config_id: 'j1',
+          rubric_id: null,
           config: {
             model_endpoint: { name: 'test', default_model: 'gpt-4' },
             judge_config: { preset: 'default' },
@@ -240,6 +241,7 @@ describe('evaluationStore', () => {
           status: 'running',
           dataset_id: 'd1',
           judge_config_id: null,
+          rubric_id: null,
           config: {
             model_endpoint: { name: 'test', default_model: 'gpt-4' },
             judge_config: { preset: 'default' },
@@ -274,6 +276,7 @@ describe('evaluationStore', () => {
           status: 'running',
           dataset_id: 'd1',
           judge_config_id: null,
+          rubric_id: null,
           config: {
             model_endpoint: { name: 'test', default_model: 'gpt-4' },
             judge_config: { preset: 'default' },
@@ -376,6 +379,7 @@ describe('evaluationStore', () => {
         dataset_id: 'd1',
 
         judge_config_id: null,
+        rubric_id: null,
         config: {
           model_endpoint: { name: 'test', default_model: 'gpt-4' },
           judge_config: { preset: 'default' },
