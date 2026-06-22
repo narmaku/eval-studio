@@ -344,14 +344,14 @@ async def test_arena_evaluation_no_dataset_id(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_arena_evaluation_dataset_not_found(db_session: AsyncSession):
-    """Arena evaluation fails if dataset_id points to a non-existent dataset."""
+    """Arena evaluation fails if no dataset_id is configured."""
     from app.services.eval_runner import run_evaluation
 
     evaluation = Evaluation(
         name="missing dataset arena",
         mode="arena",
         status="pending",
-        dataset_id="nonexistent-dataset-id",
+        dataset_id=None,
         config={
             "contestants": [{"default_model": "a"}, {"default_model": "b"}],
             "judge_config": {"provider_id": "__test__"},

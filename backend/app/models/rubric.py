@@ -2,10 +2,10 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, String, Text
+from sqlalchemy import JSON, Float, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.core.database import Base, TZDateTime
 from app.core.database import utcnow as _utcnow
 
 
@@ -18,4 +18,4 @@ class Rubric(Base):
     pass_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
     aggregation: Mapped[str] = mapped_column(String(50), nullable=False, default="weighted_average")
     prompt_template: Mapped[str | None] = mapped_column(Text, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TZDateTime, default=_utcnow, onupdate=_utcnow)

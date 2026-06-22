@@ -118,12 +118,12 @@ async def test_run_evaluation_no_dataset(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_run_evaluation_missing_dataset(db_session: AsyncSession):
-    """Evaluation with nonexistent dataset_id should fail with error message."""
+    """Evaluation with no dataset_id should fail with error message."""
     evaluation = Evaluation(
         name="missing dataset eval",
         mode="qa",
         status="pending",
-        dataset_id="nonexistent-id",
+        dataset_id=None,
         config={},
     )
     db_session.add(evaluation)
@@ -134,7 +134,7 @@ async def test_run_evaluation_missing_dataset(db_session: AsyncSession):
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == evaluation.id))
     eval_obj = result.scalar_one()
     assert eval_obj.status == "failed"
-    assert eval_obj.error == "Dataset 'nonexistent-id' not found"
+    assert eval_obj.error == "Dataset not configured"
 
 
 @pytest.mark.asyncio

@@ -4,7 +4,7 @@ import time
 
 import structlog
 from fastapi import APIRouter, Depends, Query, Request, Response
-from sqlalchemy import case, delete, func, select
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.factory import create_evaluation_adapter
@@ -16,6 +16,7 @@ from app.models.artifact import Artifact
 from app.models.dataset import Dataset
 from app.models.evaluation import Evaluation
 from app.models.result import Result
+from app.models.session import Session
 from app.schemas.common import PaginatedResponse
 from app.schemas.evaluation import (
     EvaluationCreate,
@@ -306,6 +307,8 @@ async def delete_evaluation(evaluation_id: str, db: AsyncSession = Depends(get_d
         raise ConflictException("Cannot delete a running evaluation.")
 
     await _cleanup_artifacts(evaluation_id, db)
+    await db.execute(delete(Result).where(Result.evaluation_id == evaluation_id))
+    await db.execute(update(Session).where(Session.evaluation_id == evaluation_id).values(evaluation_id=None))
     await db.delete(evaluation)
     await db.commit()
     logger.info("evaluation.deleted", id=evaluation_id)

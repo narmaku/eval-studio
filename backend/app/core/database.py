@@ -2,7 +2,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, String, event
+from sqlalchemy import DateTime, String, TypeDecorator, event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -24,6 +24,27 @@ if settings.database_url.startswith("sqlite"):
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+class TZDateTime(TypeDecorator):
+    """DateTime that guarantees timezone-aware UTC values on round-trip.
+
+    SQLite stores datetimes as naive ISO strings.  This decorator re-attaches
+    UTC on read so the rest of the application always works with aware values.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value
+
+
 def utcnow() -> datetime:
     return datetime.now(UTC)
 
@@ -39,7 +60,7 @@ class Base(DeclarativeBase):
     """Base class for all ORM models."""
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=_utcnow)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
