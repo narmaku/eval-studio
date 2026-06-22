@@ -76,7 +76,6 @@ async def list_judges(
 async def get_judge_presets() -> list[JudgeConfigResponse]:
     """Get available judge presets.
 
-    Returns all provider profiles as JudgeConfigResponse for backward compat.
     Any provider can be used as a judge — the role is decided at evaluation config time.
     """
     from app.core.providers import provider_registry
