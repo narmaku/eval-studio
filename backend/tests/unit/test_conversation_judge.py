@@ -258,27 +258,6 @@ async def test_evaluate_conversation_none_content():
 
 
 @pytest.mark.asyncio
-async def test_supports_mode_agent():
-    """Adapter supports 'agent' mode after implementation."""
-    adapter = _make_adapter()
-    assert adapter.supports_mode("agent") is True
-    assert adapter.supports_mode("qa") is True
-    assert adapter.supports_mode("rag") is True
-
-
-@pytest.mark.asyncio
-async def test_available_metrics_includes_conversation():
-    """get_available_metrics() includes conversation dimension names."""
-    adapter = _make_adapter()
-    metrics = await adapter.get_available_metrics()
-    assert "correctness" in metrics
-    assert "relevance" in metrics
-    assert "tool_use_accuracy" in metrics
-    assert "resolution" in metrics
-    assert "response_quality" in metrics
-
-
-@pytest.mark.asyncio
 async def test_evaluate_conversation_custom_threshold():
     """Custom pass_threshold from judge_config is applied."""
     adapter = _make_adapter()

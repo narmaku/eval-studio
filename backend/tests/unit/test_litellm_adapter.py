@@ -129,14 +129,6 @@ async def test_litellm_adapter_evaluate_qa_none_content():
 
 
 @pytest.mark.asyncio
-async def test_litellm_adapter_supports_mode():
-    adapter = LiteLLMJudgeAdapter()
-    assert adapter.supports_mode("qa") is True
-    assert adapter.supports_mode("agent") is True
-    assert adapter.supports_mode("rag") is True
-
-
-@pytest.mark.asyncio
 async def test_extra_params_do_not_override_explicit_kwargs():
     """extra_params must not clobber model/temperature/response_format."""
     adapter = LiteLLMJudgeAdapter(

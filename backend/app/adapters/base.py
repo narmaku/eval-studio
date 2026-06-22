@@ -57,14 +57,6 @@ class EvaluationAdapter(ABC):
         self._semaphore = asyncio.Semaphore(max_concurrency)
 
     @classmethod
-    def get_default_config(cls) -> dict[str, Any]:
-        """Return default configuration values for this adapter.
-
-        Subclasses should override to provide adapter-specific defaults.
-        """
-        return {}
-
-    @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
         """Return a JSON Schema describing configurable fields for this adapter.
 
@@ -104,14 +96,4 @@ class EvaluationAdapter(ABC):
         judge_config: JudgeConfigParams | None = None,
     ) -> dict[str, Score]:
         """Score a RAG response with retrieved context."""
-        ...
-
-    @abstractmethod
-    def supports_mode(self, mode: str) -> bool:
-        """Check if this adapter supports a given evaluation mode."""
-        ...
-
-    @abstractmethod
-    async def get_available_metrics(self) -> list[str]:
-        """List metrics this adapter can compute."""
         ...
