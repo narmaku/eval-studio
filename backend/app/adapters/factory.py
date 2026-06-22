@@ -12,15 +12,13 @@ if TYPE_CHECKING:
 
 
 def create_evaluation_adapter(
-    adapter_type: str = "litellm",
+    adapter_type: str = "litellm-judge",
     **kwargs,
 ) -> EvaluationAdapter:
-    """Create an evaluation adapter by type.
+    """Create an evaluation adapter by type via the evaluator registry.
 
     Args:
-        adapter_type: The type of adapter to create. Built-in types
-            (e.g. "litellm") are resolved directly; other IDs fall
-            through to the evaluator registry.
+        adapter_type: Evaluator ID as registered in evaluators.yaml.
         **kwargs: Passed to the adapter constructor (model, api_key, api_base, etc.).
 
     Returns:
@@ -29,12 +27,6 @@ def create_evaluation_adapter(
     Raises:
         ValueError: If the adapter_type is unknown.
     """
-    if adapter_type == "litellm":
-        from app.adapters.litellm_judge import LiteLLMJudgeAdapter
-
-        return LiteLLMJudgeAdapter(**kwargs)
-
-    # Try registry lookup
     evaluator = evaluator_registry.get_evaluator(adapter_type)
     if evaluator is not None:
         return evaluator_registry.create_adapter(adapter_type, **kwargs)
@@ -49,7 +41,7 @@ def create_adapter_from_config(
 ) -> EvaluationAdapter:
     """Build an evaluation adapter from an evaluation's config and resolved judge.
 
-    Extracts ``evaluator_id`` from *config* (defaulting to ``"litellm"``),
+    Extracts ``evaluator_id`` from *config* (defaulting to ``"litellm-judge"``),
     forwards judge credentials and concurrency settings, and delegates to
     :func:`create_evaluation_adapter`.
 
@@ -57,7 +49,7 @@ def create_adapter_from_config(
         ValueError: If the evaluator_id is unknown or unavailable.
     """
     return create_evaluation_adapter(
-        config.get("evaluator_id", "litellm"),
+        config.get("evaluator_id", "litellm-judge"),
         model=judge_resolved.model,
         api_key=judge_resolved.api_key,
         api_base=judge_resolved.api_base,

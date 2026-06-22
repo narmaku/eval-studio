@@ -1,6 +1,7 @@
 from contextlib import ExitStack
 
 import pytest
+import yaml
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -90,5 +91,23 @@ def _isolate_yaml_registries(tmp_path):
             default_model="test-judge-model",
         )
         provider_registry._persist_yaml()
+
+        evaluator_yaml = tmp_path / "evaluators.yaml"
+        evaluator_yaml.write_text(
+            yaml.dump(
+                {
+                    "evaluators": [
+                        {
+                            "id": "litellm-judge",
+                            "name": "LLM-as-Judge",
+                            "adapter_class": "app.adapters.litellm_judge.LiteLLMJudgeAdapter",
+                            "modes": ["qa", "agent", "rag"],
+                            "builtin": True,
+                        }
+                    ]
+                }
+            )
+        )
+        evaluator_registry.load_from_yaml(evaluator_yaml)
 
         yield

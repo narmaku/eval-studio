@@ -172,7 +172,7 @@ async def test_resolve_from_provider_with_mtls():
 
 
 @pytest.mark.asyncio
-async def test_resolve_ssl_cert_path_only_backward_compat():
+async def test_resolve_ssl_cert_path_only():
     """Provider with only ssl_cert_path (no key) resolves with ssl_client_key=None."""
     reg = ProviderRegistry()
     reg._items["ca-only"] = ProviderProfile(
