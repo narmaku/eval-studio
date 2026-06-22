@@ -9,8 +9,6 @@ import type {
 import { api, getWsAuthParam } from '@/services/api';
 
 const MAX_LOGS = 500;
-
-const POLL_INTERVAL_MS = 2000;
 const RUNNING_EVAL_KEY = 'runningEvaluation';
 
 interface EvaluationProgress {
@@ -38,8 +36,6 @@ interface EvaluationStore {
 
   fetchEvaluations: (params?: { mode?: string; status?: string }) => Promise<void>;
   createAndRunEvaluation: (request: CreateEvaluationRequest) => Promise<Evaluation>;
-  pollEvaluation: (id: string, onComplete: () => void) => () => void;
-
   // WebSocket-based methods
   connectToEvaluation: (evaluationId: string) => void;
   disconnectFromEvaluation: () => void;
@@ -120,28 +116,6 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
       set({ error: message, isLoading: false });
       throw err;
     }
-  },
-
-  pollEvaluation: (id: string, onComplete: () => void) => {
-    const intervalId = setInterval(async () => {
-      try {
-        const evaluation = await api.getEvaluation(id);
-        set({ currentEvaluation: evaluation });
-        if (
-          evaluation.status === 'completed' ||
-          evaluation.status === 'failed' ||
-          evaluation.status === 'cancelled'
-        ) {
-          clearInterval(intervalId);
-          get().clearRunningEvaluation();
-          onComplete();
-        }
-      } catch {
-        // Silently ignore polling errors
-      }
-    }, POLL_INTERVAL_MS);
-
-    return () => clearInterval(intervalId);
   },
 
   connectToEvaluation: (evaluationId: string) => {

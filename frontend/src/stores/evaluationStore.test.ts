@@ -374,7 +374,7 @@ describe('evaluationStore', () => {
         mode: 'qa' as const,
         status: 'pending' as const,
         dataset_id: 'd1',
-        environment_id: null,
+
         judge_config_id: null,
         config: {
           model_endpoint: { name: 'test', default_model: 'gpt-4' },
@@ -510,43 +510,6 @@ describe('evaluationStore', () => {
 
       const result = useEvaluationStore.getState().getRunningEvaluation();
       expect(result).toBeNull();
-    });
-  });
-
-  describe('pollEvaluation (backward compat)', () => {
-    it('still works as a fallback polling mechanism', async () => {
-      vi.useFakeTimers();
-
-      const mockEvaluation = {
-        id: 'e1',
-        name: 'Test',
-        mode: 'qa' as const,
-        status: 'completed' as const,
-        dataset_id: 'd1',
-        environment_id: null,
-        judge_config_id: null,
-        config: {
-          model_endpoint: { name: 'test', default_model: 'gpt-4' },
-          judge_config: { preset: 'default' },
-        },
-        result_count: 5,
-        average_score: null,
-        pass_rate: null,
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T01:00:00Z',
-      };
-      mockedApi.getEvaluation.mockResolvedValue(mockEvaluation);
-
-      const onComplete = vi.fn();
-      const cleanup = useEvaluationStore.getState().pollEvaluation('e1', onComplete);
-
-      // Advance past the poll interval
-      await vi.advanceTimersByTimeAsync(2100);
-
-      expect(mockedApi.getEvaluation).toHaveBeenCalled();
-
-      cleanup();
-      vi.useRealTimers();
     });
   });
 });

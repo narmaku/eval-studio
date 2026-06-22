@@ -78,8 +78,6 @@ export interface CreateSessionRequest {
   judge_config?: {
     provider_id?: string;
   };
-  environment_id?: string;
-  scenario_id?: string;
 }
 
 export interface SendMessageRequest {

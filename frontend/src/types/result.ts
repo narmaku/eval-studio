@@ -80,10 +80,3 @@ export interface ComparisonResponse {
   item_comparisons: CrossEvaluationItemComparison[];
   reference_evaluation_id: string | null;
 }
-
-/** @deprecated Use ComparisonResponse instead */
-export interface ResultComparison {
-  evaluation_ids: string[];
-  results: Result[];
-  comparison_metrics: Record<string, number[]>;
-}
