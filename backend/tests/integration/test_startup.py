@@ -108,7 +108,6 @@ async def test_fresh_db_tables_created_by_migration():
                         "results",
                         "sessions",
                         "artifacts",
-                        "judge_configs",
                         "rubrics",
                         "api_keys",
                     }

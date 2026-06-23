@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TZDateTime
@@ -18,9 +18,6 @@ class Evaluation(Base):
     dataset_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("datasets.id", ondelete="RESTRICT"), nullable=True
     )
-    judge_config_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("judge_configs.id", ondelete="SET NULL"), nullable=True
-    )
     rubric_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("rubrics.id", ondelete="SET NULL"), nullable=True
     )
@@ -35,20 +32,6 @@ class Evaluation(Base):
     artifacts: Mapped[list["Artifact"]] = relationship(
         "Artifact", back_populates="evaluation", cascade="all, delete-orphan", passive_deletes=True, lazy="raise"
     )
-
-
-class JudgeConfig(Base):
-    __tablename__ = "judge_configs"
-
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    preset: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    model: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    temperature: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    prompt_template: Mapped[str | None] = mapped_column(Text, nullable=True)
-    pass_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
-    dimensions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    aggregation: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(TZDateTime, default=_utcnow, onupdate=_utcnow)
 
 
 # Avoid circular import: import at module level after class definitions

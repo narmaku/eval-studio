@@ -63,7 +63,6 @@ async def _create_validated_evaluation(payload: EvaluationCreate | RunRequest, d
         mode=payload.mode.value,
         status=EvaluationStatus.PENDING,
         dataset_id=payload.dataset_id,
-        judge_config_id=payload.judge_config_id,
         rubric_id=rubric_id,
         config=payload.config,
     )

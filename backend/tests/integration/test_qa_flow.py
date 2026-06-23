@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.providers import ProviderProfile, provider_registry
+
 
 def _make_mock_call_model():
     """Return a mock that simulates call_model() returning plain text."""
@@ -41,6 +43,17 @@ def mock_bg_session_factory(async_engine):
     return ctx
 
 
+@pytest.fixture(autouse=True)
+def _register_test_judge_provider():
+    provider_registry._items["__test__"] = ProviderProfile(
+        id="__test__",
+        name="Test Judge",
+        default_model="test-judge-model",
+    )
+    yield
+    provider_registry._items.pop("__test__", None)
+
+
 @pytest.mark.asyncio
 async def test_full_qa_evaluation_flow(client, mock_bg_session_factory):
     """End-to-end Q&A evaluation through HTTP endpoints."""
@@ -57,23 +70,15 @@ async def test_full_qa_evaluation_flow(client, mock_bg_session_factory):
     assert dataset_resp.status_code == 201
     dataset_id = dataset_resp.json()["id"]
 
-    # 2. Create judge config
-    judge_payload = {
-        "name": "Test Judge",
-        "model": "test-model",
-        "pass_threshold": 0.7,
-    }
-    judge_resp = await client.post("/api/v1/judges", json=judge_payload)
-    assert judge_resp.status_code == 201
-    judge_id = judge_resp.json()["id"]
-
-    # 3. Create evaluation
+    # 2. Create evaluation
     eval_payload = {
         "name": "Flow Test Eval",
         "mode": "qa",
         "dataset_id": dataset_id,
-        "judge_config_id": judge_id,
-        "config": {"model": "test-model"},
+        "config": {
+            "model_endpoint": {"default_model": "test-model"},
+            "judge_config": {"provider_id": "__test__"},
+        },
     }
     eval_resp = await client.post("/api/v1/evaluations", json=eval_payload)
     assert eval_resp.status_code == 201

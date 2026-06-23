@@ -16,8 +16,6 @@ import type {
   Session,
   CreateSessionRequest,
   SendMessageRequest,
-  Judge,
-  CreateJudgeRequest,
   Provider,
   CreateProviderRequest,
   UpdateProviderRequest,
@@ -186,13 +184,6 @@ export const api = {
   importDataset: (data: ImportRequest) =>
     request<Dataset>('/api/v1/datasets/import', { method: 'POST', body: JSON.stringify(data) }),
 
-  // --- Judges ---
-  listJudges: () => request<Judge[]>('/api/v1/judges'),
-  getJudge: (id: string) => request<Judge>(`/api/v1/judges/${id}`),
-  createJudge: (data: CreateJudgeRequest) =>
-    request<Judge>('/api/v1/judges', { method: 'POST', body: JSON.stringify(data) }),
-  updateJudge: (id: string, data: Partial<CreateJudgeRequest>) =>
-    request<Judge>(`/api/v1/judges/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   // --- Results ---
   listResults: (params?: { evaluation_id?: string; page?: number; page_size?: number }) => {
     const query = new URLSearchParams();

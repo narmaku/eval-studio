@@ -28,7 +28,6 @@ class EvaluationCreate(BaseModel):
     name: str = Field(description="Human-readable evaluation name.")
     mode: EvaluationMode = Field(description="Evaluation mode: qa, rag, agent, or arena.")
     dataset_id: str | None = Field(default=None, description="ID of the dataset to evaluate against.")
-    judge_config_id: str | None = Field(default=None, description="ID of the judge configuration for scoring.")
     rubric_id: str | None = Field(default=None, description="ID of the rubric to use for dimension-based scoring.")
     config: dict[str, Any] = Field(default={}, description="Mode-specific configuration.")
 
@@ -42,7 +41,6 @@ class EvaluationResponse(BaseModel):
     status: EvaluationStatus = Field(description="Current evaluation status.")
     error: str | None = Field(default=None, description="Error message if the evaluation failed.")
     dataset_id: str | None = Field(description="ID of the dataset being evaluated.")
-    judge_config_id: str | None = Field(description="ID of the judge configuration used for scoring.")
     rubric_id: str | None = Field(default=None, description="ID of the rubric used for dimension-based scoring.")
     config: dict[str, Any] = Field(description="Mode-specific configuration.")
     result_count: int | None = Field(default=None, description="Number of results (populated on detail endpoint).")
