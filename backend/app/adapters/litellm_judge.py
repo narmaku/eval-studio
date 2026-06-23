@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 import litellm
@@ -174,15 +175,37 @@ Respond with ONLY a JSON object:
         self.ssl_cert_path = ssl_cert_path
         self.ssl_client_key = ssl_client_key
 
+    _CODE_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*\n?(.*?)\n?\s*```\s*$", re.DOTALL)
+
+    @staticmethod
+    def _parse_json_lenient(content: str) -> dict | None:
+        """Parse JSON from LLM output, stripping markdown code fences if present."""
+        content = content.strip()
+        try:
+            return json.loads(content)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        m = LiteLLMJudgeAdapter._CODE_FENCE_RE.match(content)
+        if m:
+            try:
+                return json.loads(m.group(1).strip())
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        return None
+
     async def _ask_judge(
         self,
         prompt: str,
         judge_config: JudgeConfigParams | None,
         mode: str,
+        retries: int = 1,
     ) -> dict | None:
         """Build kwargs, call litellm, parse JSON response.
 
-        Returns the parsed dict, or None on empty/unparseable content.
+        Retries once on parse failure. Strips markdown code fences before
+        parsing. Returns the parsed dict, or None on persistent failure.
         """
         model = (judge_config.model if judge_config else None) or self.model
         temperature = judge_config.temperature if judge_config and judge_config.temperature is not None else 0.0
@@ -211,18 +234,29 @@ Respond with ONLY a JSON object:
         if client is not None:
             kwargs["client"] = client
 
-        response = await litellm.acompletion(**kwargs)
+        for attempt in range(1 + retries):
+            try:
+                response = await litellm.acompletion(**kwargs)
+            except Exception as exc:
+                logger.warning("judge.api_error", error=str(exc), mode=mode, attempt=attempt + 1)
+                if attempt < retries:
+                    continue
+                return None
 
-        content = response.choices[0].message.content
-        if content is None:
-            logger.warning("judge.empty_response", mode=mode)
-            return None
+            content = response.choices[0].message.content
+            if content is None:
+                logger.warning("judge.empty_response", mode=mode, attempt=attempt + 1)
+                if attempt < retries:
+                    continue
+                return None
 
-        try:
-            return json.loads(content)
-        except (json.JSONDecodeError, TypeError) as exc:
-            logger.error("judge.parse_failed", error=str(exc), raw_content=content)
-            return None
+            parsed = self._parse_json_lenient(content)
+            if parsed is not None:
+                return parsed
+
+            logger.warning("judge.parse_failed", raw_content=content[:500], mode=mode, attempt=attempt + 1)
+
+        return None
 
     @staticmethod
     def _build_dimensions_prompt(dimensions: list[dict]) -> tuple[str, list[str]]:

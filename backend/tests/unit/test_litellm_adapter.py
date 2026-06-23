@@ -334,3 +334,79 @@ class TestBuildDimensionsPrompt:
         section, _schema, names = LiteLLMJudgeAdapter._build_dimensions_prompt(dims)
         assert "**overall**" in section
         assert names == ["overall"]
+
+
+class TestParseJsonLenient:
+    """Tests for _parse_json_lenient markdown fence stripping."""
+
+    def test_plain_json(self):
+        result = LiteLLMJudgeAdapter._parse_json_lenient('{"score": 0.8}')
+        assert result == {"score": 0.8}
+
+    def test_markdown_fenced_json(self):
+        content = '```json\n{"score": 0.8, "reasoning": "good"}\n```'
+        result = LiteLLMJudgeAdapter._parse_json_lenient(content)
+        assert result == {"score": 0.8, "reasoning": "good"}
+
+    def test_markdown_fenced_no_lang(self):
+        content = '```\n{"score": 0.5}\n```'
+        result = LiteLLMJudgeAdapter._parse_json_lenient(content)
+        assert result == {"score": 0.5}
+
+    def test_invalid_content(self):
+        assert LiteLLMJudgeAdapter._parse_json_lenient("not json at all") is None
+
+
+class TestAskJudgeRetry:
+    """Tests for _ask_judge retry + error handling."""
+
+    @pytest.mark.asyncio
+    async def test_retries_on_parse_failure(self):
+        adapter = LiteLLMJudgeAdapter(model="test-model")
+        judge_config = JudgeConfigParams(model="test-model", pass_threshold=0.7)
+
+        bad_response = MagicMock()
+        bad_response.choices = [MagicMock()]
+        bad_response.choices[0].message.content = "not json"
+
+        good_response = MagicMock()
+        good_response.choices = [MagicMock()]
+        good_response.choices[0].message.content = '{"score": 0.9, "reasoning": "ok"}'
+
+        with patch(
+            "app.adapters.litellm_judge.litellm.acompletion",
+            new_callable=AsyncMock,
+            side_effect=[bad_response, good_response],
+        ):
+            result = await adapter._ask_judge("test prompt", judge_config, "qa")
+            assert result == {"score": 0.9, "reasoning": "ok"}
+
+    @pytest.mark.asyncio
+    async def test_retries_on_api_error(self):
+        adapter = LiteLLMJudgeAdapter(model="test-model")
+        judge_config = JudgeConfigParams(model="test-model", pass_threshold=0.7)
+
+        good_response = MagicMock()
+        good_response.choices = [MagicMock()]
+        good_response.choices[0].message.content = '{"score": 0.7}'
+
+        with patch(
+            "app.adapters.litellm_judge.litellm.acompletion",
+            new_callable=AsyncMock,
+            side_effect=[Exception("rate limited"), good_response],
+        ):
+            result = await adapter._ask_judge("test prompt", judge_config, "qa")
+            assert result == {"score": 0.7}
+
+    @pytest.mark.asyncio
+    async def test_returns_none_after_exhausting_retries(self):
+        adapter = LiteLLMJudgeAdapter(model="test-model")
+        judge_config = JudgeConfigParams(model="test-model", pass_threshold=0.7)
+
+        with patch(
+            "app.adapters.litellm_judge.litellm.acompletion",
+            new_callable=AsyncMock,
+            side_effect=Exception("persistent error"),
+        ):
+            result = await adapter._ask_judge("test prompt", judge_config, "qa")
+            assert result is None
