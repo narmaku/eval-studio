@@ -201,7 +201,7 @@ async def _generate_config_json(evaluation: Evaluation, db: AsyncSession, artifa
         "mode": evaluation.mode,
         "status": evaluation.status,
         "dataset_id": evaluation.dataset_id,
-        "judge_config_id": evaluation.judge_config_id,
+        "rubric_id": evaluation.rubric_id,
         "config": redact_config(evaluation.config) if evaluation.config else {},
         "generated_at": datetime.now(UTC).isoformat(),
     }

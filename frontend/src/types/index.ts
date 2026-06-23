@@ -6,7 +6,6 @@ export * from './evaluator';
 export * from './dataset';
 export * from './result';
 export * from './session';
-export * from './judge';
 export * from './provider';
 export * from './rubric';
 export * from './toolServer';

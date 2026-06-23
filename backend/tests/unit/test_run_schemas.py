@@ -17,20 +17,20 @@ class TestRunRequest:
         assert req.dataset_id == "ds-123"
         assert req.pass_threshold == 0.7
         assert req.config == {}
-        assert req.judge_config_id is None
+        assert req.rubric_id is None
 
     def test_create_full(self):
         req = RunRequest(
             name="full test",
             mode=EvaluationMode.RAG,
             dataset_id="ds-456",
-            judge_config_id="jc-1",
+            rubric_id="r-1",
             config={"model": "gpt-4"},
             pass_threshold=0.8,
         )
         assert req.mode == EvaluationMode.RAG
         assert req.pass_threshold == 0.8
-        assert req.judge_config_id == "jc-1"
+        assert req.rubric_id == "r-1"
 
     def test_pass_threshold_above_one_rejected(self):
         """pass_threshold > 1 is rejected by Pydantic validation."""

@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.models.dataset import Dataset, DatasetItem
-from app.models.evaluation import Evaluation, JudgeConfig
+from app.models.evaluation import Evaluation
 from app.models.result import Result
 from app.models.rubric import Rubric
 
@@ -281,27 +281,6 @@ async def test_delete_unreferenced_dataset_succeeds(client, db_session):
 
     resp = await client.delete(f"/api/v1/datasets/{dataset.id}")
     assert resp.status_code == 204
-
-
-@pytest.mark.asyncio
-async def test_delete_judge_config_nullifies_evaluation_fk(client, db_session):
-    """Deleting a judge config sets evaluation.judge_config_id to NULL."""
-    jc = JudgeConfig(name="Test Judge", temperature=0.0, pass_threshold=0.7)
-    db_session.add(jc)
-    await db_session.commit()
-
-    eval_resp = await client.post(
-        "/api/v1/evaluations",
-        json={"name": "Judge FK Test", "mode": "qa", "judge_config_id": jc.id},
-    )
-    eval_id = eval_resp.json()["id"]
-
-    await db_session.delete(jc)
-    await db_session.commit()
-
-    result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
-    evaluation = result.scalar_one()
-    assert evaluation.judge_config_id is None
 
 
 @pytest.mark.asyncio

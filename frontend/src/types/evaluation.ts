@@ -11,7 +11,6 @@ export interface Evaluation {
   status: EvaluationStatus;
   error?: string | null;
   dataset_id: string | null;
-  judge_config_id: string | null;
   rubric_id: string | null;
   config: EvaluationConfig;
   result_count: number | null;
@@ -95,8 +94,6 @@ export interface Provider {
 }
 
 export interface JudgeReference {
-  judge_id?: string;
-  preset?: string;
   provider_id?: string;
   rubric_id?: string;
 }
@@ -105,7 +102,6 @@ export interface CreateEvaluationRequest {
   name: string;
   mode: EvaluationMode;
   dataset_id?: string;
-  judge_config_id?: string;
   rubric_id?: string;
   config: EvaluationConfig;
 }

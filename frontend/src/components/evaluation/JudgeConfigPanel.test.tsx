@@ -10,8 +10,6 @@ vi.mock('@/services/api', () => ({
   api: {
     listProviders: (...args: unknown[]) => mockListProviders(...args),
     listRubrics: (...args: unknown[]) => mockListRubrics(...args),
-    listJudges: vi.fn().mockResolvedValue([]),
-    createJudge: vi.fn(),
   },
 }));
 

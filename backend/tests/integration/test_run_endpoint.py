@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.providers import ProviderProfile, provider_registry
+
 
 @pytest.fixture
 def mock_bg_session_factory(async_engine):
@@ -37,22 +39,22 @@ async def dataset_id(client):
     return resp.json()["id"]
 
 
-@pytest.fixture
-async def judge_config_id(client):
-    """Create a judge config and return its ID."""
-    resp = await client.post(
-        "/api/v1/judges",
-        json={"name": "Test Judge", "model": "test-model", "pass_threshold": 0.7},
+@pytest.fixture(autouse=True)
+def _register_test_judge_provider():
+    provider_registry._items["__test__"] = ProviderProfile(
+        id="__test__",
+        name="Test Judge",
+        default_model="test-judge-model",
     )
-    assert resp.status_code == 201
-    return resp.json()["id"]
+    yield
+    provider_registry._items.pop("__test__", None)
 
 
 # ── Sync run ────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_run_sync_qa(client, dataset_id, judge_config_id, mock_bg_session_factory):
+async def test_run_sync_qa(client, dataset_id, mock_bg_session_factory):
     """POST /evaluations/run with QA mode returns complete RunResponse with results."""
     mock_call = AsyncMock(return_value="Test answer")
     mock_judge = AsyncMock(
@@ -71,8 +73,10 @@ async def test_run_sync_qa(client, dataset_id, judge_config_id, mock_bg_session_
                 "name": "Sync QA Run",
                 "mode": "qa",
                 "dataset_id": dataset_id,
-                "judge_config_id": judge_config_id,
-                "config": {"model": "test-model"},
+                "config": {
+                    "model_endpoint": {"default_model": "test-model"},
+                    "judge_config": {"provider_id": "__test__"},
+                },
                 "pass_threshold": 0.7,
             },
         )
@@ -149,7 +153,7 @@ async def test_run_timeout_capped(client, dataset_id):
 
 
 @pytest.mark.asyncio
-async def test_run_plain_text_response(client, dataset_id, judge_config_id, mock_bg_session_factory):
+async def test_run_plain_text_response(client, dataset_id, mock_bg_session_factory):
     """Accept: text/plain returns 'score\\nVERDICT' format."""
     mock_call = AsyncMock(return_value="Test answer")
     mock_judge = AsyncMock(
@@ -168,8 +172,10 @@ async def test_run_plain_text_response(client, dataset_id, judge_config_id, mock
                 "name": "Plain Text Run",
                 "mode": "qa",
                 "dataset_id": dataset_id,
-                "judge_config_id": judge_config_id,
-                "config": {"model": "test-model"},
+                "config": {
+                    "model_endpoint": {"default_model": "test-model"},
+                    "judge_config": {"provider_id": "__test__"},
+                },
                 "pass_threshold": 0.7,
             },
             headers={"Accept": "text/plain"},

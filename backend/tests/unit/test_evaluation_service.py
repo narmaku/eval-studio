@@ -139,9 +139,9 @@ async def test_run_evaluation_missing_dataset(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_run_evaluation_default_judge_config(db_session: AsyncSession, evaluation_with_dataset):
-    """Evaluation without judge_config_id uses default JudgeConfigParams."""
+    """Evaluation without rubric uses default JudgeConfigParams."""
     evaluation, _dataset, _items = evaluation_with_dataset
-    evaluation.judge_config_id = None
+    evaluation.rubric_id = None
     await db_session.commit()
 
     mock_call_model = AsyncMock(return_value="This is the model's answer.")

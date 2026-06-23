@@ -131,11 +131,11 @@ def resolve_judge_config(
 ) -> ResolvedModel:
     """Resolve judge model config from evaluation config.
 
-    Resolution order: provider profile > JudgeConfig model > settings fallback.
+    Resolution order: provider profile > judge params > settings fallback.
 
     Args:
         config: The evaluation config dict (may contain ``judge_config.provider_id``).
-        judge_params: JudgeConfigParams from the ORM JudgeConfig.
+        judge_params: JudgeConfigParams from the rubric or defaults.
 
     Returns:
         ResolvedModel with the resolved judge model values.

@@ -622,54 +622,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/judges': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * List Judges
-     * @description List judge configurations with pagination and optional name filter.
-     */
-    get: operations['list_judges_api_v1_judges_get'];
-    put?: never;
-    /**
-     * Create Judge
-     * @description Create a new judge configuration.
-     */
-    post: operations['create_judge_api_v1_judges_post'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/judges/{judge_id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Get Judge
-     * @description Get a judge configuration by ID.
-     */
-    get: operations['get_judge_api_v1_judges__judge_id__get'];
-    /**
-     * Update Judge
-     * @description Update a judge configuration.
-     */
-    put: operations['update_judge_api_v1_judges__judge_id__put'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/providers/schema': {
     parameters: {
       query?: never;
@@ -1570,11 +1522,6 @@ export interface components {
        */
       dataset_id?: string | null;
       /**
-       * Judge Config Id
-       * @description ID of the judge configuration for scoring.
-       */
-      judge_config_id?: string | null;
-      /**
        * Rubric Id
        * @description ID of the rubric to use for dimension-based scoring.
        */
@@ -1622,11 +1569,6 @@ export interface components {
        * @description ID of the dataset being evaluated.
        */
       dataset_id: string | null;
-      /**
-       * Judge Config Id
-       * @description ID of the judge configuration used for scoring.
-       */
-      judge_config_id: string | null;
       /**
        * Rubric Id
        * @description ID of the rubric used for dimension-based scoring.
@@ -1910,100 +1852,6 @@ export interface components {
        */
       version: string;
     };
-    /**
-     * JudgeConfigCreate
-     * @description Schema for creating a judge configuration.
-     */
-    JudgeConfigCreate: {
-      /** Name */
-      name: string;
-      /** Preset */
-      preset?: string | null;
-      /** Model */
-      model?: string | null;
-      /**
-       * Temperature
-       * @default 0
-       */
-      temperature: number;
-      /** Prompt Template */
-      prompt_template?: string | null;
-      /**
-       * Pass Threshold
-       * @default 0.7
-       */
-      pass_threshold: number;
-      /** Dimensions */
-      dimensions?:
-        | {
-            [key: string]: unknown;
-          }[]
-        | null;
-      /** Aggregation */
-      aggregation?: string | null;
-    };
-    /**
-     * JudgeConfigResponse
-     * @description Schema for a judge configuration in API responses.
-     */
-    JudgeConfigResponse: {
-      /** Id */
-      id: string;
-      /** Name */
-      name: string;
-      /** Preset */
-      preset: string | null;
-      /** Model */
-      model: string | null;
-      /** Temperature */
-      temperature: number;
-      /** Prompt Template */
-      prompt_template: string | null;
-      /** Pass Threshold */
-      pass_threshold: number;
-      /** Dimensions */
-      dimensions:
-        | {
-            [key: string]: unknown;
-          }[]
-        | null;
-      /** Aggregation */
-      aggregation: string | null;
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
-      /**
-       * Updated At
-       * Format: date-time
-       */
-      updated_at: string;
-    };
-    /**
-     * JudgeConfigUpdate
-     * @description Schema for updating a judge configuration.
-     */
-    JudgeConfigUpdate: {
-      /** Name */
-      name?: string | null;
-      /** Model */
-      model?: string | null;
-      /** Temperature */
-      temperature?: number | null;
-      /** Prompt Template */
-      prompt_template?: string | null;
-      /** Pass Threshold */
-      pass_threshold?: number | null;
-      /** Dimensions */
-      dimensions?:
-        | {
-            [key: string]: unknown;
-          }[]
-        | null;
-      /** Aggregation */
-      aggregation?: string | null;
-    };
     /** PaginatedResponse[ApiKeyResponse] */
     PaginatedResponse_ApiKeyResponse_: {
       /** Items */
@@ -2047,19 +1895,6 @@ export interface components {
     PaginatedResponse_EvaluationResponse_: {
       /** Items */
       items: components['schemas']['EvaluationResponse'][];
-      /** Total */
-      total: number;
-      /** Page */
-      page: number;
-      /** Page Size */
-      page_size: number;
-      /** Pages */
-      pages: number;
-    };
-    /** PaginatedResponse[JudgeConfigResponse] */
-    PaginatedResponse_JudgeConfigResponse_: {
-      /** Items */
-      items: components['schemas']['JudgeConfigResponse'][];
       /** Total */
       total: number;
       /** Page */
@@ -2514,10 +2349,10 @@ export interface components {
        */
       dataset_id: string;
       /**
-       * Judge Config Id
-       * @description ID of the judge configuration to use for scoring.
+       * Rubric Id
+       * @description ID of the rubric to use for dimension-based scoring.
        */
-      judge_config_id?: string | null;
+      rubric_id?: string | null;
       /**
        * Config
        * @description Mode-specific configuration (e.g., contestants for arena).
@@ -4005,138 +3840,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SessionReplayResponse'];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  list_judges_api_v1_judges_get: {
-    parameters: {
-      query?: {
-        page?: number;
-        page_size?: number;
-        name?: string | null;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PaginatedResponse_JudgeConfigResponse_'];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  create_judge_api_v1_judges_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['JudgeConfigCreate'];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['JudgeConfigResponse'];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  get_judge_api_v1_judges__judge_id__get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        judge_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['JudgeConfigResponse'];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  update_judge_api_v1_judges__judge_id__put: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        judge_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['JudgeConfigUpdate'];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['JudgeConfigResponse'];
         };
       };
       /** @description Validation Error */

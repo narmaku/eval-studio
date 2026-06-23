@@ -14,7 +14,7 @@ class RunRequest(BaseModel):
     name: str = Field(description="Human-readable evaluation name.")
     mode: EvaluationMode = Field(description="Evaluation mode: qa, rag, agent, or arena.")
     dataset_id: str = Field(description="ID of the dataset to evaluate against.")
-    judge_config_id: str | None = Field(default=None, description="ID of the judge configuration to use for scoring.")
+    rubric_id: str | None = Field(default=None, description="ID of the rubric to use for dimension-based scoring.")
     config: dict[str, Any] = Field(default={}, description="Mode-specific configuration (e.g., contestants for arena).")
     pass_threshold: float = Field(
         default=0.7, ge=0, le=1, description="Score threshold for pass/fail verdict (0.0--1.0)."
