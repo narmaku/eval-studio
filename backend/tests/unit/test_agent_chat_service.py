@@ -665,3 +665,175 @@ async def test_max_rounds_with_content_emits_is_final_true(db_session: AsyncSess
 
     # Intermediate rounds should have is_final=False
     assert complete_msgs[0]["data"]["is_final"] is False
+
+
+@pytest.mark.asyncio
+async def test_empty_content_intermediate_round_skips_message_complete(db_session: AsyncSession, session_with_tools):
+    """When an intermediate round has tool calls but no text, message_complete is skipped.
+
+    The guard `if full_content or at_max_rounds` means an intermediate round with
+    empty content produces no message_complete envelope for that round.
+    """
+    session = session_with_tools
+
+    # Round 1: tool call only, no text content
+    round1_stream = _make_streaming_chunks(
+        "", tool_calls=[{"id": "call_1", "name": "search", "arguments": {"q": "test"}}]
+    )
+    # Round 2: final text response
+    round2_stream = _make_streaming_chunks("Found the answer.")
+
+    call_count = 0
+
+    async def mock_acompletion(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return round1_stream
+        return round2_stream
+
+    mock_manager = MagicMock()
+    mock_manager.start_servers = AsyncMock(return_value=[{"type": "function", "function": {"name": "search"}}])
+    mock_manager.call_tool = AsyncMock(return_value=_make_tool_result_mock())
+
+    with (
+        patch("app.agent_backends.litellm_agent.litellm.acompletion", side_effect=mock_acompletion),
+        patch("app.services.agent_chat_service.get_or_create_manager", return_value=mock_manager),
+    ):
+        envelopes = []
+        async for msg in process_user_message(session.id, "Find it", db_session):
+            envelopes.append(msg)
+
+    complete_msgs = [m for m in envelopes if m["type"] == "message_complete"]
+    # Only the final round emits message_complete; the empty intermediate is skipped
+    assert len(complete_msgs) == 1, f"Expected 1 message_complete (final only), got {len(complete_msgs)}"
+    assert complete_msgs[0]["data"]["is_final"] is True
+    assert complete_msgs[0]["data"]["content"] == "Found the answer."
+
+
+@pytest.mark.asyncio
+async def test_max_rounds_empty_content_still_emits_message_complete(db_session: AsyncSession, session_with_tools):
+    """When max_rounds is hit and the last round has no text, message_complete is still emitted.
+
+    The `at_max_rounds` branch of the guard ensures a message_complete is always
+    emitted at max_rounds, even when full_content is empty.
+    """
+    session = session_with_tools
+
+    def make_empty_content_stream(round_num: int):
+        return _make_streaming_chunks(
+            "", tool_calls=[{"id": f"call_{round_num}", "name": "search", "arguments": {"q": f"r{round_num}"}}]
+        )
+
+    call_count = 0
+
+    async def mock_acompletion(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return make_empty_content_stream(call_count)
+
+    mock_manager = MagicMock()
+    mock_manager.start_servers = AsyncMock(return_value=[{"type": "function", "function": {"name": "search"}}])
+    mock_manager.call_tool = AsyncMock(return_value=_make_tool_result_mock())
+
+    with (
+        patch("app.agent_backends.litellm_agent.litellm.acompletion", side_effect=mock_acompletion),
+        patch("app.services.agent_chat_service.get_or_create_manager", return_value=mock_manager),
+        patch("app.services.agent_chat_service.MAX_TOOL_ROUNDS", 2),
+    ):
+        envelopes = []
+        async for msg in process_user_message(session.id, "Keep going", db_session):
+            envelopes.append(msg)
+
+    complete_msgs = [m for m in envelopes if m["type"] == "message_complete"]
+    # Only the max_rounds message_complete (intermediate empties are skipped)
+    assert len(complete_msgs) == 1, f"Expected 1 message_complete at max_rounds, got {len(complete_msgs)}"
+    assert complete_msgs[0]["data"]["is_final"] is True
+    assert complete_msgs[0]["data"]["content"] == ""
+
+
+@pytest.mark.asyncio
+async def test_unexecutable_tool_calls_has_is_final_true(db_session: AsyncSession, session_with_config):
+    """When tool calls exist but no tool servers are configured, is_final is True.
+
+    Tests the else branch where tool_calls are present but can't be executed
+    because the session has no tool_server_ids.
+    """
+    session = session_with_config  # No tool_server_ids
+
+    tool_calls = [
+        {"id": "call_unexec", "name": "unavailable_tool", "arguments": {"arg": "val"}},
+    ]
+    mock_stream = _make_streaming_chunks("I'll try this tool.", tool_calls=tool_calls)
+
+    with patch("app.agent_backends.litellm_agent.litellm.acompletion", new_callable=AsyncMock) as mock_acomp:
+        mock_acomp.return_value = mock_stream
+
+        envelopes = []
+        async for msg in process_user_message(session.id, "Do something", db_session):
+            envelopes.append(msg)
+
+    complete_msgs = [m for m in envelopes if m["type"] == "message_complete"]
+    assert len(complete_msgs) == 1
+    assert complete_msgs[0]["data"]["is_final"] is True
+    assert complete_msgs[0]["data"]["content"] == "I'll try this tool."
+    assert len(complete_msgs[0]["data"]["tool_calls"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_three_round_agentic_loop(db_session: AsyncSession, session_with_tools):
+    """A 3-round agentic loop produces correct is_final flags across all rounds.
+
+    Round 1: tool call with text -> is_final=False
+    Round 2: tool call with text -> is_final=False
+    Round 3: text only -> is_final=True
+    """
+    session = session_with_tools
+
+    round1_stream = _make_streaming_chunks(
+        "Step 1.", tool_calls=[{"id": "call_1", "name": "search", "arguments": {"q": "a"}}]
+    )
+    round2_stream = _make_streaming_chunks(
+        "Step 2.", tool_calls=[{"id": "call_2", "name": "search", "arguments": {"q": "b"}}]
+    )
+    round3_stream = _make_streaming_chunks("Final answer.")
+
+    call_count = 0
+
+    async def mock_acompletion(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return round1_stream
+        elif call_count == 2:
+            return round2_stream
+        return round3_stream
+
+    mock_manager = MagicMock()
+    mock_manager.start_servers = AsyncMock(return_value=[{"type": "function", "function": {"name": "search"}}])
+    mock_manager.call_tool = AsyncMock(return_value=_make_tool_result_mock())
+
+    with (
+        patch("app.agent_backends.litellm_agent.litellm.acompletion", side_effect=mock_acompletion),
+        patch("app.services.agent_chat_service.get_or_create_manager", return_value=mock_manager),
+    ):
+        envelopes = []
+        async for msg in process_user_message(session.id, "Multi-step task", db_session):
+            envelopes.append(msg)
+
+    complete_msgs = [m for m in envelopes if m["type"] == "message_complete"]
+    assert len(complete_msgs) == 3, f"Expected 3 message_complete envelopes, got {len(complete_msgs)}"
+
+    # All message_ids must be unique
+    ids = [m["data"]["message_id"] for m in complete_msgs]
+    assert len(set(ids)) == 3, "All 3 rounds must have unique message_ids"
+
+    # is_final progression: False, False, True
+    assert complete_msgs[0]["data"]["is_final"] is False
+    assert complete_msgs[1]["data"]["is_final"] is False
+    assert complete_msgs[2]["data"]["is_final"] is True
+
+    # Content progression
+    assert complete_msgs[0]["data"]["content"] == "Step 1."
+    assert complete_msgs[1]["data"]["content"] == "Step 2."
+    assert complete_msgs[2]["data"]["content"] == "Final answer."
