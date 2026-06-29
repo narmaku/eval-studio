@@ -54,6 +54,7 @@ interface SessionStore {
 
 // WebSocket reference kept outside Zustand state to avoid serialization issues
 let wsRef: WebSocket | null = null;
+let currentStreamingMessageId: string | null = null;
 
 export const useSessionStore = create<SessionStore>((set, get) => ({
   currentSession: null,
@@ -230,6 +231,7 @@ function handleWsMessage(
           };
         } else {
           // Create new streaming message
+          currentStreamingMessageId = chunk.data.message_id;
           messages.push({
             id: `streaming-${chunk.data.message_id}`,
             sender: envelope.sender ?? 'agent',
@@ -265,12 +267,17 @@ function handleWsMessage(
           messages.push(finalMessage);
         }
 
-        // Add any tool calls from the completed message, tagging each with message_id.
-        // Skip tool calls that were already added via individual tool_call envelopes
-        // during the agentic loop (matched by id).
+        // Back-fill message_id on tool calls that arrived via individual tool_call
+        // envelopes, and add any new ones from the message_complete data.
         let toolCalls = state.toolCalls;
         if (complete.data.tool_calls && complete.data.tool_calls.length > 0) {
+          const completeToolIds = new Set(complete.data.tool_calls.map((tc) => tc.id));
           const existingIds = new Set(toolCalls.map((tc) => tc.id));
+
+          toolCalls = toolCalls.map((tc) =>
+            completeToolIds.has(tc.id) ? { ...tc, message_id: complete.data.message_id } : tc,
+          );
+
           const newToolCalls = complete.data.tool_calls
             .filter((tc) => !existingIds.has(tc.id))
             .map((tc) => ({
@@ -296,7 +303,11 @@ function handleWsMessage(
       set((state) => ({
         toolCalls: [
           ...state.toolCalls,
-          { ...toolMsg.data, status: toolMsg.data.status ?? 'pending' },
+          {
+            ...toolMsg.data,
+            status: toolMsg.data.status ?? 'pending',
+            message_id: currentStreamingMessageId ?? undefined,
+          },
         ],
       }));
       break;

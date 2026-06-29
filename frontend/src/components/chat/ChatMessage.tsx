@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Bot, User, Monitor, Scale } from 'lucide-react';
 import type { Message } from '@/types';
 
@@ -75,15 +74,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
       >
         {message.content}
       </div>
-      {message.tool_calls && message.tool_calls.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1">
-          {message.tool_calls.map((tc) => (
-            <Badge key={tc.id} variant="secondary" className="text-[10px]">
-              {tc.tool_name}
-            </Badge>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

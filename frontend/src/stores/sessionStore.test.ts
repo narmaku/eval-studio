@@ -531,7 +531,10 @@ describe('sessionStore', () => {
       });
 
       expect(useSessionStore.getState().toolCalls).toHaveLength(1);
-      expect(useSessionStore.getState().toolCalls[0]).toEqual({ ...toolCall, status: 'pending' });
+      expect(useSessionStore.getState().toolCalls[0]).toMatchObject({
+        ...toolCall,
+        status: 'pending',
+      });
     });
 
     it('handles connected by setting isConnected', () => {

@@ -1,16 +1,69 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
-import { ToolInspector } from '@/components/chat/ToolInspector';
+import { ToolSidePanel } from '@/components/chat/ToolSidePanel';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { api } from '@/services/api';
 import { Loader2 } from 'lucide-react';
 import type { Session, Message, ToolCall, SessionScore, JudgeReference } from '@/types';
+
+function extractFromTranscript(transcript: Record<string, unknown>[]): {
+  messages: Message[];
+  toolCalls: ToolCall[];
+} {
+  const toolResults = new Map<string, { result: string; duration_ms: number; is_error: boolean }>();
+  for (const entry of transcript) {
+    if (entry.role === 'tool' && typeof entry.tool_call_id === 'string') {
+      toolResults.set(entry.tool_call_id, {
+        result: (entry.content as string) ?? '',
+        duration_ms: (entry.duration_ms as number) ?? 0,
+        is_error: (entry.is_error as boolean) ?? false,
+      });
+    }
+  }
+
+  const messages: Message[] = [];
+  const toolCalls: ToolCall[] = [];
+
+  for (const entry of transcript) {
+    const role = entry.role as string;
+    if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
+
+    const messageId = String(messages.length);
+    messages.push({
+      id: messageId,
+      sender: role === 'assistant' ? 'agent' : (role as 'user' | 'system'),
+      content: (entry.content as string) ?? '',
+      timestamp: (entry.timestamp as string) ?? '',
+    });
+
+    const entryToolCalls = entry.tool_calls as Record<string, unknown>[] | undefined;
+    if (entryToolCalls) {
+      for (let i = 0; i < entryToolCalls.length; i++) {
+        const tc = entryToolCalls[i];
+        const tcId = (tc.id as string) ?? `${messageId}-${i}`;
+        const result = toolResults.get(tcId);
+        toolCalls.push({
+          id: tcId,
+          tool_name: (tc.tool_name as string) ?? '',
+          arguments: (tc.arguments as Record<string, unknown>) ?? {},
+          result: result?.result ?? tc.result ?? null,
+          duration_ms: result?.duration_ms ?? (tc.duration_ms as number) ?? 0,
+          timestamp: (tc.timestamp as string) ?? '',
+          message_id: messageId,
+          status: result ? (result.is_error ? 'error' : 'completed') : 'completed',
+        });
+      }
+    }
+  }
+
+  return { messages, toolCalls };
+}
 
 export default function SessionDetail() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -20,6 +73,9 @@ export default function SessionDetail() {
   const [isScoring, setIsScoring] = useState(false);
   const [showScoreConfig, setShowScoreConfig] = useState(false);
   const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
+  const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
+
+  const handleToolSelect = useCallback((tc: ToolCall) => setSelectedToolId(tc.id), []);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -44,27 +100,8 @@ export default function SessionDetail() {
     };
   }, [sessionId]);
 
-  const messages: Message[] = ((session?.transcript as Record<string, unknown>[] | undefined) ?? [])
-    .filter((m) => m.role === 'user' || m.role === 'assistant' || m.role === 'system')
-    .map((m, i) => ({
-      id: String(i),
-      sender: m.role === 'assistant' ? 'agent' : (m.role as 'user' | 'system'),
-      content: (m.content as string) ?? '',
-      timestamp: (m.timestamp as string) ?? '',
-    }));
-
-  const toolCalls: ToolCall[] = (
-    (session?.transcript as Record<string, unknown>[] | undefined) ?? []
-  ).flatMap((m) =>
-    ((m.tool_calls as Record<string, unknown>[]) ?? []).map((tc, i) => ({
-      id: (tc.id as string) ?? String(i),
-      tool_name: (tc.tool_name as string) ?? '',
-      arguments: (tc.arguments as Record<string, unknown>) ?? {},
-      result: tc.result ?? null,
-      duration_ms: (tc.duration_ms as number) ?? 0,
-      timestamp: (tc.timestamp as string) ?? '',
-    })),
-  );
+  const transcript = (session?.transcript as Record<string, unknown>[] | undefined) ?? [];
+  const { messages, toolCalls } = extractFromTranscript(transcript);
 
   const scores: SessionScore[] = session?.scores
     ? [
@@ -141,7 +178,6 @@ export default function SessionDetail() {
         {isEnded && !hasScores && !showScoreConfig && !isSessionScoring && (
           <Button
             onClick={() => {
-              // Pre-populate judge config from session snapshot
               if (session.judge_config_snapshot) {
                 const snapshot = session.judge_config_snapshot;
                 if (typeof snapshot.provider_id === 'string') {
@@ -172,19 +208,24 @@ export default function SessionDetail() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="md:col-span-1 h-[600px]">
+      <div className="flex gap-4" style={{ height: '600px' }}>
+        <div className="flex-1 min-w-0 min-h-0">
           <ConversationPanel
             messages={messages}
             isProcessing={false}
             onSend={() => {}}
             disabled={true}
+            toolCalls={toolCalls}
+            onToolSelect={handleToolSelect}
+            selectedToolId={selectedToolId ?? undefined}
           />
         </div>
-        <div className="md:col-span-1 h-[600px] overflow-y-auto">
-          <ToolInspector toolCalls={toolCalls} />
-        </div>
-        <div className="md:col-span-1 h-[600px] overflow-y-auto">
+        <ToolSidePanel
+          toolCalls={toolCalls}
+          selectedToolId={selectedToolId}
+          onToolSelect={handleToolSelect}
+        />
+        <div className="w-[300px] shrink-0 overflow-y-auto">
           <ScoringPanel scores={scores} isSessionEnded={isEnded} />
         </div>
       </div>
