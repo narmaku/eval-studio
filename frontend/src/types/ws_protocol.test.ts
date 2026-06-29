@@ -59,7 +59,7 @@ const FIXTURES: Record<string, Record<string, unknown>> = {
     timestamp: '2024-01-01T00:00:00+00:00',
     sender: 'agent',
     session_id: 'sess-1',
-    data: { content: 'Hello world', message_id: 'msg-1', tool_calls: [] },
+    data: { content: 'Hello world', message_id: 'msg-1', is_final: true, tool_calls: [] },
   },
   ToolCallMsg: {
     type: 'tool_call',
