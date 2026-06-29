@@ -109,7 +109,7 @@ export interface WsMessageChunk {
 
 export interface WsMessageComplete {
   type: 'message_complete';
-  data: { content: string; message_id: string; tool_calls?: ToolCall[] };
+  data: { content: string; message_id: string; is_final: boolean; tool_calls?: ToolCall[] };
 }
 
 export interface WsToolCallMessage {
