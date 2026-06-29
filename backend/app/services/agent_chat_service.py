@@ -266,14 +266,14 @@ async def process_user_message(
 
     logger.info("agent_chat.llm_call", session_id=session_id, model=adapter.model, message_count=len(messages_for_llm))
 
-    # 6. Agentic loop
+    # 6. Agentic loop — each round gets its own message_id and message_complete
     round_count = 0
-    all_tool_calls: list[dict] = []
-    final_content = ""
-    turn_message_id = new_message_id()
-    final_message_persisted = False
+    total_tool_calls = 0
 
     while True:
+        # New message_id for each round
+        round_message_id = new_message_id()
+
         # Stream one round — accumulate content and tool-call chunks
         full_content = ""
         accumulated_tool_calls: dict[int, dict] = {}
@@ -284,7 +284,7 @@ async def process_user_message(
             if chunk.content:
                 full_content += chunk.content
                 yield MessageChunk(
-                    data=MessageChunkData(content=chunk.content, message_id=turn_message_id),
+                    data=MessageChunkData(content=chunk.content, message_id=round_message_id),
                     sender="agent",
                     session_id=session_id,
                 ).model_dump()
@@ -318,7 +318,6 @@ async def process_user_message(
                 session,
                 {"role": "assistant", "content": full_content, "timestamp": _iso_now(), "tool_calls": tool_calls_list},
             )
-            final_message_persisted = True
 
             # Add assistant message to LLM context (OpenAI format)
             messages_for_llm.append(
@@ -346,42 +345,63 @@ async def process_user_message(
             ):
                 yield envelope
 
-            all_tool_calls.extend(tool_calls_list)
+            total_tool_calls += len(tool_calls_list)
 
             round_count += 1
-            if round_count >= MAX_TOOL_ROUNDS:
+            at_max_rounds = round_count >= MAX_TOOL_ROUNDS
+
+            if at_max_rounds:
                 logger.warning("agent_chat.max_rounds_reached", session_id=session_id, max_rounds=MAX_TOOL_ROUNDS)
-                final_content = full_content
+
+            # Yield per-round message_complete:
+            # - intermediate rounds (not at max): is_final=False, skip if no text content
+            # - final round (at max): is_final=True, always emit
+            if full_content or at_max_rounds:
+                yield MessageComplete(
+                    data=MessageCompleteData(
+                        content=full_content,
+                        message_id=round_message_id,
+                        is_final=at_max_rounds,
+                        tool_calls=tool_calls_list,
+                    ),
+                    sender="agent",
+                    session_id=session_id,
+                ).model_dump()
+
+            if at_max_rounds:
                 break
             continue
 
         else:
-            final_content = full_content
+            # Final round — text only (or text + unexecutable tool calls)
             if tool_calls_list:
                 for tc_envelope in tool_calls_list:
                     yield ToolCallMsg(data=tc_envelope, sender="agent", session_id=session_id).model_dump()
-                all_tool_calls.extend(tool_calls_list)
+
+            # Yield final message_complete (is_final=True)
+            yield MessageComplete(
+                data=MessageCompleteData(
+                    content=full_content,
+                    message_id=round_message_id,
+                    is_final=True,
+                    tool_calls=tool_calls_list,
+                ),
+                sender="agent",
+                session_id=session_id,
+            ).model_dump()
+
+            # Persist final assistant message
+            assistant_entry: dict = {"role": "assistant", "content": full_content, "timestamp": _iso_now()}
+            if tool_calls_list:
+                assistant_entry["tool_calls"] = tool_calls_list
+            await _append_to_transcript(db, session, assistant_entry)
             break
-
-    # 7. Yield message_complete
-    yield MessageComplete(
-        data=MessageCompleteData(content=final_content, message_id=turn_message_id, tool_calls=all_tool_calls),
-        sender="agent",
-        session_id=session_id,
-    ).model_dump()
-
-    # 8. Persist final assistant message (only when the text-only exit path didn't persist)
-    if not final_message_persisted:
-        assistant_entry: dict = {"role": "assistant", "content": final_content, "timestamp": _iso_now()}
-        if all_tool_calls:
-            assistant_entry["tool_calls"] = all_tool_calls
-        await _append_to_transcript(db, session, assistant_entry)
 
     logger.info(
         "agent_chat.message_complete",
         session_id=session_id,
-        content_length=len(final_content),
-        tool_call_count=len(all_tool_calls),
+        content_length=len(full_content),
+        tool_call_count=total_tool_calls,
         tool_rounds=round_count,
     )
 
@@ -452,6 +472,7 @@ async def _subprocess_process(
                     data=MessageCompleteData(
                         content=final_content,
                         message_id=sub_message_id,
+                        is_final=True,
                         tool_calls=all_tool_calls,
                     ),
                     sender="agent",

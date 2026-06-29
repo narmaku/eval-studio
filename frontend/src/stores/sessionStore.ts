@@ -283,7 +283,10 @@ function handleWsMessage(
           }
         }
 
-        return { messages, toolCalls, isProcessing: false };
+        // Only stop processing when the final round completes
+        const isProcessing = !complete.data.is_final;
+
+        return { messages, toolCalls, isProcessing };
       });
       break;
     }

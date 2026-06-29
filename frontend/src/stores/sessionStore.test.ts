@@ -490,7 +490,12 @@ describe('sessionStore', () => {
 
       ws.simulateMessage({
         type: 'message_complete',
-        data: { content: 'Final answer', message_id: 'msg-agent-1', tool_calls: [] },
+        data: {
+          content: 'Final answer',
+          message_id: 'msg-agent-1',
+          is_final: true,
+          tool_calls: [],
+        },
         timestamp: '2026-01-01T00:00:01Z',
         sender: 'agent',
         session_id: 'sess-1',
@@ -788,7 +793,12 @@ describe('sessionStore', () => {
       // message_complete ends processing
       ws.simulateMessage({
         type: 'message_complete',
-        data: { content: 'Here are the results.', message_id: 'msg-1', tool_calls: [] },
+        data: {
+          content: 'Here are the results.',
+          message_id: 'msg-1',
+          is_final: true,
+          tool_calls: [],
+        },
         timestamp: '2026-01-01T00:00:04Z',
         sender: 'agent',
         session_id: 'sess-1',
@@ -827,6 +837,7 @@ describe('sessionStore', () => {
         data: {
           content: 'Done',
           message_id: 'msg-1',
+          is_final: true,
           tool_calls: [
             {
               id: 'tc-dedup-1',
@@ -846,6 +857,123 @@ describe('sessionStore', () => {
 
       // Should still have only 1 tool call (no duplicate)
       expect(useSessionStore.getState().toolCalls).toHaveLength(1);
+    });
+
+    it('keeps isProcessing true when message_complete has is_final=false', () => {
+      useSessionStore.setState({ isProcessing: true });
+      useSessionStore.getState().connectWebSocket('sess-1');
+      const ws = getWs();
+      ws.simulateOpen();
+
+      ws.simulateMessage({
+        type: 'message_complete',
+        data: {
+          content: 'Thinking...',
+          message_id: 'msg-round-1',
+          is_final: false,
+          tool_calls: [
+            {
+              id: 'tc-1',
+              tool_name: 'search',
+              arguments: { q: 'test' },
+              result: null,
+              duration_ms: 0,
+              timestamp: '2026-01-01T00:00:01Z',
+              status: 'pending',
+            },
+          ],
+        },
+        timestamp: '2026-01-01T00:00:01Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      // isProcessing should stay true for intermediate rounds
+      expect(useSessionStore.getState().isProcessing).toBe(true);
+      // Message should still be added
+      expect(useSessionStore.getState().messages).toHaveLength(1);
+      expect(useSessionStore.getState().messages[0]!.content).toBe('Thinking...');
+    });
+
+    it('sets isProcessing false when message_complete has is_final=true', () => {
+      useSessionStore.setState({ isProcessing: true });
+      useSessionStore.getState().connectWebSocket('sess-1');
+      const ws = getWs();
+      ws.simulateOpen();
+
+      ws.simulateMessage({
+        type: 'message_complete',
+        data: {
+          content: 'Final answer.',
+          message_id: 'msg-final',
+          is_final: true,
+          tool_calls: [],
+        },
+        timestamp: '2026-01-01T00:00:02Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      expect(useSessionStore.getState().isProcessing).toBe(false);
+    });
+
+    it('creates separate messages for each round via multiple message_complete', () => {
+      useSessionStore.setState({ isProcessing: true });
+      useSessionStore.getState().connectWebSocket('sess-1');
+      const ws = getWs();
+      ws.simulateOpen();
+
+      // Round 1: intermediate
+      ws.simulateMessage({
+        type: 'message_chunk',
+        data: { content: 'Let me check.', message_id: 'msg-round-1' },
+        timestamp: '2026-01-01T00:00:01Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      ws.simulateMessage({
+        type: 'message_complete',
+        data: {
+          content: 'Let me check.',
+          message_id: 'msg-round-1',
+          is_final: false,
+          tool_calls: [],
+        },
+        timestamp: '2026-01-01T00:00:02Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      // Round 2: final
+      ws.simulateMessage({
+        type: 'message_chunk',
+        data: { content: 'Done!', message_id: 'msg-round-2' },
+        timestamp: '2026-01-01T00:00:03Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      ws.simulateMessage({
+        type: 'message_complete',
+        data: {
+          content: 'Done!',
+          message_id: 'msg-round-2',
+          is_final: true,
+          tool_calls: [],
+        },
+        timestamp: '2026-01-01T00:00:04Z',
+        sender: 'agent',
+        session_id: 'sess-1',
+      });
+
+      const state = useSessionStore.getState();
+      expect(state.messages).toHaveLength(2);
+      expect(state.messages[0]!.id).toBe('msg-round-1');
+      expect(state.messages[0]!.content).toBe('Let me check.');
+      expect(state.messages[1]!.id).toBe('msg-round-2');
+      expect(state.messages[1]!.content).toBe('Done!');
+      expect(state.isProcessing).toBe(false);
     });
   });
 });

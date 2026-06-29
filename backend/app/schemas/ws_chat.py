@@ -46,6 +46,7 @@ class MessageComplete(_Envelope):
 class MessageCompleteData(BaseModel):
     content: str
     message_id: str
+    is_final: bool
     tool_calls: list[dict[str, Any]] = Field(default_factory=list)
 
 

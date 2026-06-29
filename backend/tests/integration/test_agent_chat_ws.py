@@ -118,7 +118,7 @@ async def test_ws_message_streams_response(ws_setup):
         }
         yield {
             "type": "message_complete",
-            "data": {"content": "Hi", "tool_calls": []},
+            "data": {"content": "Hi", "message_id": "msg-1", "is_final": True, "tool_calls": []},
             "timestamp": "2024-01-01T00:00:00+00:00",
             "sender": "agent",
             "session_id": setup["session_id"],

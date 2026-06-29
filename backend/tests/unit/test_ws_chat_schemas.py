@@ -49,6 +49,7 @@ def test_message_complete_includes_message_id_and_tool_calls():
         data=MessageCompleteData(
             content="Done",
             message_id=mid,
+            is_final=True,
             tool_calls=[{"id": "tc1", "tool_name": "search"}],
         ),
         sender="agent",
@@ -152,7 +153,9 @@ def test_all_envelope_types_have_consistent_keys():
     envelopes = [
         ConnectedMsg(data={"session_id": "s1"}, sender="system", session_id="s1"),
         MessageChunk(data=MessageChunkData(content="x", message_id="m1"), sender="agent", session_id="s1"),
-        MessageComplete(data=MessageCompleteData(content="x", message_id="m1"), sender="agent", session_id="s1"),
+        MessageComplete(
+            data=MessageCompleteData(content="x", message_id="m1", is_final=True), sender="agent", session_id="s1"
+        ),
         ToolCallMsg(data={"id": "tc1"}, sender="agent", session_id="s1"),
         ToolExecutingMsg(data=ToolExecutingData(tool_call_id="tc1", tool_name="t"), sender="system", session_id="s1"),
         ToolResultMsg(
@@ -166,3 +169,43 @@ def test_all_envelope_types_have_consistent_keys():
     for env in envelopes:
         d = env.model_dump()
         assert required_keys == set(d.keys()), f"{env.type} has keys {set(d.keys())}"
+
+
+def test_message_complete_requires_is_final():
+    """MessageCompleteData must include an is_final boolean field."""
+    mid = "abc-789"
+    msg = MessageComplete(
+        data=MessageCompleteData(
+            content="Done",
+            message_id=mid,
+            is_final=True,
+            tool_calls=[],
+        ),
+        sender="agent",
+        session_id="s1",
+    )
+    d = msg.model_dump()
+    assert d["data"]["is_final"] is True
+
+    # Non-final round
+    msg2 = MessageComplete(
+        data=MessageCompleteData(
+            content="Thinking...",
+            message_id="xyz",
+            is_final=False,
+            tool_calls=[{"id": "tc1", "tool_name": "search"}],
+        ),
+        sender="agent",
+        session_id="s1",
+    )
+    d2 = msg2.model_dump()
+    assert d2["data"]["is_final"] is False
+
+
+def test_message_complete_is_final_is_required():
+    """is_final must be explicitly provided — no default."""
+    import pytest as _pytest
+    from pydantic import ValidationError
+
+    with _pytest.raises(ValidationError):
+        MessageCompleteData(content="x", message_id="m1")
