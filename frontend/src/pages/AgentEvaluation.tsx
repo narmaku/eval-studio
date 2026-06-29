@@ -11,7 +11,6 @@ import { ProviderSelector } from '@/components/evaluation/ProviderSelector';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
 import { ToolSidePanel } from '@/components/chat/ToolSidePanel';
-import { ToolInspector } from '@/components/chat/ToolInspector';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
@@ -34,7 +33,7 @@ import {
   SkipForward,
   BarChart3,
 } from 'lucide-react';
-import type { ModelEndpoint, JudgeReference, ToolServer } from '@/types';
+import type { ModelEndpoint, JudgeReference, ToolServer, ToolCall } from '@/types';
 
 type PagePhase = 'configure' | 'active' | 'scoring' | 'review';
 
@@ -82,6 +81,7 @@ export default function AgentEvaluation() {
   const [selectedToolServerIds, setSelectedToolServerIds] = useState<string[]>([]);
   const [selectedHarnessId, setSelectedHarnessId] = useState<string | undefined>();
   const [selectedHarnessType, setSelectedHarnessType] = useState<string>('builtin');
+  const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
 
   const { isLoading: evalLoading, setLoading: setEvalLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
@@ -108,6 +108,10 @@ export default function AgentEvaluation() {
   const isConfigValid = Boolean(
     (isSubprocessHarness || modelEndpoint) && judgeConfig && selectedEvaluatorId,
   );
+
+  const handleToolSelect = useCallback((tc: ToolCall) => {
+    setSelectedToolId(tc.id);
+  }, []);
 
   // Load available tool servers
   useEffect(() => {
@@ -269,6 +273,7 @@ export default function AgentEvaluation() {
     setSelectedToolServerIds([]);
     setSelectedHarnessId(undefined);
     setSelectedHarnessType('builtin');
+    setSelectedToolId(null);
     useEvaluatorStore.getState().resetSelection();
   }, [resetSession]);
 
@@ -401,16 +406,23 @@ export default function AgentEvaluation() {
           {error && isConnected && <SessionErrorBanner error={error} />}
 
           {/* Chat-primary layout with collapsible tool panel */}
-          <div className="flex flex-1 gap-4" style={{ minHeight: '500px' }}>
-            <div className="flex-1 min-w-0">
+          <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
+            <div className="flex-1 min-w-0 min-h-0">
               <ConversationPanel
                 messages={messages}
                 isProcessing={isProcessing}
                 onSend={sendMessage}
                 disabled={!isConnected}
+                toolCalls={toolCalls}
+                onToolSelect={handleToolSelect}
+                selectedToolId={selectedToolId ?? undefined}
               />
             </div>
-            <ToolSidePanel toolCalls={toolCalls} />
+            <ToolSidePanel
+              toolCalls={toolCalls}
+              selectedToolId={selectedToolId}
+              onToolSelect={handleToolSelect}
+            />
           </div>
         </>
       )}
@@ -423,13 +435,16 @@ export default function AgentEvaluation() {
             <h2 className="text-lg font-semibold">Session Ended — Score Your Evaluation</h2>
           </div>
 
-          <div className="flex flex-1 gap-4" style={{ minHeight: '400px' }}>
-            <div className="flex-1 min-w-0">
+          <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
+            <div className="flex-1 min-w-0 min-h-0">
               <ConversationPanel
                 messages={messages}
                 isProcessing={false}
                 onSend={() => {}}
                 disabled={true}
+                toolCalls={toolCalls}
+                onToolSelect={handleToolSelect}
+                selectedToolId={selectedToolId ?? undefined}
               />
             </div>
             <div className="w-[400px] shrink-0 flex flex-col gap-4">
@@ -474,17 +489,26 @@ export default function AgentEvaluation() {
       {/* Review Phase */}
       {phase === 'review' && (
         <>
-          <div className="flex flex-1 gap-4" style={{ minHeight: '400px' }}>
-            <div className="flex-1 min-w-0">
+          <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
+            <div className="flex-1 min-w-0 min-h-0">
               <ConversationPanel
                 messages={messages}
                 isProcessing={false}
                 onSend={() => {}}
                 disabled={true}
+                toolCalls={toolCalls}
+                onToolSelect={handleToolSelect}
+                selectedToolId={selectedToolId ?? undefined}
               />
             </div>
-            <div className="w-[400px] shrink-0 flex flex-col gap-4">
-              <ToolInspector toolCalls={toolCalls} />
+            <div className="shrink-0 flex flex-col gap-4 min-h-0">
+              <div className="flex-1 min-h-0">
+                <ToolSidePanel
+                  toolCalls={toolCalls}
+                  selectedToolId={selectedToolId}
+                  onToolSelect={handleToolSelect}
+                />
+              </div>
               <ScoringPanel scores={scores} isSessionEnded={true} />
             </div>
           </div>

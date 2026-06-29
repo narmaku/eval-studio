@@ -1,19 +1,26 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Wrench } from 'lucide-react';
-import { ToolInspector } from './ToolInspector';
+import { ToolDetailPanel } from './ToolDetailPanel';
 import type { ToolCall } from '@/types';
 
 interface ToolSidePanelProps {
   toolCalls: ToolCall[];
+  selectedToolId: string | null;
+  onToolSelect: (toolCall: ToolCall) => void;
 }
 
-export function ToolSidePanel({ toolCalls }: ToolSidePanelProps) {
+export function ToolSidePanel({ toolCalls, selectedToolId, onToolSelect }: ToolSidePanelProps) {
   const [isOpen, setIsOpen] = useState(true);
 
+  const selectedToolCall = useMemo(() => {
+    if (!selectedToolId) return null;
+    return toolCalls.find((tc) => tc.id === selectedToolId) ?? null;
+  }, [selectedToolId, toolCalls]);
+
   return (
-    <div className="relative flex" data-testid="tool-side-panel">
+    <div className="relative flex h-full" data-testid="tool-side-panel">
       {/* Toggle button */}
       <div className="flex flex-col items-center pt-2">
         <Button
@@ -42,7 +49,11 @@ export function ToolSidePanel({ toolCalls }: ToolSidePanelProps) {
       >
         {isOpen && (
           <div className="h-full w-[400px]">
-            <ToolInspector toolCalls={toolCalls} />
+            <ToolDetailPanel
+              toolCall={selectedToolCall}
+              allToolCalls={toolCalls}
+              onSelect={onToolSelect}
+            />
           </div>
         )}
       </div>
