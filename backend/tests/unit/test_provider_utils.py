@@ -12,6 +12,7 @@ from app.services.provider_utils import (
     _litellm_clients,
     call_model,
     get_litellm_client,
+    resolve_judge_config,
     resolve_model_config,
 )
 
@@ -276,6 +277,62 @@ async def test_resolve_rate_limits_default_when_not_set():
 
     assert result.rate_limited is False
     assert result.rate_limits is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_model_override_with_provider(registry):
+    """When config has both provider_id and model, model overrides provider.default_model."""
+    config = {"provider_id": "local-llama", "model": "openai/mistral-7b"}
+    result = resolve_model_config(config, registry=registry)
+
+    assert result.model == "openai/mistral-7b"
+    assert result.api_base == "http://localhost:8080/v1"
+    assert result.proxy == "http://proxy:8888"
+
+
+@pytest.mark.asyncio
+async def test_resolve_model_override_empty_string_uses_default(registry):
+    """When model override is empty string, fall back to provider.default_model."""
+    config = {"provider_id": "local-llama", "model": ""}
+    result = resolve_model_config(config, registry=registry)
+
+    assert result.model == "openai/llama3"
+
+
+@pytest.mark.asyncio
+async def test_resolve_judge_config_with_model_override(registry):
+    """resolve_judge_config passes model from judge_ref to override provider default."""
+    from app.adapters.base import JudgeConfigParams
+
+    config = {
+        "judge_config": {
+            "provider_id": "local-llama",
+            "model": "openai/mistral-7b",
+        }
+    }
+    judge_params = JudgeConfigParams()
+    with patch("app.services.provider_utils.provider_registry", registry):
+        result = resolve_judge_config(config, judge_params)
+
+    assert result.model == "openai/mistral-7b"
+    assert result.api_base == "http://localhost:8080/v1"
+
+
+@pytest.mark.asyncio
+async def test_resolve_judge_config_without_model_uses_default(registry):
+    """resolve_judge_config without model in judge_ref uses provider default_model."""
+    from app.adapters.base import JudgeConfigParams
+
+    config = {
+        "judge_config": {
+            "provider_id": "local-llama",
+        }
+    }
+    judge_params = JudgeConfigParams()
+    with patch("app.services.provider_utils.provider_registry", registry):
+        result = resolve_judge_config(config, judge_params)
+
+    assert result.model == "openai/llama3"
 
 
 class TestCallModel:

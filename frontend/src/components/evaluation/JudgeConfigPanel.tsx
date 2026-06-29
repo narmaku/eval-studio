@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
-import type { JudgeReference, Provider, Rubric } from '@/types';
+import type { JudgeReference, Provider, ProviderModel, Rubric } from '@/types';
 
 interface JudgeConfigPanelProps {
   value: JudgeReference | undefined;
@@ -25,7 +25,10 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
   const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(
     value?.provider_id,
   );
+  const [selectedModel, setSelectedModel] = useState<string | undefined>(value?.model);
   const [selectedRubricId, setSelectedRubricId] = useState<string | undefined>(value?.rubric_id);
+  const [availableModels, setAvailableModels] = useState<ProviderModel[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   useEffect(() => {
     api
@@ -38,19 +41,51 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
       .catch(() => {});
   }, []);
 
+  const fetchModels = (providerId: string, defaultModel: string) => {
+    setIsLoadingModels(true);
+    api
+      .listProviderModels(providerId)
+      .then((models) => {
+        setAvailableModels(models);
+        if (!models.some((m) => m.id === defaultModel) && defaultModel) {
+          setAvailableModels([{ id: defaultModel, owned_by: 'configured' }, ...models]);
+        }
+      })
+      .catch(() => {
+        setAvailableModels(defaultModel ? [{ id: defaultModel, owned_by: 'configured' }] : []);
+      })
+      .finally(() => setIsLoadingModels(false));
+  };
+
   const handleProviderSelect = (providerId: string) => {
+    const provider = judgeProviders.find((p) => p.id === providerId);
+    const model = provider?.default_model ?? '';
     setSelectedProviderId(providerId);
-    onChange({ provider_id: providerId, rubric_id: selectedRubricId });
+    setSelectedModel(model);
+    onChange({ provider_id: providerId, model, rubric_id: selectedRubricId });
+
+    if (provider && !provider.single_model) {
+      fetchModels(providerId, provider.default_model);
+    } else {
+      setAvailableModels(model ? [{ id: model, owned_by: 'configured' }] : []);
+    }
+  };
+
+  const handleModelSelect = (model: string) => {
+    setSelectedModel(model);
+    onChange({ provider_id: selectedProviderId, model, rubric_id: selectedRubricId });
   };
 
   const handleRubricSelect = (rubricId: string) => {
     const newRubricId = rubricId === 'none' ? undefined : rubricId;
     setSelectedRubricId(newRubricId);
-    onChange({ ...value, rubric_id: newRubricId });
+    onChange({ provider_id: selectedProviderId, model: selectedModel, rubric_id: newRubricId });
   };
 
   const effectiveProviderId = value?.provider_id ?? selectedProviderId;
+  const effectiveModel = value?.model ?? selectedModel;
   const effectiveRubricId = value?.rubric_id ?? selectedRubricId;
+  const selectedProvider = judgeProviders.find((p) => p.id === effectiveProviderId);
   const selectedRubric = rubrics.find((r) => r.id === effectiveRubricId);
 
   return (
@@ -97,6 +132,30 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
             No providers configured. Add providers in{' '}
             <code className="text-xs">config/providers.yaml</code> or via Settings.
           </p>
+        )}
+
+        {effectiveProviderId && selectedProvider && !selectedProvider.single_model && (
+          <div className="space-y-1.5">
+            <Label>Model</Label>
+            <Select
+              value={effectiveModel ?? ''}
+              onValueChange={handleModelSelect}
+              disabled={disabled || isLoadingModels}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         {rubrics.length > 0 && (

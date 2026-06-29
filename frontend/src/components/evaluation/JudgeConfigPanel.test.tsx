@@ -5,11 +5,13 @@ import { JudgeConfigPanel } from './JudgeConfigPanel';
 
 const mockListProviders = vi.fn();
 const mockListRubrics = vi.fn();
+const mockListProviderModels = vi.fn();
 
 vi.mock('@/services/api', () => ({
   api: {
     listProviders: (...args: unknown[]) => mockListProviders(...args),
     listRubrics: (...args: unknown[]) => mockListRubrics(...args),
+    listProviderModels: (...args: unknown[]) => mockListProviderModels(...args),
   },
 }));
 
@@ -31,6 +33,13 @@ const provider = {
   single_model: false,
   rate_limited: false,
   rate_limits: null,
+};
+
+const singleModelProvider = {
+  ...provider,
+  id: 'p2',
+  name: 'Single Model',
+  single_model: true,
 };
 
 const rubric = {
@@ -61,6 +70,11 @@ describe('JudgeConfigPanel', () => {
       page_size: 100,
       pages: 1,
     });
+    mockListProviderModels.mockResolvedValue([
+      { id: 'gpt-4', owned_by: 'openai' },
+      { id: 'gpt-4o', owned_by: 'openai' },
+      { id: 'gpt-3.5-turbo', owned_by: 'openai' },
+    ]);
   });
 
   it('renders providers and rubric selector', async () => {
@@ -86,7 +100,7 @@ describe('JudgeConfigPanel', () => {
     expect(screen.getByText(/clarity \(w=1\)/)).toBeInTheDocument();
   });
 
-  it('calls onChange with rubric_id preserved when provider selected', async () => {
+  it('calls onChange with model and rubric_id when provider selected', async () => {
     const user = userEvent.setup();
     render(<JudgeConfigPanel value={{ rubric_id: 'r1' }} onChange={onChange} />);
 
@@ -96,8 +110,51 @@ describe('JudgeConfigPanel', () => {
 
     await user.click(screen.getByText('OpenAI'));
     expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ provider_id: 'p1', rubric_id: 'r1' }),
+      expect.objectContaining({ provider_id: 'p1', model: 'gpt-4', rubric_id: 'r1' }),
     );
+  });
+
+  it('fetches models when provider is selected', async () => {
+    const user = userEvent.setup();
+    render(<JudgeConfigPanel value={undefined} onChange={onChange} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('OpenAI')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('OpenAI'));
+
+    expect(mockListProviderModels).toHaveBeenCalledWith('p1');
+  });
+
+  it('shows model dropdown after provider selection', async () => {
+    const user = userEvent.setup();
+    render(<JudgeConfigPanel value={undefined} onChange={onChange} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('OpenAI')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('OpenAI'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Model')).toBeInTheDocument();
+    });
+  });
+
+  it('does not show model dropdown for single_model providers', async () => {
+    mockListProviders.mockResolvedValue([singleModelProvider]);
+    const user = userEvent.setup();
+    render(<JudgeConfigPanel value={undefined} onChange={onChange} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Single Model')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Single Model'));
+
+    expect(screen.queryByText('Model')).not.toBeInTheDocument();
+    expect(mockListProviderModels).not.toHaveBeenCalled();
   });
 
   it('does not show rubric section when no rubrics exist', async () => {

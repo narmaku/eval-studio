@@ -119,7 +119,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
 
-  scoreSession: async (judgeConfig: { provider_id: string }) => {
+  scoreSession: async (judgeConfig: { provider_id: string; model?: string }) => {
     const { currentSession } = get();
     if (!currentSession) return;
 

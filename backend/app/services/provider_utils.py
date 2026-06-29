@@ -82,7 +82,7 @@ def resolve_model_config(
     provider = registry.get_provider(provider_id) if provider_id else None
 
     if provider:
-        model = provider.default_model
+        model = config.get("model") or provider.default_model
         api_key = provider.api_key
         api_base = provider.api_base
         shared = provider.model_dump(include=_PROVIDER_SHARED_FIELDS)
@@ -147,7 +147,12 @@ def resolve_judge_config(
     judge_provider_id = judge_ref.get("provider_id") if isinstance(judge_ref, dict) else None
 
     if judge_provider_id:
-        return resolve_model_config({"provider_id": judge_provider_id})
+        return resolve_model_config(
+            {
+                "provider_id": judge_provider_id,
+                "model": judge_ref.get("model"),
+            }
+        )
 
     if judge_params.model:
         return ResolvedModel(

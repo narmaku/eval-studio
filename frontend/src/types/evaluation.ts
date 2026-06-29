@@ -95,6 +95,7 @@ export interface Provider {
 
 export interface JudgeReference {
   provider_id?: string;
+  model?: string;
   rubric_id?: string;
 }
 

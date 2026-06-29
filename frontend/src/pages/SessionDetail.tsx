@@ -120,6 +120,7 @@ export default function SessionDetail() {
     try {
       const updated = await api.scoreSession(sessionId, {
         provider_id: judgeConfig.provider_id,
+        model: judgeConfig.model,
       });
       setSession(updated);
       setShowScoreConfig(false);
