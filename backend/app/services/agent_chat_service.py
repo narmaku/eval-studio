@@ -347,35 +347,28 @@ async def process_user_message(
 
             total_tool_calls += len(tool_calls_list)
 
-            # Yield per-round message_complete (intermediate, is_final=False)
-            # Skip if the round had no text content (tool calls only)
-            if full_content:
+            round_count += 1
+            at_max_rounds = round_count >= MAX_TOOL_ROUNDS
+
+            if at_max_rounds:
+                logger.warning("agent_chat.max_rounds_reached", session_id=session_id, max_rounds=MAX_TOOL_ROUNDS)
+
+            # Yield per-round message_complete:
+            # - intermediate rounds (not at max): is_final=False, skip if no text content
+            # - final round (at max): is_final=True, always emit
+            if full_content or at_max_rounds:
                 yield MessageComplete(
                     data=MessageCompleteData(
                         content=full_content,
                         message_id=round_message_id,
-                        is_final=False,
+                        is_final=at_max_rounds,
                         tool_calls=tool_calls_list,
                     ),
                     sender="agent",
                     session_id=session_id,
                 ).model_dump()
 
-            round_count += 1
-            if round_count >= MAX_TOOL_ROUNDS:
-                logger.warning("agent_chat.max_rounds_reached", session_id=session_id, max_rounds=MAX_TOOL_ROUNDS)
-                # If we didn't emit a message_complete for this round yet (empty content), do so now
-                if not full_content:
-                    yield MessageComplete(
-                        data=MessageCompleteData(
-                            content="",
-                            message_id=round_message_id,
-                            is_final=True,
-                            tool_calls=tool_calls_list,
-                        ),
-                        sender="agent",
-                        session_id=session_id,
-                    ).model_dump()
+            if at_max_rounds:
                 break
             continue
 

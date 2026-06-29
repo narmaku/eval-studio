@@ -617,3 +617,51 @@ async def test_simple_response_has_is_final_true(db_session: AsyncSession, sessi
     complete_msgs = [m for m in envelopes if m["type"] == "message_complete"]
     assert len(complete_msgs) == 1
     assert complete_msgs[0]["data"]["is_final"] is True
+
+
+@pytest.mark.asyncio
+async def test_max_rounds_with_content_emits_is_final_true(db_session: AsyncSession, session_with_tools):
+    """When max_rounds is reached and the last round has content, is_final must be True.
+
+    Regression test: previously, when the last tool-calling round had text content,
+    the intermediate message_complete was emitted with is_final=False and the
+    max_rounds guard did not emit a corrective is_final=True, leaving the frontend
+    stuck in isProcessing=true.
+    """
+    session = session_with_tools
+
+    # Every round returns text + tool call
+    def make_tool_stream(round_num: int):
+        return _make_streaming_chunks(
+            f"Round {round_num} thinking...",
+            tool_calls=[{"id": f"call_{round_num}", "name": "search", "arguments": {"q": f"r{round_num}"}}],
+        )
+
+    call_count = 0
+
+    async def mock_acompletion(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return make_tool_stream(call_count)
+
+    mock_manager = MagicMock()
+    mock_manager.start_servers = AsyncMock(return_value=[{"type": "function", "function": {"name": "search"}}])
+    mock_manager.call_tool = AsyncMock(return_value=_make_tool_result_mock())
+
+    with (
+        patch("app.agent_backends.litellm_agent.litellm.acompletion", side_effect=mock_acompletion),
+        patch("app.services.agent_chat_service.get_or_create_manager", return_value=mock_manager),
+        patch("app.services.agent_chat_service.MAX_TOOL_ROUNDS", 2),
+    ):
+        envelopes = []
+        async for msg in process_user_message(session.id, "Keep searching", db_session):
+            envelopes.append(msg)
+
+    complete_msgs = [m for m in envelopes if m["type"] == "message_complete"]
+    assert len(complete_msgs) == 2, f"Expected 2 message_complete envelopes, got {len(complete_msgs)}"
+
+    # The last message_complete MUST have is_final=True so the frontend exits isProcessing
+    assert complete_msgs[-1]["data"]["is_final"] is True, "Last message_complete at max_rounds must have is_final=True"
+
+    # Intermediate rounds should have is_final=False
+    assert complete_msgs[0]["data"]["is_final"] is False
