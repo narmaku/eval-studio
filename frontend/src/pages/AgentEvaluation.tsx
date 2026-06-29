@@ -501,7 +501,7 @@ export default function AgentEvaluation() {
                 selectedToolId={selectedToolId ?? undefined}
               />
             </div>
-            <div className="w-[400px] shrink-0 flex flex-col gap-4 min-h-0 overflow-hidden">
+            <div className="shrink-0 flex flex-col gap-4 min-h-0">
               <div className="flex-1 min-h-0">
                 <ToolSidePanel
                   toolCalls={toolCalls}
