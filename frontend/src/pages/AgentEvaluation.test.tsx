@@ -33,11 +33,9 @@ vi.mock('@/components/chat/ConversationPanel', () => ({
 }));
 
 vi.mock('@/components/chat/ToolSidePanel', () => ({
-  ToolSidePanel: () => <div data-testid="tool-side-panel" />,
-}));
-
-vi.mock('@/components/chat/ToolInspector', () => ({
-  ToolInspector: () => <div data-testid="tool-inspector" />,
+  ToolSidePanel: ({ selectedToolId }: { selectedToolId: string | null }) => (
+    <div data-testid="tool-side-panel" data-selected={selectedToolId ?? ''} />
+  ),
 }));
 
 vi.mock('@/components/chat/ScoringPanel', () => ({
