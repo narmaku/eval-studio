@@ -44,8 +44,9 @@ export function ConversationPanel({
     // Find the last agent message id for orphan tool calls
     let lastAgentMessageId: string | undefined;
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].sender === 'agent') {
-        lastAgentMessageId = messages[i].id;
+      const msg = messages[i];
+      if (msg && msg.sender === 'agent') {
+        lastAgentMessageId = msg.id;
         break;
       }
     }

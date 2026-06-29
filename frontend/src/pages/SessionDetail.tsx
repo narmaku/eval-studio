@@ -44,8 +44,7 @@ function extractFromTranscript(transcript: Record<string, unknown>[]): {
 
     const entryToolCalls = entry.tool_calls as Record<string, unknown>[] | undefined;
     if (entryToolCalls) {
-      for (let i = 0; i < entryToolCalls.length; i++) {
-        const tc = entryToolCalls[i];
+      for (const [i, tc] of entryToolCalls.entries()) {
         const tcId = (tc.id as string) ?? `${messageId}-${i}`;
         const result = toolResults.get(tcId);
         toolCalls.push({

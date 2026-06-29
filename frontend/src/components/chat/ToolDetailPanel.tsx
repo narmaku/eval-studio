@@ -69,15 +69,13 @@ export function ToolDetailPanel({
   const hasNext = currentIndex >= 0 && currentIndex < allToolCalls.length - 1;
 
   const handlePrev = useCallback(() => {
-    if (hasPrev) {
-      onSelect(allToolCalls[currentIndex - 1]);
-    }
+    const prev = hasPrev ? allToolCalls[currentIndex - 1] : undefined;
+    if (prev) onSelect(prev);
   }, [hasPrev, currentIndex, allToolCalls, onSelect]);
 
   const handleNext = useCallback(() => {
-    if (hasNext) {
-      onSelect(allToolCalls[currentIndex + 1]);
-    }
+    const next = hasNext ? allToolCalls[currentIndex + 1] : undefined;
+    if (next) onSelect(next);
   }, [hasNext, currentIndex, allToolCalls, onSelect]);
 
   if (!toolCall) {

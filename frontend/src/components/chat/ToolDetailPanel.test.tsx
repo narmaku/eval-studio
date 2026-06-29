@@ -68,7 +68,7 @@ describe('ToolDetailPanel', () => {
     ];
 
     render(
-      <ToolDetailPanel toolCall={toolCalls[0]} allToolCalls={toolCalls} onSelect={onSelect} />,
+      <ToolDetailPanel toolCall={toolCalls[0]!} allToolCalls={toolCalls} onSelect={onSelect} />,
     );
 
     const nextBtn = screen.getByRole('button', { name: /next tool/i });
@@ -87,7 +87,7 @@ describe('ToolDetailPanel', () => {
     ];
 
     render(
-      <ToolDetailPanel toolCall={toolCalls[1]} allToolCalls={toolCalls} onSelect={onSelect} />,
+      <ToolDetailPanel toolCall={toolCalls[1]!} allToolCalls={toolCalls} onSelect={onSelect} />,
     );
 
     const prevBtn = screen.getByRole('button', { name: /previous tool/i });
@@ -102,7 +102,9 @@ describe('ToolDetailPanel', () => {
       makeToolCall({ id: 'tc-2', tool_name: 'read_file' }),
     ];
 
-    render(<ToolDetailPanel toolCall={toolCalls[0]} allToolCalls={toolCalls} onSelect={vi.fn()} />);
+    render(
+      <ToolDetailPanel toolCall={toolCalls[0]!} allToolCalls={toolCalls} onSelect={vi.fn()} />,
+    );
 
     const prevBtn = screen.getByRole('button', { name: /previous tool/i });
     expect(prevBtn).toBeDisabled();
@@ -114,7 +116,9 @@ describe('ToolDetailPanel', () => {
       makeToolCall({ id: 'tc-2', tool_name: 'read_file' }),
     ];
 
-    render(<ToolDetailPanel toolCall={toolCalls[1]} allToolCalls={toolCalls} onSelect={vi.fn()} />);
+    render(
+      <ToolDetailPanel toolCall={toolCalls[1]!} allToolCalls={toolCalls} onSelect={vi.fn()} />,
+    );
 
     const nextBtn = screen.getByRole('button', { name: /next tool/i });
     expect(nextBtn).toBeDisabled();
@@ -129,7 +133,7 @@ describe('ToolDetailPanel', () => {
     ];
 
     render(
-      <ToolDetailPanel toolCall={toolCalls[0]} allToolCalls={toolCalls} onSelect={onSelect} />,
+      <ToolDetailPanel toolCall={toolCalls[0]!} allToolCalls={toolCalls} onSelect={onSelect} />,
     );
 
     // Click on the mini pill for read_file
@@ -146,7 +150,9 @@ describe('ToolDetailPanel', () => {
       makeToolCall({ id: 'tc-3' }),
     ];
 
-    render(<ToolDetailPanel toolCall={toolCalls[1]} allToolCalls={toolCalls} onSelect={vi.fn()} />);
+    render(
+      <ToolDetailPanel toolCall={toolCalls[1]!} allToolCalls={toolCalls} onSelect={vi.fn()} />,
+    );
 
     expect(screen.getByText('2 of 3')).toBeInTheDocument();
   });
