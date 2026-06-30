@@ -10,7 +10,16 @@ import {
   type ExpandedState,
 } from '@tanstack/react-table';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, FileDown, Loader2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  FileDown,
+  Loader2,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +45,9 @@ import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { PassFailChart } from './PassFailChart';
 import { ContestantScoreChart } from './ContestantScoreChart';
 import { RadarComparisonChart } from './RadarComparisonChart';
+import { ResultEditSheet } from './ResultEditSheet';
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
+import { useResultStore } from '@/stores/resultStore';
 import { exportResultsPdf, type PdfExportData } from '@/lib/exportPdf';
 import type { Result, AggregateMetrics, DatasetItem, ArenaLeaderboardResponse } from '@/types';
 
@@ -320,6 +332,9 @@ export function ResultDetailView({
   const [expanded, setExpanded] = useState<ExpandedState>({});
   const [isExporting, setIsExporting] = useState(false);
   const chartsRef = useRef<HTMLDivElement>(null);
+  const [editTarget, setEditTarget] = useState<Result | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Result | null>(null);
+  const deleteResult = useResultStore((s) => s.deleteResult);
 
   const handleExportPdf = async () => {
     setIsExporting(true);
@@ -397,20 +412,71 @@ export function ResultDetailView({
     [itemMap],
   );
 
+  const actionsColumn: ColumnDef<Result> = useMemo(
+    () => ({
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            aria-label="Edit result"
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditTarget(row.original);
+            }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            aria-label="Delete result"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteTarget(row.original);
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ),
+      size: 80,
+    }),
+    [],
+  );
+
   const columns = useMemo<ColumnDef<Result>[]>(() => {
     switch (evaluationMode) {
       case 'qa':
-        return [expanderColumn, questionColumn, scoreColumn, passFailColumn];
+        return [expanderColumn, questionColumn, scoreColumn, passFailColumn, actionsColumn];
       case 'rag':
-        return [expanderColumn, questionColumn, chunksColumn, scoreColumn, passFailColumn];
+        return [
+          expanderColumn,
+          questionColumn,
+          chunksColumn,
+          scoreColumn,
+          passFailColumn,
+          actionsColumn,
+        ];
       case 'arena':
-        return [expanderColumn, contestantColumn, questionColumn, scoreColumn, passFailColumn];
+        return [
+          expanderColumn,
+          contestantColumn,
+          questionColumn,
+          scoreColumn,
+          passFailColumn,
+          actionsColumn,
+        ];
       case 'agent':
-        return [scoreColumn, passFailColumn, breakdownColumn, reasoningColumn];
+        return [scoreColumn, passFailColumn, breakdownColumn, reasoningColumn, actionsColumn];
       default:
-        return [scoreColumn, passFailColumn, breakdownColumn, reasoningColumn];
+        return [scoreColumn, passFailColumn, breakdownColumn, reasoningColumn, actionsColumn];
     }
-  }, [evaluationMode, questionColumn]);
+  }, [evaluationMode, questionColumn, actionsColumn]);
 
   const isExpandable =
     evaluationMode === 'qa' || evaluationMode === 'rag' || evaluationMode === 'arena';
@@ -626,6 +692,32 @@ export function ResultDetailView({
           )}
         </CardContent>
       </Card>
+
+      {/* Edit / Delete dialogs */}
+      {editTarget && (
+        <ResultEditSheet
+          open={!!editTarget}
+          onOpenChange={(open) => {
+            if (!open) setEditTarget(null);
+          }}
+          result={editTarget}
+        />
+      )}
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete result"
+        description="Are you sure you want to delete this result?"
+        entityName={deleteTarget?.name ?? deleteTarget?.id.slice(0, 8) ?? ''}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await deleteResult(deleteTarget.id);
+          toast.success('Result deleted');
+          setDeleteTarget(null);
+        }}
+      />
 
       {/* Pagination controls */}
       {pagination && pagination.pages > 1 && (
