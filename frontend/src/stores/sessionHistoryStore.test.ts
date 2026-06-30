@@ -18,7 +18,7 @@ const makeSession = (overrides: Partial<Session> = {}): Session => ({
   id: 'sess-1',
   evaluation_id: null,
   name: 'Test Session',
-  mode: 'agent',
+  mode: 'live',
   status: 'ended',
   transcript: null,
   agent_config: null,

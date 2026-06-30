@@ -24,11 +24,11 @@ export interface Session {
   judge_config_snapshot: Record<string, unknown> | null;
   scores: SessionScores | null;
   error: string | null;
-  tags: string[];
+  tags?: string[];
   started_at: string | null;
   ended_at: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface UpdateSessionRequest {
