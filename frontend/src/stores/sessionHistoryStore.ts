@@ -18,7 +18,7 @@ interface SessionHistoryStore {
   deleteSession: (id: string) => Promise<void>;
 }
 
-export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => ({
+export const useSessionHistoryStore = create<SessionHistoryStore>((set) => ({
   sessions: [],
   isLoading: false,
   error: null,
@@ -56,9 +56,9 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => 
     set({ error: null });
     try {
       await api.deleteSession(id);
-      set({
-        sessions: get().sessions.filter((s) => s.id !== id),
-      });
+      set((state) => ({
+        sessions: state.sessions.filter((s) => s.id !== id),
+      }));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete session';
       set({ error: message });

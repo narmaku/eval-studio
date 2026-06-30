@@ -203,10 +203,20 @@ export default function SessionDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon-sm" onClick={() => setEditOpen(true)}>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setEditOpen(true)}
+            aria-label="Edit session"
+          >
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon-sm" onClick={() => setDeleteOpen(true)}>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setDeleteOpen(true)}
+            aria-label="Delete session"
+          >
             <Trash2 className="h-4 w-4" />
           </Button>
           {isSessionScoring && (
