@@ -5,6 +5,8 @@ vi.mock('@/services/api', () => ({
   api: {
     listResults: vi.fn(),
     getResult: vi.fn(),
+    updateResult: vi.fn(),
+    deleteResult: vi.fn(),
     getAggregateMetrics: vi.fn(),
     compareEvaluations: vi.fn(),
   },
@@ -471,6 +473,118 @@ describe('resultStore', () => {
       await useResultStore.getState().fetchComparison(['e1', 'e2']);
 
       expect(useResultStore.getState().error).toBe('Failed to fetch comparison');
+    });
+  });
+
+  describe('updateResult', () => {
+    const makeResult = (overrides = {}) => ({
+      id: 'r1',
+      evaluation_id: 'e1',
+      dataset_item_id: 'item-1',
+      session_id: null,
+      contestant_model: null,
+      name: null,
+      score: 0.85,
+      passed: true,
+      actual_answer: 'test answer',
+      judge_reasoning: 'good answer',
+      scores_breakdown: null,
+      retrieved_chunks: null,
+      tags: [],
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      ...overrides,
+    });
+
+    it('updates result in the list on success', async () => {
+      const original = makeResult();
+      useResultStore.setState({ results: [original] });
+
+      const updated = { ...original, name: 'Named Result', tags: ['important'] };
+      mockedApi.updateResult.mockResolvedValue(updated);
+
+      const result = await useResultStore
+        .getState()
+        .updateResult('r1', { name: 'Named Result', tags: ['important'] });
+
+      expect(result).toEqual(updated);
+      expect(useResultStore.getState().results[0]?.name).toBe('Named Result');
+      expect(useResultStore.getState().error).toBeNull();
+    });
+
+    it('updates currentResult if it matches the id', async () => {
+      const original = makeResult();
+      useResultStore.setState({ results: [original], currentResult: original });
+
+      const updated = { ...original, name: 'Updated' };
+      mockedApi.updateResult.mockResolvedValue(updated);
+
+      await useResultStore.getState().updateResult('r1', { name: 'Updated' });
+
+      expect(useResultStore.getState().currentResult?.name).toBe('Updated');
+    });
+
+    it('sets error and re-throws on failure', async () => {
+      useResultStore.setState({ results: [makeResult()] });
+      mockedApi.updateResult.mockRejectedValue(new Error('Forbidden'));
+
+      await expect(useResultStore.getState().updateResult('r1', { name: 'fail' })).rejects.toThrow(
+        'Forbidden',
+      );
+
+      expect(useResultStore.getState().error).toBe('Forbidden');
+    });
+  });
+
+  describe('deleteResult', () => {
+    const makeResult = (overrides = {}) => ({
+      id: 'r1',
+      evaluation_id: 'e1',
+      dataset_item_id: 'item-1',
+      session_id: null,
+      contestant_model: null,
+      name: null,
+      score: 0.85,
+      passed: true,
+      actual_answer: 'test answer',
+      judge_reasoning: 'good answer',
+      scores_breakdown: null,
+      retrieved_chunks: null,
+      tags: [],
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      ...overrides,
+    });
+
+    it('removes result from list on success', async () => {
+      const r1 = makeResult({ id: 'r1' });
+      const r2 = makeResult({ id: 'r2' });
+      useResultStore.setState({ results: [r1, r2] });
+      mockedApi.deleteResult.mockResolvedValue(undefined);
+
+      await useResultStore.getState().deleteResult('r1');
+
+      expect(useResultStore.getState().results).toHaveLength(1);
+      expect(useResultStore.getState().results[0]?.id).toBe('r2');
+    });
+
+    it('clears currentResult if it matches the deleted id', async () => {
+      const r1 = makeResult();
+      useResultStore.setState({ results: [r1], currentResult: r1 });
+      mockedApi.deleteResult.mockResolvedValue(undefined);
+
+      await useResultStore.getState().deleteResult('r1');
+
+      expect(useResultStore.getState().currentResult).toBeNull();
+    });
+
+    it('sets error and re-throws on failure', async () => {
+      useResultStore.setState({ results: [makeResult()] });
+      mockedApi.deleteResult.mockRejectedValue(new Error('Not found'));
+
+      await expect(useResultStore.getState().deleteResult('r1')).rejects.toThrow('Not found');
+
+      expect(useResultStore.getState().error).toBe('Not found');
     });
   });
 });
