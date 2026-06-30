@@ -7,7 +7,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ArrowUp, ArrowDown, Database, Loader2, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Database, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,7 @@ import {
 import { useDatasetStore } from '@/stores/datasetStore';
 import { SmartImportDialog } from '@/components/datasets/SmartImportDialog';
 import { DatasetDetailView } from '@/components/datasets/DatasetDetailView';
+import { DatasetEditSheet } from '@/components/datasets/DatasetEditSheet';
 import type { Dataset } from '@/types';
 
 const columns: ColumnDef<Dataset>[] = [
@@ -130,6 +131,7 @@ export default function Datasets() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Dataset | null>(null);
+  const [editTarget, setEditTarget] = useState<Dataset | null>(null);
   const [detailTarget, setDetailTarget] = useState<Dataset | null>(null);
 
   useEffect(() => {
@@ -224,14 +226,24 @@ export default function Datasets() {
                     </TableCell>
                   ))}
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setDeleteTarget(row.original)}
-                      aria-label={`Delete ${row.original.name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setEditTarget(row.original)}
+                        aria-label={`Edit ${row.original.name}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeleteTarget(row.original)}
+                        aria-label={`Delete ${row.original.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -259,6 +271,15 @@ export default function Datasets() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Sheet */}
+      {editTarget && (
+        <DatasetEditSheet
+          open={!!editTarget}
+          onOpenChange={(open) => !open && setEditTarget(null)}
+          dataset={editTarget}
+        />
+      )}
 
       {/* Import Dialog */}
       <SmartImportDialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen} />
