@@ -12,7 +12,7 @@ from app.core.database import get_db
 from app.core.exceptions import AppException, NotFoundException
 from app.core.security import require_auth
 from app.models.artifact import Artifact
-from app.schemas.artifact import ArtifactResponse
+from app.schemas.artifact import ArtifactResponse, ArtifactUpdate
 from app.schemas.common import PaginatedResponse
 from app.services.artifact_service import delete_artifact_file, get_artifact_path
 
@@ -72,6 +72,26 @@ async def get_artifact(
     artifact = result.scalar_one_or_none()
     if not artifact:
         raise NotFoundException("Artifact", artifact_id)
+    return ArtifactResponse.model_validate(artifact)
+
+
+@router.put("/{artifact_id}", response_model=ArtifactResponse)
+async def update_artifact(
+    artifact_id: str, payload: ArtifactUpdate, db: AsyncSession = Depends(get_db)
+) -> ArtifactResponse:
+    """Update an artifact's description."""
+    result = await db.execute(select(Artifact).where(Artifact.id == artifact_id))
+    artifact = result.scalar_one_or_none()
+    if not artifact:
+        raise NotFoundException("Artifact", artifact_id)
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(artifact, field, value)
+
+    await db.commit()
+    await db.refresh(artifact)
+    logger.info("artifact.updated", id=artifact_id)
     return ArtifactResponse.model_validate(artifact)
 
 

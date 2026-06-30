@@ -2,7 +2,7 @@ import math
 from statistics import median
 
 import structlog
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,7 @@ from app.schemas.result import (
     CrossEvaluationItemComparison,
     EvaluationComparisonItem,
     ResultResponse,
+    ResultUpdate,
     ScoreBucket,
 )
 
@@ -309,3 +310,37 @@ async def get_result(
         raise NotFoundException("Result", result_id)
     logger.info("result.retrieved", id=result_id)
     return ResultResponse.model_validate(result_obj)
+
+
+@router.put("/{result_id}", response_model=ResultResponse)
+async def update_result(result_id: str, payload: ResultUpdate, db: AsyncSession = Depends(get_db)) -> ResultResponse:
+    """Update a result's name or tags. Scores and reasoning are immutable."""
+    result = await db.execute(select(Result).where(Result.id == result_id))
+    result_obj = result.scalar_one_or_none()
+    if not result_obj:
+        raise NotFoundException("Result", result_id)
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if "tags" in update_data and update_data["tags"] is not None:
+        update_data["tags"] = [t.lower().strip() for t in update_data["tags"]]
+    for field, value in update_data.items():
+        setattr(result_obj, field, value)
+
+    await db.commit()
+    await db.refresh(result_obj)
+    logger.info("result.updated", id=result_id)
+    return ResultResponse.model_validate(result_obj)
+
+
+@router.delete("/{result_id}", status_code=204)
+async def delete_result(result_id: str, db: AsyncSession = Depends(get_db)) -> Response:
+    """Delete a result."""
+    result = await db.execute(select(Result).where(Result.id == result_id))
+    result_obj = result.scalar_one_or_none()
+    if not result_obj:
+        raise NotFoundException("Result", result_id)
+
+    await db.delete(result_obj)
+    await db.commit()
+    logger.info("result.deleted", id=result_id)
+    return Response(status_code=204)

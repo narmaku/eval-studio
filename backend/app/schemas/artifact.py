@@ -3,6 +3,12 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
+class ArtifactUpdate(BaseModel):
+    """Schema for updating an artifact."""
+
+    description: str | None = None
+
+
 class ArtifactResponse(BaseModel):
     """Schema for an artifact in API responses."""
 

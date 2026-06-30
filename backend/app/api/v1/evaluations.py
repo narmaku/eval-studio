@@ -24,6 +24,7 @@ from app.schemas.evaluation import (
     EvaluationMode,
     EvaluationResponse,
     EvaluationStatus,
+    EvaluationUpdate,
 )
 from app.schemas.run import RunAsyncResponse, RunRequest
 from app.services.artifact_service import delete_artifact_file
@@ -300,6 +301,28 @@ async def get_evaluation(evaluation_id: str, db: AsyncSession = Depends(get_db))
     response = EvaluationResponse.model_validate(evaluation)
     response.result_count = result_count
     return response
+
+
+@router.put("/{evaluation_id}", response_model=EvaluationResponse)
+async def update_evaluation(
+    evaluation_id: str, payload: EvaluationUpdate, db: AsyncSession = Depends(get_db)
+) -> EvaluationResponse:
+    """Update an evaluation's name, description, or tags."""
+    result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
+    evaluation = result.scalar_one_or_none()
+    if not evaluation:
+        raise NotFoundException("Evaluation", evaluation_id)
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if "tags" in update_data and update_data["tags"] is not None:
+        update_data["tags"] = [t.lower().strip() for t in update_data["tags"]]
+    for field, value in update_data.items():
+        setattr(evaluation, field, value)
+
+    await db.commit()
+    await db.refresh(evaluation)
+    logger.info("evaluation.updated", id=evaluation_id)
+    return EvaluationResponse.model_validate(evaluation)
 
 
 @router.delete("/{evaluation_id}", status_code=204)

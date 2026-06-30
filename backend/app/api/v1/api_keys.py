@@ -15,7 +15,7 @@ from app.core.security import (
     verify_api_key,
 )
 from app.models.api_key import ApiKey
-from app.schemas.api_key import ApiKeyCreate, ApiKeyCreateResponse, ApiKeyResponse
+from app.schemas.api_key import ApiKeyCreate, ApiKeyCreateResponse, ApiKeyResponse, ApiKeyUpdate
 from app.schemas.common import PaginatedResponse
 
 logger = structlog.get_logger()
@@ -100,6 +100,24 @@ async def list_api_keys(
         page_size=page_size,
         pages=max(1, math.ceil(total / page_size)),
     )
+
+
+@router.put("/{key_id}", response_model=ApiKeyResponse, dependencies=[Depends(require_auth)])
+async def update_api_key(key_id: str, payload: ApiKeyUpdate, db: AsyncSession = Depends(get_db)) -> ApiKeyResponse:
+    """Update an API key's name or description."""
+    result = await db.execute(select(ApiKey).where(ApiKey.id == key_id))
+    api_key = result.scalar_one_or_none()
+    if not api_key:
+        raise NotFoundException("API key", key_id)
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(api_key, field, value)
+
+    await db.commit()
+    await db.refresh(api_key)
+    logger.info("api_key.updated", id=key_id, name=api_key.name)
+    return ApiKeyResponse.model_validate(api_key)
 
 
 @router.delete("/{key_id}", status_code=204, dependencies=[Depends(require_auth)])

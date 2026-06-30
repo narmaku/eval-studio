@@ -4,6 +4,13 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 
+class ResultUpdate(BaseModel):
+    """Schema for updating a result. Only name and tags are editable."""
+
+    name: str | None = None
+    tags: list[str] | None = None
+
+
 class ResultResponse(BaseModel):
     """Schema for a result in API responses."""
 
@@ -11,6 +18,7 @@ class ResultResponse(BaseModel):
     evaluation_id: str
     dataset_item_id: str | None
     session_id: str | None
+    name: str | None = None
     contestant_model: str | None = None
     score: float | None
     passed: bool | None
@@ -18,7 +26,9 @@ class ResultResponse(BaseModel):
     judge_reasoning: str | None
     scores_breakdown: dict[str, Any] | None
     retrieved_chunks: list[dict[str, Any]] | None = None
+    tags: list[str] = []
     created_at: datetime
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

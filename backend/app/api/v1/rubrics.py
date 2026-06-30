@@ -179,6 +179,8 @@ async def update_rubric(
         raise NotFoundException("Rubric", rubric_id)
 
     update_data = payload.model_dump(exclude_unset=True)
+    if "tags" in update_data and update_data["tags"] is not None:
+        update_data["tags"] = [t.lower().strip() for t in update_data["tags"]]
     for field, value in update_data.items():
         setattr(rubric, field, value)
 
