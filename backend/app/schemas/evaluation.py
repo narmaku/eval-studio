@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.security import redact_config
 
@@ -60,6 +60,11 @@ class EvaluationResponse(BaseModel):
     updated_at: datetime = Field(description="Timestamp when the evaluation was last updated.")
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, v: list[str] | None) -> list[str]:
+        return v if v is not None else []
 
     @model_validator(mode="after")
     def _redact_secrets(self) -> "EvaluationResponse":

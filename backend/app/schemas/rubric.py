@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RubricDimension(BaseModel):
@@ -51,6 +51,11 @@ class RubricResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, v: list[str] | None) -> list[str]:
+        return v if v is not None else []
 
 
 class RubricImportRequest(BaseModel):

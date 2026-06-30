@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class ResultUpdate(BaseModel):
@@ -31,6 +31,11 @@ class ResultResponse(BaseModel):
     updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, v: list[str] | None) -> list[str]:
+        return v if v is not None else []
 
 
 class EvaluationComparisonItem(BaseModel):
