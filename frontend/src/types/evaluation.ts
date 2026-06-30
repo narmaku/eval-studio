@@ -7,6 +7,7 @@ export type ProviderModel = components['schemas']['ProviderModelResponse'];
 export interface Evaluation {
   id: string;
   name: string;
+  description: string | null;
   mode: EvaluationMode;
   status: EvaluationStatus;
   error?: string | null;
@@ -16,8 +17,15 @@ export interface Evaluation {
   result_count: number | null;
   average_score: number | null;
   pass_rate: number | null;
+  tags: string[];
   created_at: string;
   updated_at: string;
+}
+
+export interface UpdateEvaluationRequest {
+  name?: string;
+  description?: string;
+  tags?: string[];
 }
 
 export interface RAGEndpointSettings {

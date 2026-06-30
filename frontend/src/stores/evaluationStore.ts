@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   Evaluation,
   CreateEvaluationRequest,
+  UpdateEvaluationRequest,
   LogEntry,
   RunningEvaluation,
   WebSocketMessage,
@@ -35,6 +36,8 @@ interface EvaluationStore {
   clearError: () => void;
 
   fetchEvaluations: (params?: { mode?: string; status?: string }) => Promise<void>;
+  updateEvaluation: (id: string, data: UpdateEvaluationRequest) => Promise<Evaluation>;
+  deleteEvaluation: (id: string) => Promise<void>;
   createAndRunEvaluation: (request: CreateEvaluationRequest) => Promise<Evaluation>;
   // WebSocket-based methods
   connectToEvaluation: (evaluationId: string) => void;
@@ -89,6 +92,37 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch evaluations';
       set({ error: message, isLoading: false });
+    }
+  },
+
+  updateEvaluation: async (id: string, data: UpdateEvaluationRequest) => {
+    set({ error: null });
+    try {
+      const updated = await api.updateEvaluation(id, data);
+      set((state) => ({
+        evaluations: state.evaluations.map((e) => (e.id === id ? updated : e)),
+        currentEvaluation: state.currentEvaluation?.id === id ? updated : state.currentEvaluation,
+      }));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update evaluation';
+      set({ error: message });
+      throw err;
+    }
+  },
+
+  deleteEvaluation: async (id: string) => {
+    set({ error: null });
+    try {
+      await api.deleteEvaluation(id);
+      set((state) => ({
+        evaluations: state.evaluations.filter((e) => e.id !== id),
+        currentEvaluation: state.currentEvaluation?.id === id ? null : state.currentEvaluation,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete evaluation';
+      set({ error: message });
+      throw err;
     }
   },
 

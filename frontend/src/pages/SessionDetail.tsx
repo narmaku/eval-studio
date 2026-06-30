@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,11 @@ import { ConversationPanel } from '@/components/chat/ConversationPanel';
 import { ToolSidePanel } from '@/components/chat/ToolSidePanel';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
+import { SessionEditSheet } from '@/components/sessions/SessionEditSheet';
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { api } from '@/services/api';
-import { Loader2 } from 'lucide-react';
+import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
+import { Loader2, Pencil, Trash2 } from 'lucide-react';
 import type { Session, Message, ToolCall, SessionScore, JudgeReference } from '@/types';
 
 function extractFromTranscript(transcript: Record<string, unknown>[]): {
@@ -66,6 +69,7 @@ function extractFromTranscript(transcript: Record<string, unknown>[]): {
 
 export default function SessionDetail() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +77,10 @@ export default function SessionDetail() {
   const [showScoreConfig, setShowScoreConfig] = useState(false);
   const [judgeConfig, setJudgeConfig] = useState<JudgeReference>();
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const deleteSession = useSessionHistoryStore((s) => s.deleteSession);
 
   const handleToolSelect = useCallback((tc: ToolCall) => setSelectedToolId(tc.id), []);
 
@@ -131,6 +139,25 @@ export default function SessionDetail() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!sessionId) return;
+    try {
+      await deleteSession(sessionId);
+      toast.success('Session deleted');
+      navigate('/sessions');
+    } catch {
+      // error set in store
+    }
+  };
+
+  const handleEditSaved = () => {
+    setEditOpen(false);
+    // Refresh session data
+    if (sessionId) {
+      void api.getSession(sessionId).then(setSession);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -167,29 +194,53 @@ export default function SessionDetail() {
               {session.status}
             </Badge>
             <span className="text-muted-foreground text-sm">{messages.length} messages</span>
+            {session.tags?.length > 0 &&
+              session.tags.map((tag) => (
+                <Badge key={tag} variant="secondary">
+                  {tag}
+                </Badge>
+              ))}
           </div>
         </div>
-        {isSessionScoring && (
-          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-            Scoring...
-          </Badge>
-        )}
-        {isEnded && !hasScores && !showScoreConfig && !isSessionScoring && (
+        <div className="flex items-center gap-2">
           <Button
-            onClick={() => {
-              if (session.judge_config_snapshot) {
-                const snapshot = session.judge_config_snapshot;
-                if (typeof snapshot.provider_id === 'string') {
-                  setJudgeConfig({ provider_id: snapshot.provider_id });
-                }
-              }
-              setShowScoreConfig(true);
-            }}
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setEditOpen(true)}
+            aria-label="Edit session"
           >
-            Score with Judge
+            <Pencil className="h-4 w-4" />
           </Button>
-        )}
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setDeleteOpen(true)}
+            aria-label="Delete session"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          {isSessionScoring && (
+            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              Scoring...
+            </Badge>
+          )}
+          {isEnded && !hasScores && !showScoreConfig && !isSessionScoring && (
+            <Button
+              onClick={() => {
+                if (session.judge_config_snapshot) {
+                  const snapshot = session.judge_config_snapshot;
+                  if (typeof snapshot.provider_id === 'string') {
+                    setJudgeConfig({ provider_id: snapshot.provider_id });
+                  }
+                }
+                setShowScoreConfig(true);
+              }}
+            >
+              Score with Judge
+            </Button>
+          )}
+        </div>
       </div>
       <Separator />
 
@@ -229,6 +280,28 @@ export default function SessionDetail() {
           <ScoringPanel scores={scores} isSessionEnded={isEnded} />
         </div>
       </div>
+
+      {/* Edit Sheet */}
+      {editOpen && session && (
+        <SessionEditSheet
+          open={editOpen}
+          onOpenChange={(open) => {
+            if (!open) handleEditSaved();
+          }}
+          session={session}
+        />
+      )}
+
+      {/* Delete Confirmation */}
+      <DeleteConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete session"
+        description="Are you sure you want to delete session"
+        entityName={session.name ?? session.id.slice(0, 8)}
+        onConfirm={handleDelete}
+        cascadeInfo="All results linked to this session will also be deleted."
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
-import { BarChart3 } from 'lucide-react';
+import { SessionEditSheet } from '@/components/sessions/SessionEditSheet';
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
+import { BarChart3, Pencil, Trash2 } from 'lucide-react';
+import type { Session } from '@/types';
 
 function formatDuration(startedAt: string | null, endedAt: string | null): string {
   if (!startedAt || !endedAt) return '--';
@@ -55,8 +59,10 @@ function statusBadge(status: string) {
 }
 
 export default function Sessions() {
-  const { sessions, isLoading, error, fetchSessions } = useSessionHistoryStore();
+  const { sessions, isLoading, error, fetchSessions, deleteSession } = useSessionHistoryStore();
   const navigate = useNavigate();
+  const [editTarget, setEditTarget] = useState<Session | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
 
   useEffect(() => {
     void fetchSessions();
@@ -65,6 +71,16 @@ export default function Sessions() {
   const messageCount = (transcript: Record<string, unknown>[] | null) => {
     if (!transcript) return 0;
     return transcript.filter((m) => m.role === 'user' || m.role === 'assistant').length;
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteSession(deleteTarget.id);
+      toast.success(`Session "${deleteTarget.name ?? deleteTarget.id.slice(0, 8)}" deleted`);
+    } catch {
+      // error is already set in the store
+    }
   };
 
   return (
@@ -112,6 +128,7 @@ export default function Sessions() {
               <TableHead>Duration</TableHead>
               <TableHead>Score</TableHead>
               <TableHead>Created</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -153,13 +170,59 @@ export default function Sessions() {
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {formatDate(session.started_at ?? session.id)}
+                  {formatDate(session.started_at ?? session.created_at)}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditTarget(session);
+                      }}
+                      aria-label={`Edit ${session.name ?? session.id.slice(0, 8)}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteTarget(session);
+                      }}
+                      aria-label={`Delete ${session.name ?? session.id.slice(0, 8)}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
+
+      {/* Edit Sheet */}
+      {editTarget && (
+        <SessionEditSheet
+          open={!!editTarget}
+          onOpenChange={(open) => !open && setEditTarget(null)}
+          session={editTarget}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete session"
+        description="Are you sure you want to delete session"
+        entityName={deleteTarget?.name ?? deleteTarget?.id.slice(0, 8) ?? ''}
+        onConfirm={handleDelete}
+        cascadeInfo="All results linked to this session will also be deleted."
+      />
     </div>
   );
 }

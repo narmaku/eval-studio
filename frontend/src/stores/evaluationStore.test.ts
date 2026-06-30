@@ -6,6 +6,8 @@ vi.mock('@/services/api', () => ({
     listEvaluations: vi.fn(),
     getEvaluation: vi.fn(),
     createEvaluation: vi.fn(),
+    updateEvaluation: vi.fn(),
+    deleteEvaluation: vi.fn(),
     runEvaluation: vi.fn(),
     rerunEvaluation: vi.fn(),
   },
@@ -510,6 +512,118 @@ describe('evaluationStore', () => {
 
       const result = useEvaluationStore.getState().getRunningEvaluation();
       expect(result).toBeNull();
+    });
+  });
+
+  describe('updateEvaluation', () => {
+    const makeEval = (overrides = {}) => ({
+      id: 'eval-1',
+      name: 'Original',
+      description: null,
+      mode: 'qa' as const,
+      status: 'completed' as const,
+      dataset_id: 'd1',
+      rubric_id: null,
+      config: { model_endpoint: { name: 'test', default_model: 'gpt-4' }, judge_config: {} },
+      result_count: 5,
+      average_score: null,
+      pass_rate: null,
+      tags: [],
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      ...overrides,
+    });
+
+    it('updates the evaluation in the list on success', async () => {
+      const original = makeEval();
+      useEvaluationStore.setState({ evaluations: [original] });
+
+      const updated = { ...original, name: 'Updated', tags: ['test'] };
+      mockedApi.updateEvaluation.mockResolvedValue(updated);
+
+      const result = await useEvaluationStore
+        .getState()
+        .updateEvaluation('eval-1', { name: 'Updated', tags: ['test'] });
+
+      expect(result).toEqual(updated);
+      expect(useEvaluationStore.getState().evaluations[0]?.name).toBe('Updated');
+      expect(useEvaluationStore.getState().error).toBeNull();
+    });
+
+    it('updates currentEvaluation if it matches the id', async () => {
+      const original = makeEval();
+      useEvaluationStore.setState({ evaluations: [original], currentEvaluation: original });
+
+      const updated = { ...original, name: 'Updated' };
+      mockedApi.updateEvaluation.mockResolvedValue(updated);
+
+      await useEvaluationStore.getState().updateEvaluation('eval-1', { name: 'Updated' });
+
+      expect(useEvaluationStore.getState().currentEvaluation?.name).toBe('Updated');
+    });
+
+    it('sets error and re-throws on failure', async () => {
+      useEvaluationStore.setState({ evaluations: [makeEval()] });
+      mockedApi.updateEvaluation.mockRejectedValue(new Error('Forbidden'));
+
+      await expect(
+        useEvaluationStore.getState().updateEvaluation('eval-1', { name: 'fail' }),
+      ).rejects.toThrow('Forbidden');
+
+      expect(useEvaluationStore.getState().error).toBe('Forbidden');
+    });
+  });
+
+  describe('deleteEvaluation', () => {
+    const makeEval = (overrides = {}) => ({
+      id: 'eval-1',
+      name: 'To Delete',
+      description: null,
+      mode: 'qa' as const,
+      status: 'completed' as const,
+      dataset_id: 'd1',
+      rubric_id: null,
+      config: { model_endpoint: { name: 'test', default_model: 'gpt-4' }, judge_config: {} },
+      result_count: 5,
+      average_score: null,
+      pass_rate: null,
+      tags: [],
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      ...overrides,
+    });
+
+    it('removes evaluation from list on success', async () => {
+      const eval1 = makeEval({ id: 'eval-1' });
+      const eval2 = makeEval({ id: 'eval-2', name: 'Keep' });
+      useEvaluationStore.setState({ evaluations: [eval1, eval2] });
+      mockedApi.deleteEvaluation.mockResolvedValue(undefined);
+
+      await useEvaluationStore.getState().deleteEvaluation('eval-1');
+
+      expect(useEvaluationStore.getState().evaluations).toHaveLength(1);
+      expect(useEvaluationStore.getState().evaluations[0]?.id).toBe('eval-2');
+    });
+
+    it('clears currentEvaluation if it matches the deleted id', async () => {
+      const eval1 = makeEval();
+      useEvaluationStore.setState({ evaluations: [eval1], currentEvaluation: eval1 });
+      mockedApi.deleteEvaluation.mockResolvedValue(undefined);
+
+      await useEvaluationStore.getState().deleteEvaluation('eval-1');
+
+      expect(useEvaluationStore.getState().currentEvaluation).toBeNull();
+    });
+
+    it('sets error and re-throws on failure', async () => {
+      useEvaluationStore.setState({ evaluations: [makeEval()] });
+      mockedApi.deleteEvaluation.mockRejectedValue(new Error('Not found'));
+
+      await expect(useEvaluationStore.getState().deleteEvaluation('eval-1')).rejects.toThrow(
+        'Not found',
+      );
+
+      expect(useEvaluationStore.getState().error).toBe('Not found');
     });
   });
 });

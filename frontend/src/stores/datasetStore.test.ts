@@ -7,6 +7,7 @@ vi.mock('@/services/api', () => ({
     listDatasets: vi.fn(),
     getDataset: vi.fn(),
     createDataset: vi.fn(),
+    updateDataset: vi.fn(),
     deleteDataset: vi.fn(),
     analyzeDatasetFiles: vi.fn(),
     importDataset: vi.fn(),
@@ -311,6 +312,35 @@ describe('datasetStore', () => {
       const state = useDatasetStore.getState();
       expect(state.error).toBe('Import failed');
       expect(state.isImporting).toBe(false);
+    });
+  });
+
+  describe('updateDataset', () => {
+    it('updates dataset in list on success', async () => {
+      const ds1 = makeDataset({ id: 'ds-1', name: 'Original' });
+      useDatasetStore.setState({ datasets: [ds1] });
+
+      const updated = makeDataset({ id: 'ds-1', name: 'Updated', tags: ['tagged'] });
+      mockedApi.updateDataset.mockResolvedValue(updated);
+
+      const result = await useDatasetStore
+        .getState()
+        .updateDataset('ds-1', { name: 'Updated', tags: ['tagged'] });
+
+      expect(result).toEqual(updated);
+      expect(useDatasetStore.getState().datasets[0]?.name).toBe('Updated');
+      expect(useDatasetStore.getState().error).toBeNull();
+    });
+
+    it('sets error and re-throws on failure', async () => {
+      useDatasetStore.setState({ datasets: [makeDataset()] });
+      mockedApi.updateDataset.mockRejectedValue(new Error('Forbidden'));
+
+      await expect(
+        useDatasetStore.getState().updateDataset('ds-1', { name: 'fail' }),
+      ).rejects.toThrow('Forbidden');
+
+      expect(useDatasetStore.getState().error).toBe('Forbidden');
     });
   });
 
