@@ -20,8 +20,10 @@ class Session(Base):
     agent_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     judge_config_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     scores: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    tags: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True, default=_utcnow)
     ended_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TZDateTime, default=_utcnow, onupdate=_utcnow)
 
     evaluation: Mapped["Evaluation"] = relationship("Evaluation", back_populates="sessions")  # noqa: F821

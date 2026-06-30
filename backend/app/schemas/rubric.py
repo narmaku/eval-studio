@@ -33,6 +33,7 @@ class RubricUpdate(BaseModel):
     pass_threshold: float | None = Field(default=None, ge=0, le=1)
     aggregation: str | None = None
     prompt_template: str | None = None
+    tags: list[str] | None = None
 
 
 class RubricResponse(BaseModel):
@@ -45,6 +46,7 @@ class RubricResponse(BaseModel):
     pass_threshold: float
     aggregation: str
     prompt_template: str | None
+    tags: list[str] = []
     created_at: datetime
     updated_at: datetime
 

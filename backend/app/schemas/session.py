@@ -39,6 +39,13 @@ class ScoreSessionRequest(BaseModel):
     judge_config: dict[str, Any]
 
 
+class SessionUpdate(BaseModel):
+    """Schema for updating a session."""
+
+    name: str | None = None
+    tags: list[str] | None = None
+
+
 class SessionResponse(BaseModel):
     """Schema for a session in API responses."""
 
@@ -51,10 +58,12 @@ class SessionResponse(BaseModel):
     agent_config: dict[str, Any] | None
     judge_config_snapshot: dict[str, Any] | None
     scores: dict[str, Any] | None
+    tags: list[str] = []
     error: str | None
     started_at: datetime | None
     ended_at: datetime | None
     created_at: datetime
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

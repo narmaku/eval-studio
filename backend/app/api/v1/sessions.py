@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +10,7 @@ from app.core.database import get_db
 from app.core.exceptions import AppException, ConflictException, NotFoundException, sanitize_error_for_client
 from app.core.security import require_auth
 from app.models.evaluation import Evaluation
+from app.models.result import Result
 from app.models.session import Session
 from app.schemas.common import PaginatedResponse
 from app.schemas.evaluation import EvaluationMode, EvaluationStatus
@@ -20,6 +22,7 @@ from app.schemas.session import (
     SessionReplayResponse,
     SessionResponse,
     SessionStatus,
+    SessionUpdate,
 )
 
 logger = structlog.get_logger()
@@ -112,6 +115,44 @@ async def get_session(session_id: str, db: AsyncSession = Depends(get_db)) -> Se
         raise NotFoundException("Session", session_id)
 
     return SessionResponse.model_validate(session)
+
+
+@router.put("/{session_id}", response_model=SessionResponse)
+async def update_session(
+    session_id: str, payload: SessionUpdate, db: AsyncSession = Depends(get_db)
+) -> SessionResponse:
+    """Update a session's name or tags."""
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise NotFoundException("Session", session_id)
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if "tags" in update_data and update_data["tags"] is not None:
+        update_data["tags"] = [t.lower().strip() for t in update_data["tags"]]
+    for field, value in update_data.items():
+        setattr(session, field, value)
+
+    await db.commit()
+    await db.refresh(session)
+    logger.info("session.updated", id=session_id)
+    return SessionResponse.model_validate(session)
+
+
+@router.delete("/{session_id}", status_code=204)
+async def delete_session(session_id: str, db: AsyncSession = Depends(get_db)) -> Response:
+    """Delete a session and its linked results."""
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise NotFoundException("Session", session_id)
+
+    # Cascade: delete results linked to this session
+    await db.execute(sa_delete(Result).where(Result.session_id == session_id))
+    await db.delete(session)
+    await db.commit()
+    logger.info("session.deleted", id=session_id)
+    return Response(status_code=204)
 
 
 @router.post("/{session_id}/message", response_model=SessionResponse)

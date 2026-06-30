@@ -18,4 +18,5 @@ class Rubric(Base):
     pass_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
     aggregation: Mapped[str] = mapped_column(String(50), nullable=False, default="weighted_average")
     prompt_template: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     updated_at: Mapped[datetime] = mapped_column(TZDateTime, default=_utcnow, onupdate=_utcnow)

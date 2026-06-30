@@ -10,6 +10,13 @@ class ApiKeyCreate(BaseModel):
     description: str | None = Field(default=None, description="Optional description of the key's purpose.")
 
 
+class ApiKeyUpdate(BaseModel):
+    """Schema for updating an API key."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255, description="Human-readable name.")
+    description: str | None = Field(default=None, description="Optional description of the key's purpose.")
+
+
 class ApiKeyResponse(BaseModel):
     """Schema for an API key in list/detail responses.
 

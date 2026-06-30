@@ -32,17 +32,27 @@ class EvaluationCreate(BaseModel):
     config: dict[str, Any] = Field(default={}, description="Mode-specific configuration.")
 
 
+class EvaluationUpdate(BaseModel):
+    """Schema for updating an evaluation."""
+
+    name: str | None = Field(default=None, description="Human-readable evaluation name.")
+    description: str | None = Field(default=None, description="Optional description of the evaluation.")
+    tags: list[str] | None = Field(default=None, description="Tags for categorization.")
+
+
 class EvaluationResponse(BaseModel):
     """Schema for an evaluation in API responses."""
 
     id: str = Field(description="Unique identifier for the evaluation.")
     name: str = Field(description="Human-readable evaluation name.")
+    description: str | None = Field(default=None, description="Optional description of the evaluation.")
     mode: EvaluationMode = Field(description="Evaluation mode: qa, rag, agent, or arena.")
     status: EvaluationStatus = Field(description="Current evaluation status.")
     error: str | None = Field(default=None, description="Error message if the evaluation failed.")
     dataset_id: str | None = Field(description="ID of the dataset being evaluated.")
     rubric_id: str | None = Field(default=None, description="ID of the rubric used for dimension-based scoring.")
     config: dict[str, Any] = Field(description="Mode-specific configuration.")
+    tags: list[str] = Field(default=[], description="Tags for categorization.")
     result_count: int | None = Field(default=None, description="Number of results (populated on detail endpoint).")
     average_score: float | None = Field(default=None, description="Average score across results.")
     pass_rate: float | None = Field(default=None, description="Fraction of results that passed.")
