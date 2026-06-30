@@ -14,13 +14,21 @@ export interface Result {
   dataset_item_id: string | null;
   session_id: string | null;
   contestant_model: string | null;
+  name: string | null;
   score: number | null;
   passed: boolean | null;
   actual_answer: string | null;
   judge_reasoning: string | null;
   scores_breakdown: Record<string, number> | null;
   retrieved_chunks: RetrievedChunk[] | null;
+  tags: string[];
   created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateResultRequest {
+  name?: string;
+  tags?: string[];
 }
 
 export interface ArenaContestantSummary {

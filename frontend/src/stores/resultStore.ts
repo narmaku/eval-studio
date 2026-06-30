@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Result, AggregateMetrics, ComparisonResponse } from '@/types';
+import type { Result, UpdateResultRequest, AggregateMetrics, ComparisonResponse } from '@/types';
 import { api } from '@/services/api';
 
 interface PaginationState {
@@ -30,6 +30,8 @@ interface ResultStore {
 
   fetchResults: (evaluationId: string, page?: number, pageSize?: number) => Promise<void>;
   fetchResult: (id: string) => Promise<void>;
+  updateResult: (id: string, data: UpdateResultRequest) => Promise<Result>;
+  deleteResult: (id: string) => Promise<void>;
   fetchAggregateMetrics: (evaluationId: string) => Promise<void>;
   fetchAllResultsForExport: (evaluationId: string) => Promise<Result[]>;
 
@@ -89,6 +91,37 @@ export const useResultStore = create<ResultStore>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch result';
       set({ error: message, isLoading: false });
+    }
+  },
+
+  updateResult: async (id: string, data: UpdateResultRequest) => {
+    set({ error: null });
+    try {
+      const updated = await api.updateResult(id, data);
+      set((state) => ({
+        results: state.results.map((r) => (r.id === id ? updated : r)),
+        currentResult: state.currentResult?.id === id ? updated : state.currentResult,
+      }));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update result';
+      set({ error: message });
+      throw err;
+    }
+  },
+
+  deleteResult: async (id: string) => {
+    set({ error: null });
+    try {
+      await api.deleteResult(id);
+      set((state) => ({
+        results: state.results.filter((r) => r.id !== id),
+        currentResult: state.currentResult?.id === id ? null : state.currentResult,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete result';
+      set({ error: message });
+      throw err;
     }
   },
 

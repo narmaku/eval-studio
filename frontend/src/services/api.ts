@@ -3,18 +3,22 @@ import type {
   ApiError,
   AggregateMetrics,
   Artifact,
+  UpdateArtifactRequest,
   Evaluation,
   CreateEvaluationRequest,
+  UpdateEvaluationRequest,
   Dataset,
   DatasetDetail,
   CreateDatasetRequest,
   AnalyzeResponse,
   ImportRequest,
   Result,
+  UpdateResultRequest,
   ComparisonResponse,
   ArenaLeaderboardResponse,
   Session,
   CreateSessionRequest,
+  UpdateSessionRequest,
   SendMessageRequest,
   Provider,
   CreateProviderRequest,
@@ -120,6 +124,8 @@ export const api = {
   getEvaluation: (id: string) => request<Evaluation>(`/api/v1/evaluations/${id}`),
   createEvaluation: (data: CreateEvaluationRequest) =>
     request<Evaluation>('/api/v1/evaluations', { method: 'POST', body: JSON.stringify(data) }),
+  updateEvaluation: (id: string, data: UpdateEvaluationRequest) =>
+    request<Evaluation>(`/api/v1/evaluations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteEvaluation: (id: string) =>
     request<void>(`/api/v1/evaluations/${id}`, { method: 'DELETE' }),
   runEvaluation: (id: string) =>
@@ -147,6 +153,9 @@ export const api = {
   createSession: (data: CreateSessionRequest) =>
     request<Session>('/api/v1/sessions', { method: 'POST', body: JSON.stringify(data) }),
   getSession: (id: string) => request<Session>(`/api/v1/sessions/${id}`),
+  updateSession: (id: string, data: UpdateSessionRequest) =>
+    request<Session>(`/api/v1/sessions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSession: (id: string) => request<void>(`/api/v1/sessions/${id}`, { method: 'DELETE' }),
   sendMessage: (sessionId: string, data: SendMessageRequest) =>
     request<Session>(`/api/v1/sessions/${sessionId}/message`, {
       method: 'POST',
@@ -194,6 +203,9 @@ export const api = {
     return request<PaginatedResponse<Result>>(`/api/v1/results${qs ? `?${qs}` : ''}`);
   },
   getResult: (id: string) => request<Result>(`/api/v1/results/${id}`),
+  updateResult: (id: string, data: UpdateResultRequest) =>
+    request<Result>(`/api/v1/results/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteResult: (id: string) => request<void>(`/api/v1/results/${id}`, { method: 'DELETE' }),
   getAggregateMetrics: (evaluationId: string) =>
     request<AggregateMetrics>(
       `/api/v1/results/aggregate?evaluation_id=${encodeURIComponent(evaluationId)}`,
@@ -314,6 +326,11 @@ export const api = {
       `/api/v1/artifacts?evaluation_id=${encodeURIComponent(evaluationId)}&page=${page}&page_size=${pageSize}`,
     ),
   getArtifact: (artifactId: string) => request<Artifact>(`/api/v1/artifacts/${artifactId}`),
+  updateArtifact: (artifactId: string, data: UpdateArtifactRequest) =>
+    request<Artifact>(`/api/v1/artifacts/${artifactId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   getArtifactDownloadUrl: (artifactId: string): string =>
     `${BASE_URL}/api/v1/artifacts/${artifactId}/download`,
   previewArtifact: (artifactId: string) =>

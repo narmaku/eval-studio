@@ -28,6 +28,7 @@ interface DatasetStore {
   fetchDatasets: () => Promise<void>;
   fetchDataset: (id: string) => Promise<void>;
   uploadDataset: (data: CreateDatasetRequest) => Promise<Dataset>;
+  updateDataset: (id: string, data: Partial<CreateDatasetRequest>) => Promise<Dataset>;
   removeDataset: (id: string) => Promise<void>;
 
   // Smart import actions
@@ -82,6 +83,21 @@ export const useDatasetStore = create<DatasetStore>((set, get) => ({
       return dataset;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to upload dataset';
+      set({ error: message });
+      throw err;
+    }
+  },
+
+  updateDataset: async (id: string, data: Partial<CreateDatasetRequest>) => {
+    set({ error: null });
+    try {
+      const updated = await api.updateDataset(id, data);
+      set((state) => ({
+        datasets: state.datasets.map((d) => (d.id === id ? updated : d)),
+      }));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update dataset';
       set({ error: message });
       throw err;
     }
