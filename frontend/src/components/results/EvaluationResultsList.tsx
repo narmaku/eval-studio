@@ -10,7 +10,8 @@ import {
   type ColumnFiltersState,
 } from '@tanstack/react-table';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, Star } from 'lucide-react';
+import { ArrowUpDown, Pencil, Star, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -28,9 +29,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { EvaluationEditSheet } from '@/components/evaluation/EvaluationEditSheet';
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { useResultStore } from '@/stores/resultStore';
-import type { EvaluationMode, EvaluationStatus } from '@/types';
+import { useEvaluationStore } from '@/stores/evaluationStore';
+import type { Evaluation, EvaluationMode, EvaluationStatus } from '@/types';
 
 export interface EvaluationResultRow {
   evaluationId: string;
@@ -106,6 +111,10 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'createdAt', desc: true }]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [editTarget, setEditTarget] = useState<Evaluation | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EvaluationResultRow | null>(null);
+
+  const { evaluations, deleteEvaluation, fetchEvaluations } = useEvaluationStore();
 
   const selectedEvaluationIds = useResultStore((s) => s.selectedEvaluationIds);
   const referenceEvaluationId = useResultStore((s) => s.referenceEvaluationId);
@@ -285,6 +294,40 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
           );
         },
       },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Edit evaluation"
+              onClick={(e) => {
+                e.stopPropagation();
+                const eval_ = evaluations.find((ev) => ev.id === row.original.evaluationId);
+                if (eval_) setEditTarget(eval_);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Delete evaluation"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteTarget(row.original);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+        enableSorting: false,
+      },
     ],
     [
       selectedEvaluationIds,
@@ -293,6 +336,7 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
       filterDatasetId,
       handleCheckboxClick,
       handleSetReference,
+      evaluations,
     ],
   );
 
@@ -381,6 +425,36 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
           </TableBody>
         </Table>
       </div>
+
+      {editTarget && (
+        <EvaluationEditSheet
+          open={!!editTarget}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditTarget(null);
+              void fetchEvaluations();
+            }
+          }}
+          evaluation={editTarget}
+        />
+      )}
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete evaluation"
+        description="Are you sure you want to delete this evaluation?"
+        entityName={deleteTarget?.name ?? ''}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await deleteEvaluation(deleteTarget.evaluationId);
+          toast.success(`Evaluation "${deleteTarget.name}" deleted`);
+          setDeleteTarget(null);
+        }}
+        cascadeInfo="All results and artifacts for this evaluation will also be deleted."
+      />
     </div>
   );
 }
