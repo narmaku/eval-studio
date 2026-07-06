@@ -1,31 +1,11 @@
 import { useEffect } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EvaluationLogPanel } from './EvaluationLogPanel';
 import { useEvaluationStore } from '@/stores/evaluationStore';
-import type { EvaluationStatus } from '@/types';
 
 interface EvaluationProgressProps {
   evaluationId: string;
   onComplete: () => void;
 }
-
-const statusVariant: Record<EvaluationStatus, 'outline' | 'default' | 'secondary' | 'destructive'> =
-  {
-    pending: 'outline',
-    running: 'default',
-    completed: 'secondary',
-    failed: 'destructive',
-    cancelled: 'outline',
-  };
-
-const statusLabel: Record<EvaluationStatus, string> = {
-  pending: 'Pending',
-  running: 'Running',
-  completed: 'Completed',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
-};
 
 export function EvaluationProgress({ evaluationId, onComplete }: EvaluationProgressProps) {
   const currentEvaluation = useEvaluationStore((state) => state.currentEvaluation);
@@ -40,7 +20,6 @@ export function EvaluationProgress({ evaluationId, onComplete }: EvaluationProgr
     };
   }, [evaluationId, connectToEvaluation, disconnectFromEvaluation]);
 
-  // Trigger onComplete when evaluation finishes
   useEffect(() => {
     if (
       currentEvaluation?.status === 'completed' ||
@@ -57,66 +36,80 @@ export function EvaluationProgress({ evaluationId, onComplete }: EvaluationProgr
   const hasProgress = progress !== null && progress.total > 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          Evaluation Progress
-          <Badge variant={statusVariant[status]}>{statusLabel[status]}</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <div className="space-y-4">
+      {/* Title + status pill */}
+      <div className="flex items-center gap-3">
+        <h2 className="text-[19px] font-semibold">{currentEvaluation?.name ?? 'Evaluation'}</h2>
+        {status === 'running' && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-warn-bg px-3 py-1 text-[11px] font-semibold text-warn">
+            <span className="h-1.5 w-1.5 rounded-full bg-warn animate-es-pulse" />
+            Running
+          </span>
+        )}
+        {status === 'pending' && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-3 px-3 py-1 text-[11px] font-semibold text-text-2">
+            Pending
+          </span>
+        )}
+      </div>
+
+      {status === 'running' && (
+        <p className="text-[13px] text-text-2">
+          Live logs streamed over WebSocket
+          {progress?.contestantModel && ` — scoring against ${progress.contestantModel}`}
+        </p>
+      )}
+
+      {/* Progress card */}
+      <div className="rounded-[14px] border border-border bg-card shadow-sm overflow-hidden">
+        {/* Header with progress count */}
+        {hasProgress && (
+          <div className="flex items-center justify-between px-5 pt-4 pb-2">
+            <span className="font-mono text-[13px] font-semibold">
+              {progress.completed} / {progress.total} items
+            </span>
+            {progress.currentItem && (
+              <span className="text-[12px] text-text-2 truncate max-w-[50%]">
+                {progress.currentItem}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Progress bar */}
         {(status === 'running' || status === 'pending') && (
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div className="mx-5 mb-3 h-[7px] overflow-hidden rounded-full bg-surface-3">
             {hasProgress ? (
               <div
-                className="h-full rounded-full bg-primary transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${progressPercent}%`,
+                  background: 'linear-gradient(90deg, var(--accent), var(--accent-2))',
+                }}
               />
             ) : (
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
+              <div
+                className="h-full w-1/3 rounded-full"
+                style={{
+                  background: 'linear-gradient(90deg, var(--accent), var(--accent-2))',
+                  animation: 'es-indet 1.5s ease-in-out infinite',
+                }}
+              />
             )}
           </div>
         )}
 
-        {/* Progress text */}
-        {status === 'running' && hasProgress && (
-          <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-medium">
-                {progress.completed} / {progress.total}
-              </span>
-              {progress.currentItem && <span className="ml-2">— {progress.currentItem}</span>}
-            </p>
-            {progress.contestantModel && (
-              <p className="text-xs text-muted-foreground">
-                Model: <span className="font-medium">{progress.contestantModel}</span>
-              </p>
-            )}
-          </div>
-        )}
+        {/* Log panel */}
+        <EvaluationLogPanel />
+      </div>
 
-        {status === 'running' && !hasProgress && (
-          <p className="text-sm text-muted-foreground">Scoring items...</p>
-        )}
-
-        {status === 'pending' && (
-          <p className="text-sm text-muted-foreground">Waiting for evaluation to start...</p>
-        )}
-
-        {status === 'completed' && (
-          <p className="text-sm text-muted-foreground">Evaluation completed successfully.</p>
-        )}
-
-        {status === 'failed' && (
-          <div className="space-y-1">
-            <p className="text-sm text-destructive">Evaluation failed.</p>
-          </div>
-        )}
-
-        {/* Log Panel */}
-        {(status === 'running' || status === 'pending') && <EvaluationLogPanel />}
-      </CardContent>
-    </Card>
+      {/* Status messages for terminal states */}
+      {status === 'completed' && (
+        <p className="text-[13px] text-pass font-medium">Evaluation completed successfully.</p>
+      )}
+      {status === 'failed' && (
+        <p className="text-[13px] text-fail font-medium">Evaluation failed.</p>
+      )}
+    </div>
   );
 }

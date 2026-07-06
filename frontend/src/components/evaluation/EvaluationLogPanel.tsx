@@ -4,18 +4,6 @@ import type { LogEntry, LogLevel } from '@/types';
 
 const MAX_DISPLAYED_LOGS = 500;
 
-const levelStyles: Record<LogLevel, string> = {
-  info: 'text-zinc-400',
-  warning: 'text-yellow-500',
-  error: 'text-red-500',
-};
-
-const levelLabels: Record<LogLevel, string> = {
-  info: 'INFO',
-  warning: 'WARN',
-  error: 'ERROR',
-};
-
 function formatTimestamp(iso: string): string {
   try {
     const date = new Date(iso);
@@ -25,14 +13,33 @@ function formatTimestamp(iso: string): string {
   }
 }
 
+function getLevelClasses(
+  level: LogLevel,
+  message: string,
+): { labelClass: string; label: string; messageClass: string } {
+  if (message.toLowerCase().includes('(pass)') || level === ('pass' as LogLevel)) {
+    return { labelClass: 'text-pass', label: 'PASS', messageClass: 'text-foreground' };
+  }
+  if (message.toLowerCase().startsWith('evaluation completed')) {
+    return { labelClass: 'text-accent', label: 'DONE', messageClass: 'text-accent' };
+  }
+  switch (level) {
+    case 'warning':
+      return { labelClass: 'text-warn', label: 'WARN', messageClass: 'text-text-2' };
+    case 'error':
+      return { labelClass: 'text-fail', label: 'ERROR', messageClass: 'text-fail' };
+    default:
+      return { labelClass: 'text-text-3', label: 'INFO', messageClass: 'text-text-2' };
+  }
+}
+
 function LogEntryRow({ entry }: { entry: LogEntry }) {
+  const { labelClass, label, messageClass } = getLevelClasses(entry.level, entry.message);
   return (
-    <div className="flex gap-2 py-0.5 leading-tight">
-      <span className="text-zinc-500 shrink-0">[{formatTimestamp(entry.timestamp)}]</span>
-      <span className={`shrink-0 font-semibold ${levelStyles[entry.level]}`}>
-        {levelLabels[entry.level]}
-      </span>
-      <span className="text-zinc-200 break-all">{entry.message}</span>
+    <div className="flex gap-3 py-0.5 leading-relaxed">
+      <span className="shrink-0 text-text-3">{formatTimestamp(entry.timestamp)}</span>
+      <span className={`shrink-0 w-10 font-semibold ${labelClass}`}>{label}</span>
+      <span className={`break-all ${messageClass}`}>{entry.message}</span>
     </div>
   );
 }
@@ -44,14 +51,12 @@ export function EvaluationLogPanel() {
 
   const displayedLogs = logs.length > MAX_DISPLAYED_LOGS ? logs.slice(-MAX_DISPLAYED_LOGS) : logs;
 
-  // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
     if (autoScroll && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [logs.length, autoScroll]);
 
-  // Detect if user scrolled up
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -61,8 +66,8 @@ export function EvaluationLogPanel() {
 
   if (logs.length === 0) {
     return (
-      <div className="rounded-md border bg-muted/30 p-4">
-        <p className="text-sm text-muted-foreground font-mono">Waiting for logs...</p>
+      <div className="bg-surface-2 px-5 py-6">
+        <p className="font-mono text-[11.5px] text-text-3">Waiting for logs...</p>
       </div>
     );
   }
@@ -71,7 +76,7 @@ export function EvaluationLogPanel() {
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="rounded-md border bg-zinc-950 p-3 font-mono text-xs max-h-80 overflow-y-auto"
+      className="bg-surface-2 px-5 py-3 font-mono text-[11.5px] max-h-[360px] overflow-y-auto"
       data-testid="evaluation-log-panel"
     >
       {displayedLogs.map((entry, idx) => (
