@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, Database, Play } from 'lucide-react';
 import { EvaluatorSelector } from '@/components/evaluation/EvaluatorSelector';
 import { DatasetSelector } from '@/components/evaluation/DatasetSelector';
 import { RAGEndpointConfig } from '@/components/evaluation/RAGEndpointConfig';
@@ -126,14 +126,30 @@ export default function RAGEvaluation() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">RAG Pipeline Evaluation</h1>
-        <p className="text-muted-foreground">
-          Evaluate retrieval-augmented generation with chunk-level analysis of retrieval quality and
-          answer generation.
-        </p>
+        <Link
+          to="/evaluate"
+          className="mb-3 inline-flex items-center gap-1.5 text-[12.5px] text-text-2 hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          All modes
+        </Link>
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-mode-rag-bg text-mode-rag-fg">
+            <Database className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em]">
+              RAG Pipeline Evaluation
+            </h1>
+            <p className="text-[13px] text-text-2">
+              Evaluate retrieval-augmented generation with chunk-level analysis of retrieval quality
+              and answer generation.
+            </p>
+          </div>
+        </div>
       </div>
-      <Separator />
 
       {phase === 'configure' && (
         <>
@@ -141,7 +157,9 @@ export default function RAGEvaluation() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-2">
-                <h2 className="text-sm font-medium">Dataset</h2>
+                <h2 className="text-[10.5px] font-semibold tracking-[0.06em] uppercase text-text-3">
+                  Dataset
+                </h2>
                 <DatasetSelector value={selectedDatasetId} onChange={setSelectedDatasetId} />
               </div>
               <RAGEndpointConfig value={ragEndpoint} onChange={setRagEndpoint} />
@@ -152,22 +170,26 @@ export default function RAGEvaluation() {
             </div>
           </div>
           <LLMParamsPanel label="Judge Parameters" value={judgeParams} onChange={setJudgeParams} />
-          <Button
-            className="w-full"
+          <button
+            className="flex w-full items-center justify-center gap-2 rounded-[9px] bg-primary px-4 py-3 text-[13px] font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
             disabled={!isConfigValid || isLoading}
             onClick={() => void handleStart()}
           >
+            <Play className="h-4 w-4" />
             {isLoading ? 'Starting...' : 'Start RAG Evaluation'}
-          </Button>
+          </button>
         </>
       )}
 
       {phase === 'running' && currentEvaluation && (
         <>
           <EvaluationProgress evaluationId={currentEvaluation.id} onComplete={handleComplete} />
-          <Button variant="outline" onClick={cancel}>
+          <button
+            className="rounded-[9px] border border-border px-4 py-2 text-[13px] font-medium text-text-2 transition-colors hover:bg-surface-3"
+            onClick={cancel}
+          >
             Cancel
-          </Button>
+          </button>
         </>
       )}
 
@@ -190,9 +212,12 @@ export default function RAGEvaluation() {
             onClose={() => setDrawerOpen(false)}
           />
 
-          <Button variant="outline" onClick={handleNewEvaluation}>
+          <button
+            className="rounded-[9px] border border-border px-4 py-2 text-[13px] font-medium text-text-2 transition-colors hover:bg-surface-3"
+            onClick={handleNewEvaluation}
+          >
             New Evaluation
-          </Button>
+          </button>
         </>
       )}
     </div>

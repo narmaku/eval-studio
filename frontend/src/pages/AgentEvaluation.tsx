@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Separator } from '@/components/ui/separator';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +18,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { api } from '@/services/api';
 import {
+  ArrowLeft,
   Play,
   Square,
   RefreshCw,
@@ -285,13 +286,28 @@ export default function AgentEvaluation() {
 
   return (
     <div className="flex h-full flex-col space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Agent/Chat Evaluation</h1>
-        <p className="text-muted-foreground">
-          Multi-turn conversational evaluation with tool call tracing, live or simulated sessions.
-        </p>
+        <Link
+          to="/evaluate"
+          className="mb-3 inline-flex items-center gap-1.5 text-[12.5px] text-text-2 hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          All modes
+        </Link>
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-mode-agent-bg text-mode-agent-fg">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Agent Chat Evaluation</h1>
+            <p className="text-[13px] text-text-2">
+              Interactive or simulated multi-turn conversations with full tool-call tracing and
+              scoring.
+            </p>
+          </div>
+        </div>
       </div>
-      <Separator />
 
       {/* Configure Phase */}
       {phase === 'configure' && (
@@ -361,14 +377,14 @@ export default function AgentEvaluation() {
               <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
             </div>
           </div>
-          <Button
-            className="w-full"
+          <button
+            className="flex w-full items-center justify-center gap-2 rounded-[9px] bg-primary px-4 py-3 text-[13px] font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
             disabled={!isConfigValid || evalLoading}
             onClick={() => void handleStart()}
           >
-            <Play className="mr-2 h-4 w-4" />
-            {evalLoading ? 'Starting...' : 'Start Session'}
-          </Button>
+            <Play className="h-4 w-4" />
+            {evalLoading ? 'Starting...' : 'Start Agent Evaluation'}
+          </button>
         </>
       )}
 
@@ -397,10 +413,13 @@ export default function AgentEvaluation() {
           {error && !isConnected && currentSession?.status === 'active' && (
             <div className="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2">
               <p className="text-sm text-destructive">{error}</p>
-              <Button variant="outline" size="sm" onClick={handleReconnect}>
+              <button
+                className="rounded-[9px] border border-border px-4 py-2 text-[13px] font-medium text-text-2 transition-colors hover:bg-surface-3"
+                onClick={handleReconnect}
+              >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                 Reconnect
-              </Button>
+              </button>
             </div>
           )}
           {error && isConnected && <SessionErrorBanner error={error} />}
@@ -471,15 +490,14 @@ export default function AgentEvaluation() {
                     </>
                   )}
                 </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
+                <button
+                  className="rounded-[9px] border border-border px-4 py-2 text-[13px] font-medium text-text-2 transition-colors hover:bg-surface-3"
                   onClick={handleSkipScoring}
                   disabled={isScoring}
                 >
                   <SkipForward className="mr-2 h-4 w-4" />
                   Skip Scoring
-                </Button>
+                </button>
               </div>
             </div>
           </div>
@@ -514,10 +532,13 @@ export default function AgentEvaluation() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={handleNewSession}>
+            <button
+              className="rounded-[9px] border border-border px-4 py-2 text-[13px] font-medium text-text-2 transition-colors hover:bg-surface-3"
+              onClick={handleNewSession}
+            >
               <RefreshCw className="mr-2 h-4 w-4" />
               New Session
-            </Button>
+            </button>
             {currentSession && (
               <Button variant="ghost" asChild>
                 <a href={`/results/${currentSession.evaluation_id}`}>
