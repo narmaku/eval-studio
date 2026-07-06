@@ -1,15 +1,21 @@
 import { Outlet } from 'react-router-dom';
-import { TopNav } from './TopNav';
+import { Sidebar } from './Sidebar';
+import { TopBar } from './TopBar';
 import { Toaster } from '@/components/ui/sonner';
 import { NotificationPanel } from '@/components/notifications/NotificationPanel';
 
 export function AppShell() {
   return (
-    <div className="min-h-screen bg-background">
-      <TopNav />
-      <main className="container mx-auto py-6 px-4">
-        <Outlet />
-      </main>
+    <div className="flex h-screen overflow-hidden bg-background">
+      <Sidebar />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <TopBar />
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[1160px] px-8 py-7 pb-16 animate-es-fade">
+            <Outlet />
+          </div>
+        </main>
+      </div>
       <Toaster />
       <NotificationPanel />
     </div>
