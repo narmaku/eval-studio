@@ -7,13 +7,23 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ArrowUp, ArrowDown, Database, Loader2, Pencil, Trash2 } from 'lucide-react';
+import {
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Database,
+  Loader2,
+  Pencil,
+  Star,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { formatMonoDate } from '@/lib/designUtils';
 import {
   Table,
   TableBody,
@@ -122,7 +132,11 @@ const columns: ColumnDef<Dataset>[] = [
         )}
       </Button>
     ),
-    cell: ({ row }) => new Date(row.getValue('created_at') as string).toLocaleDateString(),
+    cell: ({ row }) => (
+      <span className="font-mono text-[11px] text-text-2">
+        {formatMonoDate(row.getValue('created_at') as string)}
+      </span>
+    ),
   },
 ];
 
@@ -168,15 +182,32 @@ export default function Datasets() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Datasets</h1>
-          <p className="text-muted-foreground">
-            Manage your dataset library. Upload, import, version, and browse evaluation datasets.
+          <h1 className="text-[25px] font-semibold tracking-[-0.02em]">Datasets</h1>
+          <p className="text-[13px] text-text-2">
+            Your dataset library. Upload, import, version, and browse evaluation datasets.
           </p>
         </div>
-        <Button onClick={() => setUploadDialogOpen(true)}>Import Dataset</Button>
+        <button
+          className="flex items-center gap-2 rounded-[9px] bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+          onClick={() => setUploadDialogOpen(true)}
+        >
+          <Upload className="h-4 w-4" />
+          Import Dataset
+        </button>
       </div>
 
-      <Separator />
+      {/* Smart-import banner */}
+      <div className="rounded-[14px] border border-dashed border-border bg-accent/10 p-5">
+        <div className="flex items-center gap-3">
+          <Star className="h-5 w-5 shrink-0 text-primary" />
+          <div>
+            <p className="text-[13px] font-medium">Smart import auto-detects your format</p>
+            <p className="text-[12px] text-text-2">
+              Drop any CSV, JSON, JSONL, or YAML file and we will parse it automatically.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="flex justify-center py-12" data-testid="datasets-loading">
@@ -227,22 +258,20 @@ export default function Datasets() {
                   ))}
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
+                      <button
+                        className="rounded-[9px] p-1.5 text-text-3 transition-colors hover:bg-surface-3 hover:text-foreground"
                         onClick={() => setEditTarget(row.original)}
                         aria-label={`Edit ${row.original.name}`}
                       >
                         <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
+                      </button>
+                      <button
+                        className="rounded-[9px] p-1.5 text-text-3 transition-colors hover:bg-surface-3 hover:text-foreground"
                         onClick={() => setDeleteTarget(row.original)}
                         aria-label={`Delete ${row.original.name}`}
                       >
                         <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </button>
                     </div>
                   </TableCell>
                 </TableRow>
