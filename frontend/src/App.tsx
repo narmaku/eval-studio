@@ -16,6 +16,7 @@ const ResultComparison = lazy(() => import('@/pages/ResultComparison'));
 const Sessions = lazy(() => import('@/pages/Sessions'));
 const SessionDetail = lazy(() => import('@/pages/SessionDetail'));
 const Settings = lazy(() => import('@/pages/Settings'));
+const Search = lazy(() => import('@/pages/Search'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 export function Loading() {
@@ -139,6 +140,14 @@ export default function App() {
               element={
                 <Suspense fallback={<Loading />}>
                   <Settings />
+                </Suspense>
+              }
+            />
+            <Route
+              path="search"
+              element={
+                <Suspense fallback={<Loading />}>
+                  <Search />
                 </Suspense>
               }
             />

@@ -21,9 +21,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { getScoreColorClass, getModeBadgeClasses, getModeLabel } from '@/lib/designUtils';
 import {
   Select,
   SelectContent,
@@ -78,14 +78,17 @@ function ScoreBreakdownBadges({
 }) {
   const entries = Object.entries(breakdown ?? {});
   if (entries.length === 0) {
-    return <span className="text-muted-foreground">--</span>;
+    return <span className="text-text-3">--</span>;
   }
   return (
     <div className="flex flex-wrap gap-1">
       {entries.map(([key, value]) => (
-        <Badge key={key} variant="outline" className="text-xs">
+        <span
+          key={key}
+          className="rounded-[5px] bg-surface-3 px-1.5 py-0.5 text-[10px] font-mono text-text-3"
+        >
           {key}: {value.toFixed(2)}
-        </Badge>
+        </span>
       ))}
     </div>
   );
@@ -104,7 +107,7 @@ function ExpandableText({
   const content = text ?? '';
 
   if (content.length === 0) {
-    return <span className="text-muted-foreground">--</span>;
+    return <span className="text-text-3">--</span>;
   }
 
   const showFull = expanded || forceExpand || content.length <= maxLength;
@@ -114,7 +117,7 @@ function ExpandableText({
       {showFull ? content : `${content.slice(0, maxLength)}...`}
       {!showFull && (
         <button
-          className="ml-1 text-primary underline text-xs whitespace-nowrap"
+          className="ml-1 text-accent underline text-xs whitespace-nowrap"
           data-no-print
           onClick={(e) => {
             e.stopPropagation();
@@ -126,7 +129,7 @@ function ExpandableText({
       )}
       {expanded && !forceExpand && (
         <button
-          className="ml-1 text-primary underline text-xs whitespace-nowrap"
+          className="ml-1 text-accent underline text-xs whitespace-nowrap"
           data-no-print
           onClick={(e) => {
             e.stopPropagation();
@@ -180,9 +183,16 @@ const scoreColumn: ColumnDef<Result> = {
   id: 'score',
   header: 'Score',
   accessorFn: (row) => row.score ?? 0,
-  cell: ({ getValue }) => (
-    <span className="text-right tabular-nums">{(getValue<number>() * 100).toFixed(0)}%</span>
-  ),
+  cell: ({ getValue }) => {
+    const score = getValue<number>();
+    return (
+      <span
+        className={cn('text-right font-mono font-semibold tabular-nums', getScoreColorClass(score))}
+      >
+        {(score * 100).toFixed(0)}%
+      </span>
+    );
+  },
   enableSorting: true,
 };
 
@@ -194,15 +204,19 @@ const passFailColumn: ColumnDef<Result> = {
     const val = getValue<boolean | null>();
     if (val === true) {
       return (
-        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+        <span className="inline-block rounded-full bg-pass-bg px-2.5 py-0.5 text-[10.5px] font-medium text-pass">
           Pass
-        </Badge>
+        </span>
       );
     }
     if (val === false) {
-      return <Badge variant="destructive">Fail</Badge>;
+      return (
+        <span className="inline-block rounded-full bg-fail-bg px-2.5 py-0.5 text-[10.5px] font-medium text-fail">
+          Fail
+        </span>
+      );
     }
-    return <span className="text-muted-foreground">--</span>;
+    return <span className="text-text-3">--</span>;
   },
 };
 
@@ -232,9 +246,11 @@ const chunksColumn: ColumnDef<Result> = {
   cell: ({ getValue }) => {
     const count = getValue<number>();
     return count > 0 ? (
-      <Badge variant="outline">{count}</Badge>
+      <span className="rounded-[5px] bg-surface-3 px-1.5 py-0.5 text-[10px] font-mono text-text-3">
+        {count}
+      </span>
     ) : (
-      <span className="text-muted-foreground">--</span>
+      <span className="text-text-3">--</span>
     );
   },
 };
@@ -293,7 +309,7 @@ function ExpandedDetail({
       {result.scores_breakdown && Object.keys(result.scores_breakdown).length > 0 && (
         <div>
           <p className="font-medium mb-1">Metric Breakdown</p>
-          <ul className="list-disc list-inside text-muted-foreground">
+          <ul className="list-disc list-inside text-text-2">
             {Object.entries(result.scores_breakdown).map(([name, value]) => (
               <li key={name}>
                 {name}: {value.toFixed(3)}
@@ -306,7 +322,7 @@ function ExpandedDetail({
       {result.judge_reasoning && (
         <div>
           <p className="font-medium">Judge Reasoning</p>
-          <blockquote className="mt-1 border-l-2 border-muted-foreground/30 pl-3 text-muted-foreground italic whitespace-pre-line">
+          <blockquote className="mt-1 border-l-2 border-border-soft pl-3 text-text-2 italic whitespace-pre-line">
             {result.judge_reasoning}
           </blockquote>
         </div>
@@ -498,25 +514,25 @@ export function ResultDetailView({
       <div className="flex items-center justify-between" data-no-print>
         <Link
           to="/results"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-[12.5px] text-text-2 hover:text-foreground"
           data-no-print
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-3.5 w-3.5" />
           Back to Results
         </Link>
-        <Button
-          variant="outline"
-          size="sm"
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 rounded-[9px] border border-border px-3 py-1.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-surface-3 disabled:opacity-50"
           disabled={isExporting}
           onClick={() => void handleExportPdf()}
         >
           {isExporting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <FileDown className="h-4 w-4" />
+            <FileDown className="h-3.5 w-3.5" />
           )}
           Export PDF
-        </Button>
+        </button>
       </div>
 
       {/* Summary Header — arena gets leaderboard + charts, others get aggregate metrics */}
@@ -539,43 +555,67 @@ export function ResultDetailView({
         </>
       ) : (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
+          <div className="rounded-[14px] border border-border bg-card p-5">
+            <div className="mb-5 flex items-center gap-3">
+              <h2 className="text-[22px] font-semibold tracking-[-0.02em]">
                 {evaluationName ?? 'Evaluation Result'}
-                {evaluationMode && (
-                  <Badge variant="outline" className="text-xs">
-                    {evaluationMode.toUpperCase()}
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Items</p>
-                  <p className="text-2xl font-bold">{metrics.total_items || results.length}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pass Rate</p>
-                  <p className="text-2xl font-bold">{(metrics.pass_rate * 100).toFixed(1)}%</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Mean Score</p>
-                  <p className="text-2xl font-bold">{metrics.mean_score.toFixed(3)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Median Score</p>
-                  <p className="text-2xl font-bold">{metrics.median_score.toFixed(3)}</p>
-                </div>
+              </h2>
+              {evaluationMode && (
+                <span
+                  className={cn(
+                    'rounded-[6px] px-2 py-0.5 text-[10px] font-semibold uppercase',
+                    getModeBadgeClasses(evaluationMode),
+                  )}
+                >
+                  {getModeLabel(evaluationMode)}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                  Total Items
+                </p>
+                <p className="text-[27px] font-semibold tabular-nums">
+                  {metrics.total_items || results.length}
+                </p>
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                  Pass Rate
+                </p>
+                <p
+                  className={cn(
+                    'text-[27px] font-semibold tabular-nums',
+                    getScoreColorClass(metrics.pass_rate),
+                  )}
+                >
+                  {(metrics.pass_rate * 100).toFixed(1)}%
+                </p>
+              </div>
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                  Mean Score
+                </p>
+                <p className="text-[27px] font-semibold tabular-nums">
+                  {metrics.mean_score.toFixed(3)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                  Median Score
+                </p>
+                <p className="text-[27px] font-semibold tabular-nums">
+                  {metrics.median_score.toFixed(3)}
+                </p>
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2" ref={chartsRef}>
-            <div data-chart>
+            <div className="rounded-[14px] border border-border bg-card p-5" data-chart>
               <ScoreDistributionChart distribution={metrics.score_distribution} />
             </div>
-            <div data-chart>
+            <div className="rounded-[14px] border border-border bg-card p-5" data-chart>
               <PassFailChart
                 passedItems={metrics.passed_items}
                 failedItems={metrics.failed_items}
@@ -617,17 +657,15 @@ export function ResultDetailView({
         })()}
 
       {/* Per-Item Results Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Per-Item Results</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-[14px] border border-border bg-card p-5">
+        <h3 className="mb-4 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
+          Per-Item Results
+        </h3>
+        <div>
           {results.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-center">
-              No individual results available.
-            </p>
+            <p className="text-text-3 py-4 text-center">No individual results available.</p>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border border-border">
               <Table>
                 <TableHeader>
                   {table.getHeaderGroups().map((headerGroup) => (
@@ -645,10 +683,7 @@ export function ResultDetailView({
                 <TableBody>
                   {table.getRowModel().rows.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={columns.length}
-                        className="text-center text-muted-foreground"
-                      >
+                      <TableCell colSpan={columns.length} className="text-center text-text-3">
                         No results to display.
                       </TableCell>
                     </TableRow>
@@ -669,7 +704,7 @@ export function ResultDetailView({
                         </TableRow>
                         {row.getIsExpanded() && (
                           <TableRow>
-                            <TableCell colSpan={columns.length} className="bg-muted/30 p-4">
+                            <TableCell colSpan={columns.length} className="bg-surface-2 p-4">
                               <ExpandedDetail
                                 result={row.original}
                                 datasetItem={
@@ -690,8 +725,8 @@ export function ResultDetailView({
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Edit / Delete dialogs */}
       {editTarget && (
@@ -722,19 +757,19 @@ export function ResultDetailView({
       {/* Pagination controls */}
       {pagination && pagination.pages > 1 && (
         <div className="flex items-center justify-between" data-testid="pagination-controls">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[12.5px] text-text-2">
             Showing {(pagination.page - 1) * pagination.page_size + 1}–
             {Math.min(pagination.page * pagination.page_size, pagination.total)} of{' '}
             {pagination.total} results
           </p>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Per page</span>
+              <span className="text-[12.5px] text-text-2">Per page</span>
               <Select
                 value={String(pagination.page_size)}
                 onValueChange={(value) => onPageSizeChange?.(Number(value))}
               >
-                <SelectTrigger size="sm" className="w-20">
+                <SelectTrigger size="sm" className="w-20 rounded-[9px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -746,29 +781,29 @@ export function ResultDetailView({
               </Select>
             </div>
             <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-[9px] border border-border px-3 py-1.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-surface-3 disabled:opacity-50"
                 disabled={pagination.page <= 1}
                 onClick={() => onPageChange?.(pagination.page - 1)}
                 aria-label="Previous page"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-3.5 w-3.5" />
                 Previous
-              </Button>
-              <span className="px-2 text-sm text-muted-foreground">
+              </button>
+              <span className="px-2 text-[12.5px] text-text-2">
                 Page {pagination.page} of {pagination.pages}
               </span>
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-[9px] border border-border px-3 py-1.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-surface-3 disabled:opacity-50"
                 disabled={pagination.page >= pagination.pages}
                 onClick={() => onPageChange?.(pagination.page + 1)}
                 aria-label="Next page"
               >
                 Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         </div>
