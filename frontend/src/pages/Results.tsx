@@ -1,7 +1,5 @@
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import { EvaluationResultsList } from '@/components/results';
@@ -26,7 +24,6 @@ export default function Results() {
   const error = evaluationsError;
 
   const rows = useMemo<EvaluationResultRow[]>(() => {
-    // Build rows from evaluations that have completed, using server-side aggregates
     const completedEvals = evaluations.filter(
       (e) => e.status === 'completed' || e.status === 'failed',
     );
@@ -60,25 +57,25 @@ export default function Results() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Results</h1>
-        <p className="text-muted-foreground">
-          Browse historical evaluation results, compare runs, and export data for further analysis.
+        <h1 className="text-[25px] font-semibold tracking-[-0.02em]">Results</h1>
+        <p className="text-[13px] text-text-2">
+          Browse historical runs, compare evaluations, and export data for analysis.
         </p>
       </div>
-      <Separator />
 
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Loading results...</p>
+          <p className="text-[13px] text-text-3">Loading results...</p>
         </div>
       )}
 
       {error && !isLoading && (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <p className="text-destructive font-medium">Error loading results</p>
-            <p className="text-muted-foreground text-sm">{error}</p>
+            <p className="text-[13px] font-medium text-fail">Error loading results</p>
+            <p className="text-[12px] text-text-3">{error}</p>
           </div>
         </div>
       )}
@@ -90,17 +87,24 @@ export default function Results() {
           className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
           data-testid="compare-action-bar"
         >
-          <div className="flex items-center gap-4 rounded-lg border bg-background px-6 py-3 shadow-lg">
-            <span className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-4 rounded-[13px] border border-border bg-card px-6 py-3 shadow">
+            <span className="text-[12.5px] text-text-2">
               {selectedEvaluationIds.length} evaluation
               {selectedEvaluationIds.length !== 1 ? 's' : ''} selected
             </span>
-            <Button variant="outline" size="sm" onClick={clearSelection}>
-              Clear Selection
-            </Button>
-            <Button size="sm" disabled={!canCompare} onClick={handleCompare}>
+            <button
+              className="rounded-[9px] border border-border px-3 py-1.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-surface-3"
+              onClick={clearSelection}
+            >
+              Clear
+            </button>
+            <button
+              className="rounded-[9px] bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              disabled={!canCompare}
+              onClick={handleCompare}
+            >
               Compare
-            </Button>
+            </button>
           </div>
         </div>
       )}

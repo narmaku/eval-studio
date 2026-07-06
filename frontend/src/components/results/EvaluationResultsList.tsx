@@ -20,7 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
@@ -35,6 +34,14 @@ import { EvaluationEditSheet } from '@/components/evaluation/EvaluationEditSheet
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationStore } from '@/stores/evaluationStore';
+import {
+  getModeBadgeClasses,
+  getModeLabel,
+  getStatusPillClasses,
+  getScoreColorClass,
+  formatMonoDate,
+} from '@/lib/designUtils';
+import { cn } from '@/lib/utils';
 import type { Evaluation, EvaluationMode, EvaluationStatus } from '@/types';
 
 export interface EvaluationResultRow {
@@ -49,28 +56,6 @@ export interface EvaluationResultRow {
   createdAt: string;
   datasetId: string | null;
 }
-
-const modeBadgeStyles: Record<EvaluationMode, string> = {
-  qa: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  agent: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  rag: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  arena: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-};
-
-const modeLabels: Record<EvaluationMode, string> = {
-  qa: 'Q&A',
-  agent: 'Agent',
-  rag: 'RAG',
-  arena: 'Arena',
-};
-
-const statusBadgeVariants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  completed: 'default',
-  failed: 'destructive',
-  pending: 'secondary',
-  running: 'secondary',
-  cancelled: 'outline',
-};
 
 /**
  * Check if a row is compatible with the current selection filter.
@@ -218,9 +203,14 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
         accessorKey: 'mode',
         header: 'Mode',
         cell: ({ row }) => (
-          <Badge variant="outline" className={modeBadgeStyles[row.original.mode]}>
-            {modeLabels[row.original.mode]}
-          </Badge>
+          <span
+            className={cn(
+              'rounded-[6px] px-2 py-0.5 text-[10px] font-semibold uppercase',
+              getModeBadgeClasses(row.original.mode),
+            )}
+          >
+            {getModeLabel(row.original.mode)}
+          </span>
         ),
         filterFn: (row, _columnId, filterValue: string) => {
           if (filterValue === 'all') return true;
@@ -231,9 +221,14 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
         accessorKey: 'status',
         header: 'Status',
         cell: ({ row }) => (
-          <Badge variant={statusBadgeVariants[row.original.status] ?? 'secondary'}>
+          <span
+            className={cn(
+              'rounded-full px-2.5 py-0.5 text-[10.5px] font-medium capitalize',
+              getStatusPillClasses(row.original.status),
+            )}
+          >
             {row.original.status}
-          </Badge>
+          </span>
         ),
       },
       {
@@ -260,7 +255,13 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
             <ArrowUpDown className="h-4 w-4" />
           </button>
         ),
-        cell: ({ row }) => `${(row.original.passRate * 100).toFixed(1)}%`,
+        cell: ({ row }) => (
+          <span className="font-mono tabular-nums">
+            {row.original.status === 'failed'
+              ? '—'
+              : `${(row.original.passRate * 100).toFixed(1)}%`}
+          </span>
+        ),
       },
       {
         accessorKey: 'meanScore',
@@ -273,7 +274,18 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
             <ArrowUpDown className="h-4 w-4" />
           </button>
         ),
-        cell: ({ row }) => row.original.meanScore.toFixed(3),
+        cell: ({ row }) => (
+          <span
+            className={cn(
+              'font-mono font-semibold tabular-nums',
+              row.original.status === 'failed'
+                ? 'text-text-3'
+                : getScoreColorClass(row.original.meanScore),
+            )}
+          >
+            {row.original.status === 'failed' ? '—' : row.original.meanScore.toFixed(3)}
+          </span>
+        ),
       },
       {
         accessorKey: 'createdAt',
@@ -286,7 +298,11 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
             <ArrowUpDown className="h-4 w-4" />
           </button>
         ),
-        cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
+        cell: ({ row }) => (
+          <span className="font-mono text-[11px] text-text-2">
+            {formatMonoDate(row.original.createdAt)}
+          </span>
+        ),
         sortingFn: (rowA, rowB) => {
           return (
             new Date(rowA.original.createdAt).getTime() -
