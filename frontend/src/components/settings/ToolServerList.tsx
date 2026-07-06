@@ -1,7 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
@@ -16,6 +13,7 @@ import {
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToolServerStore } from '@/stores/toolServerStore';
 import { ToolServerForm } from './ToolServerForm';
+import { cn } from '@/lib/utils';
 import type { ToolServer } from '@/types';
 
 export function ToolServerList() {
@@ -69,94 +67,109 @@ export function ToolServerList() {
           placeholder="Filter tool servers..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="max-w-sm"
+          className="max-w-[260px]"
         />
-        <Button onClick={handleNew}>
-          <Plus className="mr-1 h-4 w-4" />
+        <button
+          className="inline-flex items-center rounded-[9px] bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+          onClick={handleNew}
+        >
+          <Plus className="mr-1 h-3.5 w-3.5" />
           New Tool Server
-        </Button>
+        </button>
       </div>
 
       {isLoading && (
         <div className="flex justify-center py-8">
-          <p className="text-sm text-muted-foreground">Loading tool servers...</p>
+          <p className="text-[13px] text-text-3">Loading tool servers...</p>
         </div>
       )}
 
       {!isLoading && filtered.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
-          <p className="text-sm text-muted-foreground">
+        <div className="flex flex-col items-center justify-center rounded-[14px] border border-dashed border-border py-12">
+          <p className="text-[13px] text-text-3">
             No tool servers configured. Add one here or edit config/tool_servers.yaml.
           </p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((server) => (
-          <Card key={server.id} className="flex flex-col">
-            <CardContent className="flex flex-col gap-2 py-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-medium truncate">{server.name}</h3>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => handleEdit(server)}
-                    aria-label="Edit"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setDeleteTarget(server)}
-                    aria-label="Delete"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+          <div
+            key={server.id}
+            className="flex flex-col rounded-[14px] border border-border bg-card p-5 shadow-sm transition-all hover:shadow"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-[14px] font-semibold">{server.name}</h3>
               </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {server.type === 'mcp_stdio' ? 'MCP' : 'Standalone'}
-                  </Badge>
-                  <Badge variant={server.enabled ? 'default' : 'outline'} className="text-xs">
-                    {server.enabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
-                </div>
-                {server.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">{server.description}</p>
-                )}
-                {server.command && (
-                  <p
-                    className="text-xs text-muted-foreground font-mono truncate"
-                    title={`${server.command} ${server.args.join(' ')}`}
-                  >
-                    {server.command} {server.args.join(' ')}
-                  </p>
-                )}
-                {server.tool_count !== null && (
-                  <p className="text-xs text-muted-foreground">{server.tool_count} tool(s)</p>
-                )}
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  className="rounded-md p-1.5 text-text-3 transition-colors hover:bg-surface-3 hover:text-foreground"
+                  onClick={() => handleEdit(server)}
+                  aria-label="Edit"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className="rounded-md p-1.5 text-text-3 transition-colors hover:bg-surface-3 hover:text-foreground"
+                  onClick={() => setDeleteTarget(server)}
+                  aria-label="Delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
+            </div>
 
-              {server.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-auto pt-1">
-                  {server.tags.map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
+            <div className="mt-2 space-y-1.5">
+              <div className="flex items-center gap-2">
+                {server.type === 'mcp_stdio' ? (
+                  <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+                    MCP
+                  </span>
+                ) : (
+                  <span className="rounded-[5px] bg-surface-3 px-1.5 py-0.5 text-[10px] text-text-3">
+                    Standalone
+                  </span>
+                )}
+                <span className="flex items-center gap-1 text-[11px] text-text-2">
+                  <span
+                    className={cn(
+                      'inline-block h-2 w-2 rounded-full',
+                      server.enabled ? 'bg-pass' : 'bg-fail',
+                    )}
+                  />
+                  {server.enabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              {server.description && (
+                <p className="text-[12px] text-text-2 line-clamp-2">{server.description}</p>
               )}
-            </CardContent>
-          </Card>
+              {server.command && (
+                <p
+                  className="truncate font-mono text-[11px] text-text-2"
+                  title={`${server.command} ${server.args.join(' ')}`}
+                >
+                  {server.command} {server.args.join(' ')}
+                </p>
+              )}
+              {server.tool_count !== null && (
+                <p className="text-[11px] text-text-3">{server.tool_count} tool(s)</p>
+              )}
+            </div>
+
+            {server.tags.length > 0 && (
+              <div className="mt-auto flex flex-wrap gap-1 pt-2">
+                {server.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-[5px] bg-surface-3 px-1.5 py-0.5 text-[10px] text-text-3"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
