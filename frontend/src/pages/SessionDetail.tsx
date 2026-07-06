@@ -1,9 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
 import { ToolSidePanel } from '@/components/chat/ToolSidePanel';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
@@ -12,7 +9,14 @@ import { SessionEditSheet } from '@/components/sessions/SessionEditSheet';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { api } from '@/services/api';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
-import { Loader2, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  getModeBadgeClasses,
+  getModeLabel,
+  getStatusPillClasses,
+  formatMonoTimestamp,
+} from '@/lib/designUtils';
 import type { Session, Message, ToolCall, SessionScore, JudgeReference } from '@/types';
 
 function extractFromTranscript(transcript: Record<string, unknown>[]): {
@@ -183,78 +187,117 @@ export default function SessionDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {session.name ?? `Session ${session.id.slice(0, 8)}`}
-          </h1>
-          <div className="mt-1 flex items-center gap-2">
-            <Badge variant="outline">{session.mode}</Badge>
-            <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
-              {session.status}
-            </Badge>
-            <span className="text-muted-foreground text-sm">{messages.length} messages</span>
-            {session.tags?.length > 0 &&
-              session.tags.map((tag) => (
-                <Badge key={tag} variant="secondary">
-                  {tag}
-                </Badge>
-              ))}
+      <div>
+        <Link
+          to="/sessions"
+          className="mb-3 inline-flex items-center gap-1.5 text-[12.5px] text-text-2 hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          All sessions
+        </Link>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[25px] font-semibold tracking-[-0.02em]">
+                {session.name ?? `Session ${session.id.slice(0, 8)}`}
+              </h1>
+              <span
+                className={cn(
+                  'rounded-[6px] px-2 py-0.5 text-[10px] font-semibold uppercase',
+                  getModeBadgeClasses(session.mode),
+                )}
+              >
+                {getModeLabel(session.mode)}
+              </span>
+              <span
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-[10.5px] font-medium capitalize',
+                  getStatusPillClasses(session.status),
+                )}
+              >
+                {session.status}
+              </span>
+              {isSessionScoring && (
+                <span className="inline-flex items-center rounded-full bg-warn-bg px-2.5 py-0.5 text-[10.5px] font-medium text-warn">
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Scoring...
+                </span>
+              )}
+            </div>
+            <p className="mt-1 font-mono text-[11px] text-text-2">
+              {messages.length} messages
+              {session.tags?.length > 0 && (
+                <>
+                  {' · '}
+                  {session.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="mr-1 rounded-[5px] bg-surface-3 px-1.5 py-0.5 text-[10px] text-text-3"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </>
+              )}
+              {' · '}
+              {formatMonoTimestamp(session.started_at ?? session.created_at)}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded-md p-1.5 text-text-3 transition-colors hover:bg-surface-3 hover:text-foreground"
+              onClick={() => setEditOpen(true)}
+              aria-label="Edit session"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              className="rounded-md p-1.5 text-text-3 transition-colors hover:bg-surface-3 hover:text-foreground"
+              onClick={() => setDeleteOpen(true)}
+              aria-label="Delete session"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+            {isEnded && !hasScores && !showScoreConfig && !isSessionScoring && (
+              <button
+                className="rounded-[9px] bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                onClick={() => {
+                  if (session.judge_config_snapshot) {
+                    const snapshot = session.judge_config_snapshot;
+                    if (typeof snapshot.provider_id === 'string') {
+                      setJudgeConfig({ provider_id: snapshot.provider_id });
+                    }
+                  }
+                  setShowScoreConfig(true);
+                }}
+              >
+                Score with Judge
+              </button>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            onClick={() => setEditOpen(true)}
-            aria-label="Edit session"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            onClick={() => setDeleteOpen(true)}
-            aria-label="Delete session"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          {isSessionScoring && (
-            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-              Scoring...
-            </Badge>
-          )}
-          {isEnded && !hasScores && !showScoreConfig && !isSessionScoring && (
-            <Button
-              onClick={() => {
-                if (session.judge_config_snapshot) {
-                  const snapshot = session.judge_config_snapshot;
-                  if (typeof snapshot.provider_id === 'string') {
-                    setJudgeConfig({ provider_id: snapshot.provider_id });
-                  }
-                }
-                setShowScoreConfig(true);
-              }}
-            >
-              Score with Judge
-            </Button>
-          )}
-        </div>
       </div>
-      <Separator />
 
       {showScoreConfig && (
-        <div className="rounded-lg border p-4 space-y-4">
-          <h3 className="text-sm font-medium">Select Judge for Scoring</h3>
+        <div className="rounded-[14px] border border-border bg-card p-5 shadow-sm space-y-4">
+          <h3 className="text-[10.5px] font-semibold tracking-[0.06em] uppercase text-text-3">
+            Select Judge for Scoring
+          </h3>
           <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
           <div className="flex gap-2">
-            <Button onClick={() => void handleScore()} disabled={!judgeConfig || isScoring}>
+            <button
+              className="rounded-[9px] bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              onClick={() => void handleScore()}
+              disabled={!judgeConfig || isScoring}
+            >
               {isScoring ? 'Scoring...' : 'Run Judge'}
-            </Button>
-            <Button variant="outline" onClick={() => setShowScoreConfig(false)}>
+            </button>
+            <button
+              className="rounded-[9px] border border-border px-3 py-1.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-surface-3"
+              onClick={() => setShowScoreConfig(false)}
+            >
               Cancel
-            </Button>
+            </button>
           </div>
         </div>
       )}
