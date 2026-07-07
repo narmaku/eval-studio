@@ -46,7 +46,13 @@ git add \
     "$SCRIPT_DIR/backend/pyproject.toml" \
     "$SCRIPT_DIR/backend/app/core/config.py" \
     "$SCRIPT_DIR/frontend/package.json"
-git commit -m "chore: release v$VERSION"
+
+if git diff --cached --quiet; then
+    echo "  (no changes needed — already at $VERSION)"
+else
+    git commit -m "chore: release v$VERSION"
+fi
+
 git tag -a "v$VERSION" -m "Release v$VERSION"
 
 echo ""
