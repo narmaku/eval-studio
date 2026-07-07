@@ -69,9 +69,9 @@ describe('EvaluatorList', () => {
     render(<EvaluatorList />);
 
     await waitFor(() => {
-      expect(screen.getByText('qa')).toBeInTheDocument();
-      expect(screen.getByText('rag')).toBeInTheDocument();
-      expect(screen.getByText('agent')).toBeInTheDocument();
+      expect(screen.getByText('Q&A')).toBeInTheDocument();
+      expect(screen.getByText('RAG')).toBeInTheDocument();
+      expect(screen.getByText('AGENT')).toBeInTheDocument();
     });
   });
 

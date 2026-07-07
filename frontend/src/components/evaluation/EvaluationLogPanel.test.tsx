@@ -70,7 +70,7 @@ describe('EvaluationLogPanel', () => {
     render(<EvaluationLogPanel />);
 
     const errorBadge = screen.getByText('ERROR');
-    expect(errorBadge.className).toContain('text-red');
+    expect(errorBadge.className).toContain('text-fail');
   });
 
   it('applies warning styling to warning-level logs', () => {
@@ -80,7 +80,7 @@ describe('EvaluationLogPanel', () => {
     render(<EvaluationLogPanel />);
 
     const warnBadge = screen.getByText('WARN');
-    expect(warnBadge.className).toContain('text-yellow');
+    expect(warnBadge.className).toContain('text-warn');
   });
 
   it('limits displayed logs to 500 entries', () => {

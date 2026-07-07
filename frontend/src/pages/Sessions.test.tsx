@@ -88,22 +88,22 @@ describe('Sessions page', () => {
   });
 
   describe('status badges', () => {
-    it('shows Active badge for active sessions', async () => {
+    it('shows active status pill for active sessions', async () => {
       await renderPage([makeSession({ status: 'active' })]);
-      expect(screen.getByText('Active')).toBeInTheDocument();
+      expect(screen.getByText('active')).toBeInTheDocument();
     });
 
-    it('shows Ended badge for ended sessions', async () => {
+    it('shows ended status pill for ended sessions', async () => {
       await renderPage([makeSession({ status: 'ended', ended_at: '2026-01-01T00:05:00Z' })]);
-      expect(screen.getByText('Ended')).toBeInTheDocument();
+      expect(screen.getByText('ended')).toBeInTheDocument();
     });
 
-    it('shows Scoring... badge for scoring sessions', async () => {
+    it('shows scoring status pill for scoring sessions', async () => {
       await renderPage([makeSession({ status: 'scoring', ended_at: '2026-01-01T00:05:00Z' })]);
-      expect(screen.getByText('Scoring...')).toBeInTheDocument();
+      expect(screen.getByText('scoring')).toBeInTheDocument();
     });
 
-    it('shows Scored badge for completed sessions', async () => {
+    it('shows completed status pill for completed sessions', async () => {
       await renderPage([
         makeSession({
           status: 'completed',
@@ -111,7 +111,7 @@ describe('Sessions page', () => {
           scores: { overall: 0.85, passed: true, reasoning: null, breakdown: null },
         }),
       ]);
-      expect(screen.getByText('Scored')).toBeInTheDocument();
+      expect(screen.getByText('completed')).toBeInTheDocument();
     });
   });
 

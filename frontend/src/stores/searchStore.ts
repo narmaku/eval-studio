@@ -82,8 +82,9 @@ export const useSearchStore = create<SearchStore>((set) => ({
     while (allResults.length < MAX_RESULTS) {
       let added = false;
       for (const source of sources) {
-        if (idx < source.length && allResults.length < MAX_RESULTS) {
-          allResults.push(source[idx]);
+        const item = source[idx];
+        if (item && allResults.length < MAX_RESULTS) {
+          allResults.push(item);
           added = true;
         }
       }
