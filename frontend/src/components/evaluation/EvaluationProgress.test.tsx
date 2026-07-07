@@ -3,9 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { EvaluationProgress } from './EvaluationProgress';
 
 const mockConnectToEvaluation = vi.fn();
-const mockDisconnectFromEvaluation = vi.fn();
 
-let mockCurrentEvaluation: { status: string } | null = null;
+let mockCurrentEvaluation: { name?: string; status: string } | null = null;
 let mockProgress: {
   completed: number;
   total: number;
@@ -21,7 +20,6 @@ const getState = () => ({
   currentEvaluation: mockCurrentEvaluation,
   progress: mockProgress,
   connectToEvaluation: mockConnectToEvaluation,
-  disconnectFromEvaluation: mockDisconnectFromEvaluation,
   logs: mockLogs,
   wsConnection: mockWsConnection,
   _connectedEvaluationId: mockConnectedEvaluationId,
@@ -40,7 +38,7 @@ vi.mock('@/stores/evaluationStore', () => ({
 describe('EvaluationProgress', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCurrentEvaluation = { status: 'running' };
+    mockCurrentEvaluation = { name: 'Test Eval', status: 'running' };
     mockProgress = null;
     mockLogs = [];
     mockWsConnection = null;
@@ -50,7 +48,7 @@ describe('EvaluationProgress', () => {
   it('renders with running status', () => {
     render(<EvaluationProgress evaluationId="eval-123" onComplete={vi.fn()} />);
 
-    expect(screen.getByText('Evaluation Progress')).toBeInTheDocument();
+    expect(screen.getByText('Test Eval')).toBeInTheDocument();
     expect(screen.getByText('Running')).toBeInTheDocument();
   });
 
@@ -60,12 +58,13 @@ describe('EvaluationProgress', () => {
     expect(mockConnectToEvaluation).toHaveBeenCalledWith('eval-123');
   });
 
-  it('disconnects from WebSocket on unmount', () => {
+  it('does not disconnect WebSocket on unmount', () => {
+    const disconnect = vi.fn();
     const { unmount } = render(<EvaluationProgress evaluationId="eval-123" onComplete={vi.fn()} />);
 
     unmount();
 
-    expect(mockDisconnectFromEvaluation).toHaveBeenCalled();
+    expect(disconnect).not.toHaveBeenCalled();
   });
 
   it('shows determinate progress bar with completed/total', () => {
@@ -73,7 +72,7 @@ describe('EvaluationProgress', () => {
 
     render(<EvaluationProgress evaluationId="eval-123" onComplete={vi.fn()} />);
 
-    expect(screen.getByText('5 / 10')).toBeInTheDocument();
+    expect(screen.getByText('5 / 10 items')).toBeInTheDocument();
   });
 
   it('shows current item text', () => {
@@ -97,28 +96,35 @@ describe('EvaluationProgress', () => {
     expect(screen.getByText(/gpt-4/)).toBeInTheDocument();
   });
 
-  it('shows completed status when evaluation is completed', () => {
-    mockCurrentEvaluation = { status: 'completed' };
+  it('shows completed message when evaluation is completed', () => {
+    mockCurrentEvaluation = { name: 'Test Eval', status: 'completed' };
 
     render(<EvaluationProgress evaluationId="eval-123" onComplete={vi.fn()} />);
 
-    expect(screen.getByText('Completed')).toBeInTheDocument();
+    expect(screen.getByText('Evaluation completed successfully.')).toBeInTheDocument();
   });
 
-  it('shows failed status when evaluation failed', () => {
-    mockCurrentEvaluation = { status: 'failed' };
+  it('shows failed message when evaluation failed', () => {
+    mockCurrentEvaluation = { name: 'Test Eval', status: 'failed' };
 
     render(<EvaluationProgress evaluationId="eval-123" onComplete={vi.fn()} />);
 
-    expect(screen.getByText('Failed')).toBeInTheDocument();
+    expect(screen.getByText('Evaluation failed.')).toBeInTheDocument();
   });
 
-  it('shows indeterminate progress when no progress data', () => {
-    mockProgress = null;
+  it('shows fallback title when no evaluation name', () => {
+    mockCurrentEvaluation = { status: 'running' };
 
     render(<EvaluationProgress evaluationId="eval-123" onComplete={vi.fn()} />);
 
-    // Should show "Scoring items..." text (indeterminate state)
-    expect(screen.getByText('Scoring items...')).toBeInTheDocument();
+    expect(screen.getByText('Evaluation')).toBeInTheDocument();
+  });
+
+  it('shows pending status pill', () => {
+    mockCurrentEvaluation = { name: 'Test Eval', status: 'pending' };
+
+    render(<EvaluationProgress evaluationId="eval-123" onComplete={vi.fn()} />);
+
+    expect(screen.getByText('Pending')).toBeInTheDocument();
   });
 });
