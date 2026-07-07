@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -167,7 +168,11 @@ describe('ArenaComparison page', () => {
   async function renderPage() {
     const mod = await import('./ArenaComparison');
     const ArenaComparison = mod.default;
-    return render(<ArenaComparison />);
+    return render(
+      <MemoryRouter>
+        <ArenaComparison />
+      </MemoryRouter>,
+    );
   }
 
   it('renders page heading', async () => {
@@ -516,8 +521,6 @@ describe('ArenaComparison page', () => {
   it('displays page description text', async () => {
     await renderPage();
 
-    expect(
-      screen.getByText(/compare multiple models by running the same evaluation/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/run the same evaluation across multiple models/i)).toBeInTheDocument();
   });
 });

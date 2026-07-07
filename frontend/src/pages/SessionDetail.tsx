@@ -226,7 +226,7 @@ export default function SessionDetail() {
             </div>
             <p className="mt-1 font-mono text-[11px] text-text-2">
               {messages.length} messages
-              {session.tags?.length > 0 && (
+              {session.tags && session.tags.length > 0 && (
                 <>
                   {' · '}
                   {session.tags.map((tag) => (

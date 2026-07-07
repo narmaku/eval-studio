@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { useSessionStore } from '@/stores/sessionStore';
 import { act } from 'react';
 
@@ -130,12 +131,16 @@ describe('AgentEvaluation — scoring phase', () => {
   async function renderPage() {
     const mod = await import('./AgentEvaluation');
     const AgentEvaluation = mod.default;
-    return render(<AgentEvaluation />);
+    return render(
+      <MemoryRouter>
+        <AgentEvaluation />
+      </MemoryRouter>,
+    );
   }
 
   it('renders configure phase by default', async () => {
     await renderPage();
-    expect(screen.getByText('Start Session')).toBeInTheDocument();
+    expect(screen.getByText('Start Agent Evaluation')).toBeInTheDocument();
     expect(screen.queryByText('Score Session')).not.toBeInTheDocument();
     expect(screen.queryByText('Skip Scoring')).not.toBeInTheDocument();
   });
@@ -179,7 +184,7 @@ describe('AgentEvaluation — scoring phase', () => {
       // Should show End Session button in active phase
       // But phase is local React state starting at 'configure'.
       // We need to verify that the configure phase Start Session renders.
-      expect(screen.getByText('Start Session')).toBeInTheDocument();
+      expect(screen.getByText('Start Agent Evaluation')).toBeInTheDocument();
     });
   });
 
