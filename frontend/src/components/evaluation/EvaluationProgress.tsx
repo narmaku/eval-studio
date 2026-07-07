@@ -11,14 +11,10 @@ export function EvaluationProgress({ evaluationId, onComplete }: EvaluationProgr
   const currentEvaluation = useEvaluationStore((state) => state.currentEvaluation);
   const progress = useEvaluationStore((state) => state.progress);
   const connectToEvaluation = useEvaluationStore((state) => state.connectToEvaluation);
-  const disconnectFromEvaluation = useEvaluationStore((state) => state.disconnectFromEvaluation);
 
   useEffect(() => {
     connectToEvaluation(evaluationId);
-    return () => {
-      disconnectFromEvaluation();
-    };
-  }, [evaluationId, connectToEvaluation, disconnectFromEvaluation]);
+  }, [evaluationId, connectToEvaluation]);
 
   useEffect(() => {
     if (

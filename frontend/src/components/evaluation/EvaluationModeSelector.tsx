@@ -54,40 +54,40 @@ export function EvaluationModeSelector() {
           Pick a mode — the workspace adapts its setup and metrics to what you're testing.
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-3">
         {modes.map((mode) => {
           const Icon = mode.icon;
           return (
             <Link key={mode.to} to={mode.to} className="group">
               <div
                 className={cn(
-                  'relative flex flex-col rounded-[15px] border border-border bg-card p-6 shadow-sm',
-                  'transition-all duration-150 hover:-translate-y-0.5 hover:border-accent hover:shadow',
+                  'relative flex items-center gap-4 rounded-[14px] border border-border bg-card px-5 py-4 shadow-sm',
+                  'transition-all duration-150 hover:border-accent hover:shadow',
                 )}
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div
-                    className={cn(
-                      'flex h-[42px] w-[42px] items-center justify-center rounded-xl',
-                      mode.colorClasses,
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <span
-                    className={cn(
-                      'rounded-[6px] px-2.5 py-1 text-[10px] font-semibold tracking-[0.05em] uppercase',
-                      mode.tagClasses,
-                    )}
-                  >
-                    {mode.tag}
-                  </span>
+                <div
+                  className={cn(
+                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                    mode.colorClasses,
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="text-[17px] font-semibold mb-1.5">{mode.title}</h3>
-                <p className="text-[12.5px] text-text-2 mb-4 flex-1">{mode.description}</p>
-                <span className="flex items-center gap-1 text-[12px] font-medium text-accent">
-                  Configure <ArrowRight className="h-3 w-3" />
-                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[15px] font-semibold">{mode.title}</h3>
+                    <span
+                      className={cn(
+                        'rounded-[5px] px-2 py-0.5 text-[9px] font-semibold tracking-[0.05em] uppercase',
+                        mode.tagClasses,
+                      )}
+                    >
+                      {mode.tag}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[12px] text-text-2 line-clamp-1">{mode.description}</p>
+                </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-text-3 transition-colors group-hover:text-accent" />
               </div>
             </Link>
           );

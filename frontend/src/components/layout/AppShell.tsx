@@ -1,10 +1,18 @@
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { Toaster } from '@/components/ui/sonner';
 import { NotificationPanel } from '@/components/notifications/NotificationPanel';
+import { useEvaluationStore } from '@/stores/evaluationStore';
 
 export function AppShell() {
+  const resumeTracking = useEvaluationStore((s) => s.resumeTracking);
+
+  useEffect(() => {
+    resumeTracking();
+  }, [resumeTracking]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />

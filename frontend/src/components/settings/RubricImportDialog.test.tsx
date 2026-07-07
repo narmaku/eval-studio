@@ -39,7 +39,7 @@ describe('RubricImportDialog', () => {
     render(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
     const link = screen.getByRole('link', { name: /rubric-kit/i });
     expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute('href', 'https://github.com/instructlab/rubric-kit');
+    expect(link).toHaveAttribute('href', 'https://github.com/narmaku/rubric-kit');
   });
 
   it('disables import button when textarea is empty', () => {

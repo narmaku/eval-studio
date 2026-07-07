@@ -28,6 +28,7 @@ interface EvaluationStore {
   progress: EvaluationProgress | null;
   wsConnection: WebSocket | null;
   _connectedEvaluationId: string | null;
+  _reconnectTimer: ReturnType<typeof setTimeout> | null;
 
   setEvaluations: (evaluations: Evaluation[]) => void;
   setCurrentEvaluation: (evaluation: Evaluation | null) => void;
@@ -43,6 +44,7 @@ interface EvaluationStore {
   connectToEvaluation: (evaluationId: string) => void;
   disconnectFromEvaluation: () => void;
   clearLogs: () => void;
+  resumeTracking: () => void;
 
   // sessionStorage persistence
   persistRunningEvaluation: (eval_: RunningEvaluation) => void;
@@ -70,6 +72,7 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
   progress: null,
   wsConnection: null,
   _connectedEvaluationId: null,
+  _reconnectTimer: null,
 
   setEvaluations: (evaluations) => set({ evaluations }),
   setCurrentEvaluation: (currentEvaluation) => set({ currentEvaluation }),
@@ -163,13 +166,18 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
       return;
     }
 
-    // Close existing connection if any
+    // Cancel any pending reconnect timer
+    const timer = get()._reconnectTimer;
+    if (timer) clearTimeout(timer);
+
+    // Close existing connection if any — clear ID first so onclose guard skips
     if (existing) {
+      set({ _connectedEvaluationId: null });
       existing.close();
     }
 
     // Reset logs and progress
-    set({ logs: [], progress: null, _connectedEvaluationId: evaluationId });
+    set({ logs: [], progress: null, _connectedEvaluationId: evaluationId, _reconnectTimer: null });
 
     const wsUrl = getWsUrl(evaluationId);
     const ws = new WebSocket(wsUrl);
@@ -216,7 +224,11 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
     };
 
     ws.onclose = () => {
-      // Check evaluation status via API when connection closes
+      // Only process if this is still the connection we're tracking
+      if (get()._connectedEvaluationId !== evaluationId) return;
+
+      set({ wsConnection: null, _connectedEvaluationId: null });
+
       void api
         .getEvaluation(evaluationId)
         .then((evaluation) => {
@@ -227,10 +239,22 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
             evaluation.status === 'cancelled'
           ) {
             get().clearRunningEvaluation();
+          } else {
+            // Still running — reconnect after delay
+            const running = get().getRunningEvaluation();
+            if (running && running.id === evaluationId) {
+              const timer = setTimeout(() => get().connectToEvaluation(evaluationId), 3000);
+              set({ _reconnectTimer: timer });
+            }
           }
         })
         .catch(() => {
-          // Ignore errors on status check
+          // API unreachable — retry reconnect after longer delay
+          const running = get().getRunningEvaluation();
+          if (running && running.id === evaluationId) {
+            const timer = setTimeout(() => get().connectToEvaluation(evaluationId), 5000);
+            set({ _reconnectTimer: timer });
+          }
         });
     };
 
@@ -238,14 +262,28 @@ export const useEvaluationStore = create<EvaluationStore>((set, get) => ({
   },
 
   disconnectFromEvaluation: () => {
+    const timer = get()._reconnectTimer;
+    if (timer) clearTimeout(timer);
+
     const ws = get().wsConnection;
-    if (ws) {
-      ws.close();
-    }
-    set({ wsConnection: null, _connectedEvaluationId: null });
+    // Clear state BEFORE closing so the onclose guard skips reconnection
+    set({ wsConnection: null, _connectedEvaluationId: null, _reconnectTimer: null });
+    if (ws) ws.close();
   },
 
   clearLogs: () => set({ logs: [], progress: null }),
+
+  resumeTracking: () => {
+    const running = get().getRunningEvaluation();
+    if (!running) return;
+
+    const ws = get().wsConnection;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    get().connectToEvaluation(running.id);
+  },
 
   persistRunningEvaluation: (eval_: RunningEvaluation) => {
     try {

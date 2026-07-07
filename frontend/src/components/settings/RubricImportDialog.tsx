@@ -100,7 +100,7 @@ export function RubricImportDialog({ open, onOpenChange, onImported }: RubricImp
           <p className="text-xs text-muted-foreground">
             Import rubric in rubric-kit YAML format. See{' '}
             <a
-              href="https://github.com/instructlab/rubric-kit"
+              href="https://github.com/narmaku/rubric-kit"
               target="_blank"
               rel="noopener noreferrer"
               className="underline"
