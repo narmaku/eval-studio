@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help check-deps dev test test-backend test-frontend lint format build clean docker-build docker-up docker-down docs-serve docs-build pre-commit-install pre-commit-run
+.PHONY: help check-deps dev test test-backend test-frontend lint format build clean docker-build docker-up docker-down docs-serve docs-build pre-commit-install pre-commit-run release
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -65,3 +65,7 @@ pre-commit-install: ## Install pre-commit hooks into .git/hooks
 
 pre-commit-run: ## Run all pre-commit hooks on all files
 	pre-commit run --all-files
+
+release: ## Bump version and tag release (usage: make release V=0.2.0)
+	@test -n "$(V)" || { echo "Usage: make release V=0.2.0"; exit 1; }
+	./scripts/release.sh $(V)

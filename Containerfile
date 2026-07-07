@@ -14,6 +14,11 @@ RUN npm run build
 # Stage 2: Python runtime
 FROM python:3.11-slim AS runtime
 
+LABEL org.opencontainers.image.title="eval-studio" \
+      org.opencontainers.image.description="Workspace for building, running, and improving AI evaluations" \
+      org.opencontainers.image.source="https://github.com/narmaku/eval-studio" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
 # Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl && \
