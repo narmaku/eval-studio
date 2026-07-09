@@ -31,7 +31,7 @@ export function RAGResultDetailDrawer({
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" size="wide" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>RAG Result Detail</SheetTitle>
           <SheetDescription>

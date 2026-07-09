@@ -47,7 +47,7 @@ export function RubricBuilder({ open, onOpenChange, rubric, onSaved }: RubricBui
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" size="wide" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{rubric ? 'Edit Rubric' : 'New Rubric'}</SheetTitle>
         </SheetHeader>

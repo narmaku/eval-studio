@@ -33,7 +33,7 @@ interface EvaluatorDetailProps {
 export function EvaluatorDetail({ open, onOpenChange, evaluator }: EvaluatorDetailProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto sm:max-w-lg">
+      <SheetContent size="wide" className="overflow-y-auto">
         <EvaluatorDetailContent key={evaluator.id} evaluator={evaluator} />
       </SheetContent>
     </Sheet>

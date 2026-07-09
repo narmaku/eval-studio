@@ -29,7 +29,7 @@ export function ResultDetailDrawer({
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" size="wide" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Result Detail</SheetTitle>
           <SheetDescription>
