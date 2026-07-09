@@ -191,7 +191,8 @@ export function JudgeConfigPanel({ value, onChange, disabled }: JudgeConfigPanel
                 <div className="mt-1 flex flex-wrap gap-1">
                   {selectedRubric.dimensions.map((dim) => (
                     <Badge key={dim.name} variant="outline" className="text-[10px] px-1.5 py-0">
-                      {dim.name} (w={dim.weight})
+                      {dim.name} (w={dim.weight}
+                      {dim.criteria?.length ? `, ${dim.criteria.length}c` : ''})
                     </Badge>
                   ))}
                 </div>

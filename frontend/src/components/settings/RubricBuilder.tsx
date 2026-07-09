@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { useRubricStore } from '@/stores/rubricStore';
 import type { Rubric, RubricDimension, CreateRubricRequest } from '@/types';
 
@@ -23,10 +23,17 @@ interface RubricBuilderProps {
   onSaved?: () => void;
 }
 
+interface FormCriterion {
+  name: string;
+  criterion: string;
+  weight: string;
+}
+
 interface FormDimension {
   name: string;
   weight: string;
   description: string;
+  criteria: FormCriterion[];
 }
 
 /**
@@ -83,8 +90,14 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
       name: d.name,
       weight: String(d.weight),
       description: d.description,
+      criteria: (d.criteria ?? []).map((c) => ({
+        name: c.name,
+        criterion: c.criterion,
+        weight: String(c.weight ?? 1),
+      })),
     })) ?? [],
   );
+  const [expandedCriteria, setExpandedCriteria] = useState<Set<number>>(new Set());
   const [passThreshold, setPassThreshold] = useState(String(rubric?.pass_threshold ?? 0.7));
   const [aggregation, setAggregation] = useState(rubric?.aggregation ?? 'weighted_average');
   const [promptTemplate, setPromptTemplate] = useState(rubric?.prompt_template ?? '');
@@ -92,15 +105,69 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   const addDimension = () => {
-    setDimensions((prev) => [...prev, { name: '', weight: '1.0', description: '' }]);
+    setDimensions((prev) => [...prev, { name: '', weight: '1.0', description: '', criteria: [] }]);
   };
 
   const removeDimension = (index: number) => {
     setDimensions((prev) => prev.filter((_, i) => i !== index));
+    setExpandedCriteria((prev) => {
+      const next = new Set<number>();
+      for (const idx of prev) {
+        if (idx < index) next.add(idx);
+        else if (idx > index) next.add(idx - 1);
+      }
+      return next;
+    });
   };
 
   const updateDimensionField = (index: number, field: keyof FormDimension, value: string) => {
     setDimensions((prev) => prev.map((d, i) => (i === index ? { ...d, [field]: value } : d)));
+  };
+
+  const toggleCriteriaExpanded = (dimIndex: number) => {
+    setExpandedCriteria((prev) => {
+      const next = new Set(prev);
+      if (next.has(dimIndex)) next.delete(dimIndex);
+      else next.add(dimIndex);
+      return next;
+    });
+  };
+
+  const addCriterion = (dimIndex: number) => {
+    setDimensions((prev) =>
+      prev.map((d, i) =>
+        i === dimIndex
+          ? { ...d, criteria: [...d.criteria, { name: '', criterion: '', weight: '1' }] }
+          : d,
+      ),
+    );
+    setExpandedCriteria((prev) => new Set(prev).add(dimIndex));
+  };
+
+  const removeCriterion = (dimIndex: number, critIndex: number) => {
+    setDimensions((prev) =>
+      prev.map((d, i) =>
+        i === dimIndex ? { ...d, criteria: d.criteria.filter((_, j) => j !== critIndex) } : d,
+      ),
+    );
+  };
+
+  const updateCriterionField = (
+    dimIndex: number,
+    critIndex: number,
+    field: keyof FormCriterion,
+    value: string,
+  ) => {
+    setDimensions((prev) =>
+      prev.map((d, i) =>
+        i === dimIndex
+          ? {
+              ...d,
+              criteria: d.criteria.map((c, j) => (j === critIndex ? { ...c, [field]: value } : c)),
+            }
+          : d,
+      ),
+    );
   };
 
   const validate = (): boolean => {
@@ -119,6 +186,18 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
       if (isNaN(weight) || weight <= 0) {
         newErrors.push(`Dimension ${i + 1}: weight must be a positive number`);
       }
+      d.criteria.forEach((c, j) => {
+        if (!c.name.trim()) {
+          newErrors.push(`Dimension ${i + 1}, Criterion ${j + 1}: name is required`);
+        }
+        if (!c.criterion.trim()) {
+          newErrors.push(`Dimension ${i + 1}, Criterion ${j + 1}: criterion text is required`);
+        }
+        const cWeight = parseFloat(c.weight);
+        if (isNaN(cWeight) || cWeight <= 0) {
+          newErrors.push(`Dimension ${i + 1}, Criterion ${j + 1}: weight must be positive`);
+        }
+      });
     });
 
     setErrors(newErrors);
@@ -134,6 +213,13 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
         name: d.name,
         weight: parseFloat(d.weight) || 1.0,
         description: d.description,
+        ...(d.criteria.length > 0 && {
+          criteria: d.criteria.map((c) => ({
+            name: c.name,
+            criterion: c.criterion,
+            weight: parseFloat(c.weight) || 1.0,
+          })),
+        }),
       }));
 
       const data: CreateRubricRequest = {
@@ -244,6 +330,84 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
               value={dim.description}
               onChange={(e) => updateDimensionField(index, 'description', e.target.value)}
             />
+
+            {/* Criteria sub-editor */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  onClick={() => toggleCriteriaExpanded(index)}
+                >
+                  {expandedCriteria.has(index) ? (
+                    <ChevronDown className="h-3 w-3" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3" />
+                  )}
+                  Criteria ({dim.criteria.length})
+                </button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => addCriterion(index)}
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add Criterion
+                </Button>
+              </div>
+
+              {expandedCriteria.has(index) && dim.criteria.length > 0 && (
+                <div className="space-y-2 rounded-md border border-dashed border-border bg-muted/20 p-2">
+                  {dim.criteria.map((crit, critIdx) => (
+                    <div
+                      key={critIdx}
+                      className="space-y-1.5 rounded-md border border-border bg-background p-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Criterion name"
+                          className="h-7 text-xs"
+                          value={crit.name}
+                          onChange={(e) =>
+                            updateCriterionField(index, critIdx, 'name', e.target.value)
+                          }
+                        />
+                        <Input
+                          type="number"
+                          placeholder="Weight"
+                          step="0.1"
+                          min="0"
+                          className="h-7 w-20 text-xs"
+                          value={crit.weight}
+                          onChange={(e) =>
+                            updateCriterionField(index, critIdx, 'weight', e.target.value)
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeCriterion(index, critIdx)}
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                          aria-label={`Remove criterion ${critIdx + 1}`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <Textarea
+                        placeholder="Criterion text (evaluation instruction)"
+                        rows={2}
+                        className="text-xs"
+                        value={crit.criterion}
+                        onChange={(e) =>
+                          updateCriterionField(index, critIdx, 'criterion', e.target.value)
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
