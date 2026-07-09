@@ -29,6 +29,7 @@ const makeRubric = (overrides: Partial<Rubric> = {}): Rubric => ({
   pass_threshold: 0.7,
   aggregation: 'weighted_average',
   prompt_template: null,
+  tags: [],
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
   ...overrides,
@@ -177,6 +178,199 @@ describe('RubricBuilder', () => {
     expect(mockUpdateRubric).toHaveBeenCalledWith(
       'r-1',
       expect.objectContaining({ name: 'Updated' }),
+    );
+  });
+
+  it('loads criteria from existing rubric in edit mode', async () => {
+    const user = userEvent.setup();
+    const rubricWithCriteria = makeRubric({
+      dimensions: [
+        {
+          name: 'accuracy',
+          weight: 1,
+          description: 'Factual accuracy',
+          criteria: [
+            { name: 'factual', criterion: 'Is factually correct', weight: 1 },
+            { name: 'complete', criterion: 'Is complete', weight: 2 },
+          ],
+        },
+      ],
+    });
+
+    render(<RubricBuilder open={true} onOpenChange={vi.fn()} rubric={rubricWithCriteria} />);
+
+    // Criteria count shows in the toggle button
+    expect(screen.getByText('Criteria (2)')).toBeInTheDocument();
+
+    // Click toggle to expand criteria
+    await user.click(screen.getByText('Criteria (2)'));
+
+    // Verify criterion input fields contain expected values
+    expect(screen.getByDisplayValue('factual')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('complete')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Is factually correct')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Is complete')).toBeInTheDocument();
+  });
+
+  it('can add a criterion to a dimension', async () => {
+    const user = userEvent.setup();
+    render(<RubricBuilder open={true} onOpenChange={vi.fn()} />);
+
+    // Add a dimension first
+    await user.click(screen.getByRole('button', { name: /add dimension/i }));
+
+    // Initially shows Criteria (0)
+    expect(screen.getByText('Criteria (0)')).toBeInTheDocument();
+
+    // Click "Add Criterion"
+    await user.click(screen.getByRole('button', { name: /add criterion/i }));
+
+    // Count updates to 1
+    expect(screen.getByText('Criteria (1)')).toBeInTheDocument();
+
+    // Section auto-expands and shows input fields
+    expect(screen.getByPlaceholderText('Criterion name')).toBeInTheDocument();
+  });
+
+  it('can remove a criterion', async () => {
+    const user = userEvent.setup();
+    const rubricWithCriteria = makeRubric({
+      dimensions: [
+        {
+          name: 'accuracy',
+          weight: 1,
+          description: 'Factual accuracy',
+          criteria: [
+            { name: 'factual', criterion: 'Is factually correct', weight: 1 },
+            { name: 'complete', criterion: 'Is complete', weight: 2 },
+          ],
+        },
+      ],
+    });
+
+    render(<RubricBuilder open={true} onOpenChange={vi.fn()} rubric={rubricWithCriteria} />);
+
+    // Expand criteria section
+    await user.click(screen.getByText('Criteria (2)'));
+
+    // Remove the first criterion
+    const removeButton = screen.getByRole('button', { name: /remove criterion 1/i });
+    await user.click(removeButton);
+
+    // Only 1 criterion remains
+    expect(screen.getByText('Criteria (1)')).toBeInTheDocument();
+    // The second criterion (now first) still exists
+    expect(screen.getByDisplayValue('complete')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('factual')).not.toBeInTheDocument();
+  });
+
+  it('validates criteria fields', async () => {
+    const user = userEvent.setup();
+    render(<RubricBuilder open={true} onOpenChange={vi.fn()} />);
+
+    // Fill in rubric name
+    await user.type(screen.getByLabelText(/name/i), 'Test Rubric');
+
+    // Add a dimension with a name
+    await user.click(screen.getByRole('button', { name: /add dimension/i }));
+    const row = screen.getByTestId('dimension-row');
+    const dimInputs = within(row).getAllByRole('textbox');
+    await user.type(dimInputs[0]!, 'quality');
+
+    // Add a criterion but leave fields empty
+    await user.click(screen.getByRole('button', { name: /add criterion/i }));
+
+    // Try to save
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(screen.getByText(/name is required/i)).toBeInTheDocument();
+    expect(screen.getByText(/criterion text is required/i)).toBeInTheDocument();
+    expect(mockCreateRubric).not.toHaveBeenCalled();
+  });
+
+  it('includes criteria in save payload', async () => {
+    const user = userEvent.setup();
+    mockCreateRubric.mockResolvedValue(makeRubric());
+
+    render(<RubricBuilder open={true} onOpenChange={vi.fn()} />);
+
+    // Fill rubric name
+    await user.type(screen.getByLabelText(/name/i), 'Criteria Rubric');
+
+    // Add dimension
+    await user.click(screen.getByRole('button', { name: /add dimension/i }));
+    const row = screen.getByTestId('dimension-row');
+    const dimInputs = within(row).getAllByRole('textbox');
+    await user.type(dimInputs[0]!, 'quality');
+
+    // Add criterion and fill fields
+    await user.click(screen.getByRole('button', { name: /add criterion/i }));
+
+    const criterionName = screen.getByPlaceholderText('Criterion name');
+    await user.type(criterionName, 'factual');
+
+    const criterionText = screen.getByPlaceholderText('Criterion text (evaluation instruction)');
+    await user.type(criterionText, 'Must be factually correct');
+
+    // Save
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(mockCreateRubric).toHaveBeenCalledTimes(1);
+    expect(mockCreateRubric).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Criteria Rubric',
+        dimensions: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'quality',
+            criteria: expect.arrayContaining([
+              expect.objectContaining({
+                name: 'factual',
+                criterion: 'Must be factually correct',
+                weight: 1,
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('criteria preserved through edit round-trip', async () => {
+    const user = userEvent.setup();
+    const rubricWithCriteria = makeRubric({
+      dimensions: [
+        {
+          name: 'accuracy',
+          weight: 1,
+          description: 'Factual accuracy',
+          criteria: [{ name: 'factual', criterion: 'Is factually correct', weight: 1 }],
+        },
+      ],
+    });
+    mockUpdateRubric.mockResolvedValue(rubricWithCriteria);
+
+    render(<RubricBuilder open={true} onOpenChange={vi.fn()} rubric={rubricWithCriteria} />);
+
+    // Save without changes
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(mockUpdateRubric).toHaveBeenCalledTimes(1);
+    expect(mockUpdateRubric).toHaveBeenCalledWith(
+      'r-1',
+      expect.objectContaining({
+        dimensions: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'accuracy',
+            criteria: expect.arrayContaining([
+              expect.objectContaining({
+                name: 'factual',
+                criterion: 'Is factually correct',
+                weight: 1,
+              }),
+            ]),
+          }),
+        ]),
+      }),
     );
   });
 });

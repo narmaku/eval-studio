@@ -174,4 +174,38 @@ describe('JudgeConfigPanel', () => {
 
     expect(screen.queryByText('Scoring Rubric (optional)')).not.toBeInTheDocument();
   });
+
+  it('shows criteria count in dimension badges', async () => {
+    const rubricWithCriteria = {
+      ...rubric,
+      dimensions: [
+        {
+          name: 'accuracy',
+          weight: 2,
+          description: 'Factual accuracy',
+          criteria: [
+            { name: 'factual', criterion: 'Is factual', weight: 1 },
+            { name: 'complete', criterion: 'Is complete', weight: 1 },
+          ],
+        },
+        { name: 'clarity', weight: 1, description: 'Clarity' },
+      ],
+    };
+    mockListRubrics.mockResolvedValue({
+      items: [rubricWithCriteria],
+      total: 1,
+      page: 1,
+      page_size: 100,
+      pages: 1,
+    });
+
+    render(<JudgeConfigPanel value={{ provider_id: 'p1', rubric_id: 'r1' }} onChange={onChange} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/accuracy \(w=2, 2c\)/)).toBeInTheDocument();
+    });
+
+    // clarity has no criteria, so no criteria count suffix
+    expect(screen.getByText(/clarity \(w=1\)/)).toBeInTheDocument();
+  });
 });
