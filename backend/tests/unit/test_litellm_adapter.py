@@ -335,6 +335,64 @@ class TestBuildDimensionsPrompt:
         assert "**overall**" in section
         assert names == ["overall"]
 
+    def test_build_dimensions_prompt_with_criteria(self):
+        """Criteria sub-items are listed under each dimension."""
+        dims = [
+            {
+                "name": "factual_correctness",
+                "weight": 0.6,
+                "description": "Evaluates factual accuracy.",
+                "criteria": [
+                    {"name": "identifies_catalog", "criterion": "Must identify the catalog.", "weight": 3},
+                    {"name": "covers_certification", "criterion": "Must mention certification.", "weight": 2},
+                ],
+            },
+            {
+                "name": "completeness",
+                "weight": 0.4,
+                "description": "Evaluates completeness.",
+            },
+        ]
+        section, _schema, _names = LiteLLMJudgeAdapter._build_dimensions_prompt(dims)
+        # Criteria should appear under the first dimension
+        assert "Criteria:" in section
+        assert "identifies_catalog" in section
+        assert "weight 3" in section
+        assert "Must identify the catalog." in section
+        assert "covers_certification" in section
+        # Second dimension without criteria should not have "Criteria:" after it
+        lines = section.split("\n")
+        completeness_idx = next(i for i, line in enumerate(lines) if "completeness" in line)
+        # No Criteria: line after completeness
+        remaining = "\n".join(lines[completeness_idx + 1 :])
+        assert "Criteria:" not in remaining
+
+    def test_build_dimensions_prompt_without_criteria(self):
+        """Dimensions without criteria produce the same output as before."""
+        dims = [
+            {"name": "accuracy", "weight": 1.0, "description": "Factual accuracy"},
+        ]
+        section, _schema, names = LiteLLMJudgeAdapter._build_dimensions_prompt(dims)
+        assert "Criteria:" not in section
+        assert "**accuracy**" in section
+        assert names == ["accuracy"]
+
+    def test_build_dimensions_prompt_empty_criteria_list(self):
+        """Empty criteria list treated same as no criteria."""
+        dims = [
+            {"name": "accuracy", "weight": 1.0, "description": "Factual accuracy", "criteria": []},
+        ]
+        section, _schema, _names = LiteLLMJudgeAdapter._build_dimensions_prompt(dims)
+        assert "Criteria:" not in section
+
+    def test_build_dimensions_prompt_criteria_none(self):
+        """Criteria set to None treated same as absent."""
+        dims = [
+            {"name": "accuracy", "weight": 1.0, "description": "Factual accuracy", "criteria": None},
+        ]
+        section, _schema, _names = LiteLLMJudgeAdapter._build_dimensions_prompt(dims)
+        assert "Criteria:" not in section
+
 
 class TestParseJsonLenient:
     """Tests for _parse_json_lenient markdown fence stripping."""

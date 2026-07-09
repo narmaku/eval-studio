@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from app.schemas.rubric import RubricCriterion, RubricDimension
 from app.services.rubric_service import (
     clean_yaml_block,
     convert_rubric_kit_to_internal,
@@ -425,3 +426,236 @@ class TestRefineRubric:
         assert result["pass_threshold"] == 0.85
         assert result["aggregation"] == "simple_average"
         assert result["prompt_template"] == "Rate: {response}"
+
+
+class TestRubricCriterionSchema:
+    """Tests for the RubricCriterion and updated RubricDimension schemas."""
+
+    def test_rubric_criterion_defaults(self):
+        c = RubricCriterion(name="test", criterion="some criterion text")
+        assert c.name == "test"
+        assert c.criterion == "some criterion text"
+        assert c.weight == 1.0
+
+    def test_rubric_criterion_custom_weight(self):
+        c = RubricCriterion(name="test", criterion="text", weight=3.0)
+        assert c.weight == 3.0
+
+    def test_rubric_dimension_criteria_optional(self):
+        d = RubricDimension(name="accuracy", weight=1.0, description="test")
+        assert d.criteria is None
+
+    def test_rubric_dimension_with_criteria(self):
+        d = RubricDimension(
+            name="accuracy",
+            weight=1.0,
+            description="test",
+            criteria=[
+                RubricCriterion(name="c1", criterion="criterion 1", weight=2.0),
+                RubricCriterion(name="c2", criterion="criterion 2"),
+            ],
+        )
+        assert len(d.criteria) == 2
+        assert d.criteria[0].name == "c1"
+        assert d.criteria[0].weight == 2.0
+        assert d.criteria[1].weight == 1.0
+
+
+class TestRubricKitCriteriaImport:
+    """Tests for rubric-kit YAML import with criteria stored per dimension."""
+
+    def test_rubric_kit_format_stores_criteria_per_dimension(self):
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - factual_correctness: "Evaluates factual accuracy"
+                grading_type: score
+                scores:
+                  1: "Incorrect"
+                  5: "Correct"
+              - completeness: "Evaluates answer completeness"
+                grading_type: score
+                scores:
+                  1: "Incomplete"
+                  5: "Complete"
+            criteria:
+              - name: identifies_catalog
+                weight: 3
+                dimension: factual_correctness
+                criterion: "The answer must identify the Red Hat Ecosystem Catalog."
+              - name: covers_certification
+                weight: 2
+                dimension: completeness
+                criterion: "The answer must mention RHEL certification."
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+
+        # factual_correctness should have 1 criterion
+        fc_dim = next(d for d in dims if d["name"] == "factual_correctness")
+        assert fc_dim["criteria"] is not None
+        assert len(fc_dim["criteria"]) == 1
+        assert fc_dim["criteria"][0]["name"] == "identifies_catalog"
+        assert fc_dim["criteria"][0]["weight"] == 3
+        assert "Red Hat Ecosystem Catalog" in fc_dim["criteria"][0]["criterion"]
+
+        # completeness should have 1 criterion
+        comp_dim = next(d for d in dims if d["name"] == "completeness")
+        assert comp_dim["criteria"] is not None
+        assert len(comp_dim["criteria"]) == 1
+        assert comp_dim["criteria"][0]["name"] == "covers_certification"
+
+    def test_rubric_kit_format_variable_substitution(self):
+        yaml_content = textwrap.dedent("""\
+            variables:
+              product: "Red Hat Enterprise Linux"
+              version: "9.4"
+            dimensions:
+              - accuracy: "Accuracy of the answer"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: mentions_product
+                weight: 2
+                dimension: accuracy
+                criterion: "The answer must mention {{product}} version {{version}}."
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert acc_dim["criteria"] is not None
+        crit_text = acc_dim["criteria"][0]["criterion"]
+        assert "Red Hat Enterprise Linux" in crit_text
+        assert "9.4" in crit_text
+        assert "{{product}}" not in crit_text
+
+    def test_rubric_kit_format_unresolved_variables_warns(self):
+        yaml_content = textwrap.dedent("""\
+            variables:
+              product: "RHEL"
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "Must mention {{product}} and {{missing_var}}."
+        """)
+        with patch("app.services.rubric_service.logger") as mock_logger:
+            result = parse_rubric_yaml(yaml_content)
+
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        crit_text = acc_dim["criteria"][0]["criterion"]
+        # product should be substituted, missing_var left as-is
+        assert "RHEL" in crit_text
+        assert "{{missing_var}}" in crit_text
+        # Warning should have been logged via structlog
+        mock_logger.warning.assert_called()
+        call_args = mock_logger.warning.call_args
+        assert call_args[0][0] == "rubric.variable_substitution.unresolved"
+        assert "missing_var" in call_args[1]["unresolved_placeholders"]
+
+    def test_rubric_kit_criteria_unknown_dimension_skipped(self):
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "Valid criterion."
+              - name: c2
+                weight: 1
+                dimension: nonexistent_dimension
+                criterion: "This references a missing dimension."
+        """)
+        with patch("app.services.rubric_service.logger") as mock_logger:
+            result = parse_rubric_yaml(yaml_content)
+
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        # Should have only the valid criterion
+        assert len(acc_dim["criteria"]) == 1
+        assert acc_dim["criteria"][0]["name"] == "c1"
+        # Warning about skipped criterion logged via structlog
+        mock_logger.warning.assert_called()
+        call_args = mock_logger.warning.call_args
+        assert call_args[0][0] == "rubric.criteria.unknown_dimension"
+        assert call_args[1]["dimension"] == "nonexistent_dimension"
+
+    def test_simple_format_no_criteria(self):
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - name: quality
+                weight: 1.0
+                description: "Overall quality"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        # Simple format dimensions should NOT have criteria
+        assert "criteria" not in result["dimensions"][0]
+
+    def test_empty_criteria_list_treated_as_none(self):
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria: []
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        # With empty criteria list, no criteria should be attached
+        assert dims[0].get("criteria") is None
+
+
+class TestConvertRubricKitPreservesCriteria:
+    """Tests for convert_rubric_kit_to_internal preserving criteria."""
+
+    def test_convert_rubric_kit_preserves_criteria(self):
+        from rubric_kit import Criterion, Dimension, Rubric
+
+        rubric = Rubric(
+            dimensions=[
+                Dimension(
+                    name="accuracy",
+                    description="Factual accuracy",
+                    grading_type="score",
+                    scores={1: "Bad", 5: "Good"},
+                ),
+                Dimension(
+                    name="clarity",
+                    description="Clarity",
+                    grading_type="score",
+                    scores={1: "Bad", 5: "Good"},
+                ),
+            ],
+            criteria=[
+                Criterion(name="fact_check", weight=3, dimension="accuracy", criterion="Is it factually correct?"),
+                Criterion(name="sources", weight=2, dimension="accuracy", criterion="Does it cite sources?"),
+                Criterion(name="readable", weight=1, dimension="clarity", criterion="Is it easy to read?"),
+            ],
+        )
+        result = convert_rubric_kit_to_internal(rubric)
+        acc_dim = next(d for d in result["dimensions"] if d["name"] == "accuracy")
+        assert acc_dim["criteria"] is not None
+        assert len(acc_dim["criteria"]) == 2
+        assert acc_dim["criteria"][0]["name"] == "fact_check"
+        assert acc_dim["criteria"][0]["weight"] == 3
+        assert acc_dim["criteria"][1]["name"] == "sources"
+
+        clar_dim = next(d for d in result["dimensions"] if d["name"] == "clarity")
+        assert clar_dim["criteria"] is not None
+        assert len(clar_dim["criteria"]) == 1
+        assert clar_dim["criteria"][0]["name"] == "readable"

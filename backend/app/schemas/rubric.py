@@ -5,12 +5,21 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class RubricCriterion(BaseModel):
+    """A single evaluation criterion within a rubric dimension."""
+
+    name: str = Field(min_length=1, max_length=255)
+    criterion: str = Field(min_length=1)
+    weight: float = Field(default=1.0, gt=0)
+
+
 class RubricDimension(BaseModel):
     """A single scoring dimension within a rubric."""
 
     name: str = Field(min_length=1, max_length=255)
     weight: float = Field(gt=0)
     description: str = Field(min_length=1)
+    criteria: list[RubricCriterion] | None = None
 
 
 class RubricCreate(BaseModel):
