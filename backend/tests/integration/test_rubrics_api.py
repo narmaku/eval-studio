@@ -262,6 +262,55 @@ async def test_import_rubric_empty_body(client):
     assert response.status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_import_rubric_kit_format(client):
+    """POST /rubrics/import creates a rubric from rubric-kit format YAML."""
+    yaml_content = textwrap.dedent("""\
+        name: "Kit Format Rubric"
+        description: "Imported via rubric-kit"
+        pass_threshold: 0.85
+        dimensions:
+          - accuracy: "Factual accuracy"
+            grading_type: score
+            scores:
+              1: "Incorrect"
+              5: "Correct"
+        criteria:
+          - name: fact_check
+            weight: 2
+            dimension: accuracy
+            criterion: "Is the answer factually correct?"
+    """)
+    response = await client.post("/api/v1/rubrics/import", json={"yaml_content": yaml_content})
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Kit Format Rubric"
+    assert data["description"] == "Imported via rubric-kit"
+    assert data["pass_threshold"] == 0.85
+    assert len(data["dimensions"]) == 1
+    assert data["dimensions"][0]["name"] == "accuracy"
+    assert data["dimensions"][0]["criteria"] is not None
+    assert data["dimensions"][0]["criteria"][0]["name"] == "fact_check"
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_kit_format_validation_error(client):
+    """POST /rubrics/import returns 400 for rubric-kit validation failures."""
+    yaml_content = textwrap.dedent("""\
+        dimensions:
+          - broken: "Missing scores"
+            grading_type: score
+        criteria:
+          - name: c1
+            weight: 1
+            dimension: broken
+            criterion: "Text."
+    """)
+    response = await client.post("/api/v1/rubrics/import", json={"yaml_content": yaml_content})
+    assert response.status_code == 400
+    assert "scores" in response.json()["detail"].lower()
+
+
 # --- Generate endpoint tests ---
 
 

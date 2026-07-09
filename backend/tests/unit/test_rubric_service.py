@@ -1008,3 +1008,74 @@ class TestRubricKitLoadRubricIntegration:
         assert result["dimensions"][0]["name"] == "correctness"
         assert result["dimensions"][0]["description"] == "Factual accuracy"
         assert result["dimensions"][0]["criteria"][0]["name"] == "fact_check"
+
+    def test_rubric_kit_format_metadata_preserved(self):
+        """Custom pass_threshold, aggregation, and prompt_template propagate in rubric-kit format."""
+        yaml_content = textwrap.dedent("""\
+            name: "Custom Meta Rubric"
+            description: "Rubric with custom metadata"
+            pass_threshold: 0.9
+            aggregation: simple_average
+            prompt_template: "Rate the response: {response}"
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "Is it accurate?"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert result["name"] == "Custom Meta Rubric"
+        assert result["description"] == "Rubric with custom metadata"
+        assert result["pass_threshold"] == 0.9
+        assert result["aggregation"] == "simple_average"
+        assert result["prompt_template"] == "Rate the response: {response}"
+
+    def test_rubric_kit_format_nested_rubric_key(self):
+        """rubric-kit format YAML nested under 'rubric:' key is parsed correctly."""
+        yaml_content = textwrap.dedent("""\
+            rubric:
+              name: "Nested Kit Rubric"
+              description: "Nested rubric-kit format"
+              dimensions:
+                - accuracy: "Accuracy"
+                  grading_type: score
+                  scores:
+                    1: "Bad"
+                    5: "Good"
+              criteria:
+                - name: c1
+                  weight: 1
+                  dimension: accuracy
+                  criterion: "Is it accurate?"
+              pass_threshold: 0.85
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert result["name"] == "Nested Kit Rubric"
+        assert result["description"] == "Nested rubric-kit format"
+        assert result["pass_threshold"] == 0.85
+        dims = result["dimensions"]
+        assert len(dims) == 1
+        assert dims[0]["name"] == "accuracy"
+        assert dims[0]["criteria"][0]["name"] == "c1"
+
+    def test_rubric_kit_format_validation_error_surfaces_as_value_error(self):
+        """rubric-kit RubricValidationError is surfaced as ValueError."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "Text."
+        """)
+        # grading_type: score without scores dict triggers RubricValidationError
+        with pytest.raises(ValueError):
+            parse_rubric_yaml(yaml_content)
