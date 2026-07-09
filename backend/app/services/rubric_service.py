@@ -7,12 +7,14 @@ descriptions, and refining existing rubrics with feedback.
 import contextlib
 import os
 import re
+import tempfile
 
 import structlog
 import yaml
-from rubric_kit import Criterion, Dimension, Rubric
+from rubric_kit import Criterion, Dimension, Rubric, RubricValidationError
 from rubric_kit import generate as rubric_kit_generate
 from rubric_kit import refine as rubric_kit_refine
+from rubric_kit.validator import load_rubric
 
 logger = structlog.get_logger()
 
@@ -32,37 +34,15 @@ def clean_yaml_block(text: str) -> str:
     return text.strip()
 
 
-def _substitute_variables(text: str, variables: dict[str, str]) -> str:
-    """Replace ``{{var}}`` placeholders with values from *variables*.
-
-    Resolved placeholders are replaced in-place.  Any ``{{...}}`` tokens
-    that do **not** have a matching key are left as-is and a warning is
-    logged so the caller knows something was missed.
-    """
-    if not variables:
-        return text
-
-    for key, value in variables.items():
-        text = text.replace("{{" + key + "}}", str(value))
-
-    # Warn about any remaining unresolved placeholders
-    unresolved = re.findall(r"\{\{(\w+)\}\}", text)
-    if unresolved:
-        logger.warning(
-            "rubric.variable_substitution.unresolved",
-            unresolved_placeholders=unresolved,
-            text_preview=text[:200],
-        )
-
-    return text
-
-
 def parse_rubric_yaml(yaml_content: str) -> dict:
     """Parse YAML content into internal rubric dict.
 
     Supports two formats:
     1. Internal format (name + dimensions with weight/description)
     2. rubric-kit format (dimensions with grading_type + criteria)
+
+    rubric-kit format YAML is delegated to ``load_rubric()`` for full
+    validation, variable substitution, and ``from_scores`` handling.
 
     Args:
         yaml_content: Raw YAML string.
@@ -71,7 +51,8 @@ def parse_rubric_yaml(yaml_content: str) -> dict:
         Dict with name, description, dimensions, pass_threshold, aggregation, prompt_template.
 
     Raises:
-        ValueError: If YAML is invalid or no dimensions are found.
+        ValueError: If YAML is invalid, no dimensions are found, or
+            rubric-kit validation fails.
     """
     yaml_content = clean_yaml_block(yaml_content)
 
@@ -87,8 +68,6 @@ def parse_rubric_yaml(yaml_content: str) -> dict:
     rubric_data = data.get("rubric", data)
 
     raw_dimensions = rubric_data.get("dimensions", [])
-    raw_criteria = rubric_data.get("criteria", [])
-    variables = rubric_data.get("variables", {}) or {}
 
     if not raw_dimensions:
         raise ValueError("No dimensions found in YAML content")
@@ -97,18 +76,17 @@ def parse_rubric_yaml(yaml_content: str) -> dict:
     is_rubric_kit_format = any(isinstance(d, dict) and "grading_type" in d for d in raw_dimensions)
 
     if is_rubric_kit_format:
-        dimensions = _convert_rubric_kit_dims_and_criteria(raw_dimensions, raw_criteria, variables)
+        return _parse_rubric_kit_format(rubric_data)
     else:
         dimensions = _normalize_simple_dimensions(raw_dimensions)
-
-    return {
-        "name": rubric_data.get("name", "Imported Rubric"),
-        "description": rubric_data.get("description"),
-        "dimensions": dimensions,
-        "pass_threshold": rubric_data.get("pass_threshold", 0.7),
-        "aggregation": rubric_data.get("aggregation", "weighted_average"),
-        "prompt_template": rubric_data.get("prompt_template"),
-    }
+        return {
+            "name": rubric_data.get("name", "Imported Rubric"),
+            "description": rubric_data.get("description"),
+            "dimensions": dimensions,
+            "pass_threshold": rubric_data.get("pass_threshold", 0.7),
+            "aggregation": rubric_data.get("aggregation", "weighted_average"),
+            "prompt_template": rubric_data.get("prompt_template"),
+        }
 
 
 def _normalize_simple_dimensions(raw_dims: list[dict]) -> list[dict]:
@@ -127,116 +105,87 @@ def _normalize_simple_dimensions(raw_dims: list[dict]) -> list[dict]:
     return dims
 
 
-def _extract_dim_name_and_desc(d: dict) -> tuple[str, str]:
-    """Extract dimension name and description from a rubric-kit dimension entry.
+def _to_rubric_kit_format(rubric_data: dict) -> dict:
+    """Convert parsed rubric data to rubric-kit native YAML format.
 
-    rubric-kit format: {dim_name: description, grading_type: ..., scores: ...}
-    The dimension name is the first key that isn't a reserved field.
+    rubric-kit's ``parse_nested_dict`` expects:
+    - Dimensions as ``[{dim_name: description, grading_type: ..., scores: ...}]``
+    - Criteria as ``{crit_name: {weight: ..., dimension: ..., criterion: ...}}``
+
+    Dimensions and criteria with explicit ``name`` fields are converted to the
+    native key-based format so ``parse_nested_dict`` handles them correctly.
     """
-    reserved = {"grading_type", "scores", "name", "description"}
-    for key, val in d.items():
-        if key not in reserved and isinstance(val, str):
-            return key, val
-    return d.get("name", "unnamed"), d.get("description", "unnamed")
+    result: dict = {}
+
+    # Convert dimensions to native key-based format
+    raw_dims = rubric_data.get("dimensions", [])
+    if isinstance(raw_dims, list):
+        converted_dims = []
+        for d in raw_dims:
+            if isinstance(d, dict) and "name" in d and "description" in d:
+                d_copy = dict(d)
+                name = d_copy.pop("name")
+                desc = d_copy.pop("description")
+                converted_dims.append({name: desc, **d_copy})
+            elif isinstance(d, dict):
+                converted_dims.append(dict(d))
+            else:
+                converted_dims.append(d)
+        result["dimensions"] = converted_dims
+
+    # Convert criteria list to dict-of-dicts keyed by criterion name
+    raw_criteria = rubric_data.get("criteria", [])
+    if isinstance(raw_criteria, list):
+        criteria_dict: dict = {}
+        for i, c in enumerate(raw_criteria):
+            if isinstance(c, dict):
+                c_copy = dict(c)
+                name = c_copy.pop("name", f"criterion_{i}")
+                criteria_dict[name] = c_copy
+        result["criteria"] = criteria_dict
+    elif isinstance(raw_criteria, dict):
+        result["criteria"] = raw_criteria
+
+    # Copy variables
+    if "variables" in rubric_data:
+        result["variables"] = rubric_data["variables"]
+
+    return result
 
 
-def _convert_rubric_kit_dims_and_criteria(
-    raw_dims: list[dict],
-    raw_criteria: list | dict,
-    variables: dict[str, str] | None = None,
-) -> list[dict]:
-    """Convert rubric-kit format (dimensions + criteria) to internal weighted dimensions.
+def _parse_rubric_kit_format(rubric_data: dict) -> dict:
+    """Parse rubric-kit format YAML using rubric-kit's ``load_rubric`` API.
 
-    Criteria are stored per dimension as a list of ``{name, criterion, weight}``
-    dicts.  Template variables (``{{var}}``) in criterion text are substituted
-    from *variables*.  Criteria referencing non-existent dimensions are skipped
-    with a warning.
+    Converts the parsed rubric data to rubric-kit native format, writes it to
+    a temporary file, and delegates to ``load_rubric()`` for full validation,
+    variable substitution, and ``from_scores`` handling.
+
+    Args:
+        rubric_data: Parsed YAML dict (already unwrapped from ``rubric:`` key).
+
+    Returns:
+        Dict matching internal rubric schema.
+
+    Raises:
+        ValueError: If rubric-kit validation fails.
     """
-    variables = variables or {}
+    kit_data = _to_rubric_kit_format(rubric_data)
 
-    # Criteria can be a dict of dicts (keyed by criterion name) or a list
-    criteria_items: list[dict] = []
-    if isinstance(raw_criteria, dict):
-        for key, val in raw_criteria.items():
-            if isinstance(val, dict):
-                if "name" not in val:
-                    val = {**val, "name": key}
-                criteria_items.append(val)
-    elif isinstance(raw_criteria, list):
-        criteria_items = [c for c in raw_criteria if isinstance(c, dict)]
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=True) as f:
+        yaml.dump(kit_data, f, default_flow_style=False, sort_keys=False)
+        f.flush()
+        try:
+            rubric = load_rubric(f.name)
+        except RubricValidationError as exc:
+            raise ValueError(str(exc)) from exc
 
-    # Build dimension lookup: name → (scores dict, grading_type)
-    dim_info: dict[str, tuple[dict, str]] = {}
-    dim_names: set[str] = set()
-    for d in raw_dims:
-        if not isinstance(d, dict):
-            continue
-        name, _ = _extract_dim_name_and_desc(d)
-        dim_names.add(name)
-        raw_scores = d.get("scores", {})
-        scores = {int(k): str(v) for k, v in raw_scores.items()} if isinstance(raw_scores, dict) else {}
-        dim_info[name] = (scores, d.get("grading_type", ""))
-
-    # Group criteria by dimension, applying variable substitution
-    criteria_by_dim: dict[str, list[dict]] = {}
-    dim_weights: dict[str, float] = {}
-
-    for c in criteria_items:
-        dim_name = c.get("dimension", "")
-        if dim_name not in dim_names:
-            logger.warning(
-                "rubric.criteria.unknown_dimension",
-                criterion_name=c.get("name", "unknown"),
-                dimension=dim_name,
-                known_dimensions=sorted(dim_names),
-            )
-            continue
-
-        scores, _grading_type = dim_info.get(dim_name, ({}, ""))
-
-        weight = c.get("weight", 1)
-        if weight == "from_scores":
-            weight = max(scores.keys()) if scores else 1
-        elif isinstance(weight, str):
-            weight = 1
-        weight = float(weight)
-
-        criterion_text = c.get("criterion", "")
-        if criterion_text == "from_scores" and scores:
-            criterion_text = "\n".join(f"{k}: {v}" for k, v in sorted(scores.items()))
-        elif criterion_text == "from_scores":
-            criterion_text = ""
-        if variables and criterion_text:
-            criterion_text = _substitute_variables(criterion_text, variables)
-
-        criteria_by_dim.setdefault(dim_name, []).append(
-            {
-                "name": c.get("name", "unnamed"),
-                "criterion": criterion_text,
-                "weight": weight,
-            }
-        )
-        dim_weights[dim_name] = dim_weights.get(dim_name, 0) + weight
-
-    total_weight = sum(dim_weights.values()) or 1.0
-
-    dims = []
-    for d in raw_dims:
-        if not isinstance(d, dict):
-            continue
-        name, description = _extract_dim_name_and_desc(d)
-        raw_w = dim_weights.get(name, 1.0)
-        dim_dict: dict = {
-            "name": name,
-            "weight": round(raw_w / total_weight, 4),
-            "description": description,
-        }
-        dim_criteria = criteria_by_dim.get(name)
-        if dim_criteria:
-            dim_dict["criteria"] = dim_criteria
-        dims.append(dim_dict)
-
-    return dims
+    result = convert_rubric_kit_to_internal(rubric)
+    result["name"] = rubric_data.get("name", "Imported Rubric")
+    result["description"] = rubric_data.get("description")
+    result["pass_threshold"] = rubric_data.get("pass_threshold", 0.7)
+    result["aggregation"] = rubric_data.get("aggregation", "weighted_average")
+    result["prompt_template"] = rubric_data.get("prompt_template")
+    return result
 
 
 def convert_rubric_kit_to_internal(rubric: Rubric, name: str = "Generated Rubric") -> dict:
