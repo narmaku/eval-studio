@@ -9,7 +9,6 @@ from pydantic import ValidationError
 
 from app.schemas.rubric import RubricCriterion, RubricDimension
 from app.services.rubric_service import (
-    _substitute_variables,
     clean_yaml_block,
     convert_rubric_kit_to_internal,
     generate_rubric,
@@ -532,7 +531,8 @@ class TestRubricKitCriteriaImport:
         assert "9.4" in crit_text
         assert "{{product}}" not in crit_text
 
-    def test_rubric_kit_format_unresolved_variables_warns(self):
+    def test_rubric_kit_format_unresolved_variables_raises(self):
+        """Undefined variables now raise ValueError via rubric-kit validation."""
         yaml_content = textwrap.dedent("""\
             variables:
               product: "RHEL"
@@ -548,22 +548,11 @@ class TestRubricKitCriteriaImport:
                 dimension: accuracy
                 criterion: "Must mention {{product}} and {{missing_var}}."
         """)
-        with patch("app.services.rubric_service.logger") as mock_logger:
-            result = parse_rubric_yaml(yaml_content)
+        with pytest.raises(ValueError, match="missing_var"):
+            parse_rubric_yaml(yaml_content)
 
-        dims = result["dimensions"]
-        acc_dim = next(d for d in dims if d["name"] == "accuracy")
-        crit_text = acc_dim["criteria"][0]["criterion"]
-        # product should be substituted, missing_var left as-is
-        assert "RHEL" in crit_text
-        assert "{{missing_var}}" in crit_text
-        # Warning should have been logged via structlog
-        mock_logger.warning.assert_called()
-        call_args = mock_logger.warning.call_args
-        assert call_args[0][0] == "rubric.variable_substitution.unresolved"
-        assert "missing_var" in call_args[1]["unresolved_placeholders"]
-
-    def test_rubric_kit_criteria_unknown_dimension_skipped(self):
+    def test_rubric_kit_criteria_unknown_dimension_raises(self):
+        """Criteria referencing unknown dimensions now raise ValueError."""
         yaml_content = textwrap.dedent("""\
             dimensions:
               - accuracy: "Accuracy"
@@ -581,19 +570,8 @@ class TestRubricKitCriteriaImport:
                 dimension: nonexistent_dimension
                 criterion: "This references a missing dimension."
         """)
-        with patch("app.services.rubric_service.logger") as mock_logger:
-            result = parse_rubric_yaml(yaml_content)
-
-        dims = result["dimensions"]
-        acc_dim = next(d for d in dims if d["name"] == "accuracy")
-        # Should have only the valid criterion
-        assert len(acc_dim["criteria"]) == 1
-        assert acc_dim["criteria"][0]["name"] == "c1"
-        # Warning about skipped criterion logged via structlog
-        mock_logger.warning.assert_called()
-        call_args = mock_logger.warning.call_args
-        assert call_args[0][0] == "rubric.criteria.unknown_dimension"
-        assert call_args[1]["dimension"] == "nonexistent_dimension"
+        with pytest.raises(ValueError, match="nonexistent_dimension"):
+            parse_rubric_yaml(yaml_content)
 
     def test_simple_format_no_criteria(self):
         yaml_content = textwrap.dedent("""\
@@ -663,48 +641,6 @@ class TestConvertRubricKitPreservesCriteria:
         assert clar_dim["criteria"][0]["name"] == "readable"
 
 
-class TestSubstituteVariables:
-    """Tests for _substitute_variables helper."""
-
-    def test_replaces_single_variable(self):
-        result = _substitute_variables("Hello {{name}}", {"name": "World"})
-        assert result == "Hello World"
-
-    def test_replaces_multiple_variables(self):
-        result = _substitute_variables(
-            "{{product}} version {{version}}",
-            {"product": "RHEL", "version": "9.4"},
-        )
-        assert result == "RHEL version 9.4"
-
-    def test_replaces_repeated_placeholder(self):
-        result = _substitute_variables(
-            "{{x}} and {{x}} again",
-            {"x": "val"},
-        )
-        assert result == "val and val again"
-
-    def test_empty_variables_returns_text_unchanged(self):
-        assert _substitute_variables("{{keep}}", {}) == "{{keep}}"
-
-    def test_no_placeholders_returns_text_unchanged(self):
-        assert _substitute_variables("plain text", {"unused": "v"}) == "plain text"
-
-    def test_non_string_variable_values_converted(self):
-        result = _substitute_variables("count={{n}}", {"n": 42})
-        assert result == "count=42"
-
-    def test_empty_text_returns_empty(self):
-        assert _substitute_variables("", {"key": "val"}) == ""
-
-    def test_unresolved_placeholders_logged(self):
-        with patch("app.services.rubric_service.logger") as mock_logger:
-            result = _substitute_variables("{{known}} {{unknown}}", {"known": "ok"})
-        assert result == "ok {{unknown}}"
-        mock_logger.warning.assert_called_once()
-        assert "unknown" in mock_logger.warning.call_args[1]["unresolved_placeholders"]
-
-
 class TestRubricCriterionValidation:
     """Pydantic validation edge cases for RubricCriterion."""
 
@@ -763,8 +699,8 @@ class TestRubricKitCriteriaEdgeCases:
         assert acc_dim["criteria"] is not None
         assert len(acc_dim["criteria"]) == 2
 
-    def test_criteria_with_string_weight_defaults_to_one(self):
-        """Non-numeric weight strings should fall back to 1."""
+    def test_criteria_with_invalid_string_weight_raises(self):
+        """Non-numeric weight strings are rejected by rubric-kit validation."""
         yaml_content = textwrap.dedent("""\
             dimensions:
               - accuracy: "Accuracy"
@@ -778,13 +714,11 @@ class TestRubricKitCriteriaEdgeCases:
                 dimension: accuracy
                 criterion: "Some criterion."
         """)
-        result = parse_rubric_yaml(yaml_content)
-        dims = result["dimensions"]
-        acc_dim = next(d for d in dims if d["name"] == "accuracy")
-        assert acc_dim["criteria"][0]["weight"] == 1
+        with pytest.raises(ValueError, match=r"[Ww]eight"):
+            parse_rubric_yaml(yaml_content)
 
-    def test_criterion_missing_name_defaults_to_unnamed(self):
-        """Criterion without a name field should get 'unnamed'."""
+    def test_criterion_missing_name_gets_generated_name(self):
+        """Criterion without a name field gets an auto-generated name."""
         yaml_content = textwrap.dedent("""\
             dimensions:
               - accuracy: "Accuracy"
@@ -800,10 +734,11 @@ class TestRubricKitCriteriaEdgeCases:
         result = parse_rubric_yaml(yaml_content)
         dims = result["dimensions"]
         acc_dim = next(d for d in dims if d["name"] == "accuracy")
-        assert acc_dim["criteria"][0]["name"] == "unnamed"
+        # Auto-generated name from index
+        assert acc_dim["criteria"][0]["name"] == "criterion_0"
 
-    def test_criterion_missing_criterion_text_defaults_to_empty(self):
-        """Criterion without criterion text should default to empty string."""
+    def test_criterion_missing_criterion_text_resolves_from_scores(self):
+        """Criterion without criterion text resolves to score descriptions."""
         yaml_content = textwrap.dedent("""\
             dimensions:
               - accuracy: "Accuracy"
@@ -819,7 +754,8 @@ class TestRubricKitCriteriaEdgeCases:
         result = parse_rubric_yaml(yaml_content)
         dims = result["dimensions"]
         acc_dim = next(d for d in dims if d["name"] == "accuracy")
-        assert acc_dim["criteria"][0]["criterion"] == ""
+        assert "1: Bad" in acc_dim["criteria"][0]["criterion"]
+        assert "5: Good" in acc_dim["criteria"][0]["criterion"]
 
     def test_dimension_without_criteria_has_no_criteria_key(self):
         """Dimensions that have no matching criteria should omit the key."""
@@ -878,8 +814,8 @@ class TestRubricKitCriteriaEdgeCases:
         names = [c["name"] for c in acc_dim["criteria"]]
         assert names == ["c1", "c2", "c3"]
 
-    def test_variables_none_treated_as_empty(self):
-        """variables: null in YAML should not break criteria import."""
+    def test_variables_none_with_placeholders_raises(self):
+        """variables: null with unresolved placeholders raises ValueError."""
         yaml_content = textwrap.dedent("""\
             variables: null
             dimensions:
@@ -894,14 +830,11 @@ class TestRubricKitCriteriaEdgeCases:
                 dimension: accuracy
                 criterion: "Criterion with {{placeholder}}."
         """)
-        result = parse_rubric_yaml(yaml_content)
-        dims = result["dimensions"]
-        acc_dim = next(d for d in dims if d["name"] == "accuracy")
-        # placeholder should remain unresolved since variables is null
-        assert "{{placeholder}}" in acc_dim["criteria"][0]["criterion"]
+        with pytest.raises(ValueError, match="placeholder"):
+            parse_rubric_yaml(yaml_content)
 
-    def test_all_criteria_reference_unknown_dimensions(self):
-        """When all criteria reference unknown dimensions, dimensions get no criteria."""
+    def test_all_criteria_reference_unknown_dimensions_raises(self):
+        """When all criteria reference unknown dimensions, ValueError is raised."""
         yaml_content = textwrap.dedent("""\
             dimensions:
               - accuracy: "Accuracy"
@@ -915,11 +848,8 @@ class TestRubricKitCriteriaEdgeCases:
                 dimension: nonexistent
                 criterion: "This goes nowhere."
         """)
-        with patch("app.services.rubric_service.logger"):
-            result = parse_rubric_yaml(yaml_content)
-        dims = result["dimensions"]
-        acc_dim = next(d for d in dims if d["name"] == "accuracy")
-        assert "criteria" not in acc_dim
+        with pytest.raises(ValueError, match="nonexistent"):
+            parse_rubric_yaml(yaml_content)
 
 
 class TestConvertRubricKitEdgeCases:
@@ -973,3 +903,108 @@ class TestConvertRubricKitEdgeCases:
         )
         result = convert_rubric_kit_to_internal(rubric, name="Custom Name")
         assert result["name"] == "Custom Name"
+
+
+class TestRubricKitLoadRubricIntegration:
+    """Tests for the load_rubric()-based rubric-kit import path."""
+
+    def test_broken_dimension_raises_value_error(self):
+        """Malformed dimension (score type without scores) raises ValueError."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - broken_dim: "Missing scores for score type"
+                grading_type: score
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: broken_dim
+                criterion: "Some criterion."
+        """)
+        with pytest.raises(ValueError, match="scores"):
+            parse_rubric_yaml(yaml_content)
+
+    def test_from_scores_weight_resolves_to_max_score(self):
+        """Criterion with weight: from_scores resolves to max score value."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: from_scores
+                dimension: accuracy
+                criterion: "Is it accurate?"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert acc_dim["criteria"] is not None
+        assert len(acc_dim["criteria"]) == 1
+        assert acc_dim["criteria"][0]["weight"] == 5.0
+
+    def test_from_scores_criterion_text_resolved(self):
+        """Criterion with criterion: from_scores resolves to score descriptions."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "from_scores"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert "1: Bad" in acc_dim["criteria"][0]["criterion"]
+        assert "5: Good" in acc_dim["criteria"][0]["criterion"]
+
+    def test_variables_none_without_placeholders_works(self):
+        """variables: null without placeholders in criteria works fine."""
+        yaml_content = textwrap.dedent("""\
+            variables: null
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "No placeholders here."
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert acc_dim["criteria"][0]["criterion"] == "No placeholders here."
+
+    def test_rubric_kit_format_with_explicit_name_description_dims(self):
+        """Dimensions with explicit name/description fields are parsed correctly."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - name: correctness
+                description: "Factual accuracy"
+                grading_type: score
+                scores:
+                  1: "Incorrect"
+                  5: "Fully correct"
+            criteria:
+              - name: fact_check
+                weight: 2
+                dimension: correctness
+                criterion: "Is the answer factually correct?"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert len(result["dimensions"]) == 1
+        assert result["dimensions"][0]["name"] == "correctness"
+        assert result["dimensions"][0]["description"] == "Factual accuracy"
+        assert result["dimensions"][0]["criteria"][0]["name"] == "fact_check"
