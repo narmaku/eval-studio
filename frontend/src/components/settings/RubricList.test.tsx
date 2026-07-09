@@ -14,6 +14,7 @@ const makeRubric = (overrides: Partial<Rubric> = {}): Rubric => ({
   pass_threshold: 0.7,
   aggregation: 'weighted_average',
   prompt_template: null,
+  tags: [],
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
   ...overrides,
@@ -227,5 +228,77 @@ describe('RubricList', () => {
 
     expect(screen.getByTestId('refine-dialog')).toBeInTheDocument();
     expect(screen.getByText('refining My Rubric')).toBeInTheDocument();
+  });
+
+  it('shows criteria count badge when rubric has criteria', () => {
+    storeState = {
+      ...defaultStore,
+      rubrics: [
+        makeRubric({
+          id: 'r-1',
+          name: 'Criteria Rubric',
+          dimensions: [
+            {
+              name: 'accuracy',
+              weight: 1,
+              description: '',
+              criteria: [
+                { name: 'factual', criterion: 'Is factual', weight: 1 },
+                { name: 'complete', criterion: 'Is complete', weight: 1 },
+              ],
+            },
+            {
+              name: 'clarity',
+              weight: 1,
+              description: '',
+              criteria: [{ name: 'readable', criterion: 'Is readable', weight: 1 }],
+            },
+          ],
+        }),
+      ],
+    };
+    render(<RubricList />);
+    expect(screen.getByText('3 criteria')).toBeInTheDocument();
+  });
+
+  it('shows singular criterion for count of 1', () => {
+    storeState = {
+      ...defaultStore,
+      rubrics: [
+        makeRubric({
+          id: 'r-1',
+          name: 'Single Criterion Rubric',
+          dimensions: [
+            {
+              name: 'accuracy',
+              weight: 1,
+              description: '',
+              criteria: [{ name: 'factual', criterion: 'Is factual', weight: 1 }],
+            },
+          ],
+        }),
+      ],
+    };
+    render(<RubricList />);
+    expect(screen.getByText('1 criterion')).toBeInTheDocument();
+  });
+
+  it('does not show criteria badge when no criteria', () => {
+    storeState = {
+      ...defaultStore,
+      rubrics: [
+        makeRubric({
+          id: 'r-1',
+          name: 'Plain Rubric',
+          dimensions: [
+            { name: 'accuracy', weight: 1, description: '' },
+            { name: 'clarity', weight: 1, description: '' },
+          ],
+        }),
+      ],
+    };
+    render(<RubricList />);
+    expect(screen.queryByText(/\d+ criteria/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ criterion/i)).not.toBeInTheDocument();
   });
 });
