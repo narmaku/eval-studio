@@ -32,6 +32,31 @@ def clean_yaml_block(text: str) -> str:
     return text.strip()
 
 
+def _substitute_variables(text: str, variables: dict[str, str]) -> str:
+    """Replace ``{{var}}`` placeholders with values from *variables*.
+
+    Resolved placeholders are replaced in-place.  Any ``{{...}}`` tokens
+    that do **not** have a matching key are left as-is and a warning is
+    logged so the caller knows something was missed.
+    """
+    if not variables:
+        return text
+
+    for key, value in variables.items():
+        text = text.replace("{{" + key + "}}", str(value))
+
+    # Warn about any remaining unresolved placeholders
+    unresolved = re.findall(r"\{\{(\w+)\}\}", text)
+    if unresolved:
+        logger.warning(
+            "rubric.variable_substitution.unresolved",
+            unresolved_placeholders=unresolved,
+            text_preview=text[:200],
+        )
+
+    return text
+
+
 def parse_rubric_yaml(yaml_content: str) -> dict:
     """Parse YAML content into internal rubric dict.
 
@@ -63,6 +88,7 @@ def parse_rubric_yaml(yaml_content: str) -> dict:
 
     raw_dimensions = rubric_data.get("dimensions", [])
     raw_criteria = rubric_data.get("criteria", [])
+    variables = rubric_data.get("variables", {}) or {}
 
     if not raw_dimensions:
         raise ValueError("No dimensions found in YAML content")
@@ -71,7 +97,7 @@ def parse_rubric_yaml(yaml_content: str) -> dict:
     is_rubric_kit_format = any(isinstance(d, dict) and "grading_type" in d for d in raw_dimensions)
 
     if is_rubric_kit_format:
-        dimensions = _convert_rubric_kit_dims_and_criteria(raw_dimensions, raw_criteria)
+        dimensions = _convert_rubric_kit_dims_and_criteria(raw_dimensions, raw_criteria, variables)
     else:
         dimensions = _normalize_simple_dimensions(raw_dimensions)
 
@@ -114,8 +140,20 @@ def _extract_dim_name_and_desc(d: dict) -> tuple[str, str]:
     return d.get("name", "unnamed"), d.get("description", "unnamed")
 
 
-def _convert_rubric_kit_dims_and_criteria(raw_dims: list[dict], raw_criteria: list | dict) -> list[dict]:
-    """Convert rubric-kit format (dimensions + criteria) to internal weighted dimensions."""
+def _convert_rubric_kit_dims_and_criteria(
+    raw_dims: list[dict],
+    raw_criteria: list | dict,
+    variables: dict[str, str] | None = None,
+) -> list[dict]:
+    """Convert rubric-kit format (dimensions + criteria) to internal weighted dimensions.
+
+    Criteria are stored per dimension as a list of ``{name, criterion, weight}``
+    dicts.  Template variables (``{{var}}``) in criterion text are substituted
+    from *variables*.  Criteria referencing non-existent dimensions are skipped
+    with a warning.
+    """
+    variables = variables or {}
+
     # Criteria can be a dict of dicts (keyed by criterion name) or a list
     criteria_items: list[dict] = []
     if isinstance(raw_criteria, dict):
@@ -123,14 +161,46 @@ def _convert_rubric_kit_dims_and_criteria(raw_dims: list[dict], raw_criteria: li
     elif isinstance(raw_criteria, list):
         criteria_items = [c for c in raw_criteria if isinstance(c, dict)]
 
-    # Aggregate criteria weights per dimension
+    # Build set of known dimension names for validation
+    dim_names: set[str] = set()
+    for d in raw_dims:
+        if not isinstance(d, dict):
+            continue
+        name, _ = _extract_dim_name_and_desc(d)
+        dim_names.add(name)
+
+    # Group criteria by dimension, applying variable substitution
+    criteria_by_dim: dict[str, list[dict]] = {}
     dim_weights: dict[str, float] = {}
+
     for c in criteria_items:
         dim_name = c.get("dimension", "")
+        if dim_name not in dim_names:
+            logger.warning(
+                "rubric.criteria.unknown_dimension",
+                criterion_name=c.get("name", "unknown"),
+                dimension=dim_name,
+                known_dimensions=sorted(dim_names),
+            )
+            continue
+
         weight = c.get("weight", 1)
         if isinstance(weight, str):
             weight = 1
-        dim_weights[dim_name] = dim_weights.get(dim_name, 0) + float(weight)
+        weight = float(weight)
+
+        criterion_text = c.get("criterion", "")
+        if variables:
+            criterion_text = _substitute_variables(criterion_text, variables)
+
+        criteria_by_dim.setdefault(dim_name, []).append(
+            {
+                "name": c.get("name", "unnamed"),
+                "criterion": criterion_text,
+                "weight": weight,
+            }
+        )
+        dim_weights[dim_name] = dim_weights.get(dim_name, 0) + weight
 
     total_weight = sum(dim_weights.values()) or 1.0
 
@@ -140,19 +210,24 @@ def _convert_rubric_kit_dims_and_criteria(raw_dims: list[dict], raw_criteria: li
             continue
         name, description = _extract_dim_name_and_desc(d)
         raw_w = dim_weights.get(name, 1.0)
-        dims.append(
-            {
-                "name": name,
-                "weight": round(raw_w / total_weight, 4),
-                "description": description,
-            }
-        )
+        dim_dict: dict = {
+            "name": name,
+            "weight": round(raw_w / total_weight, 4),
+            "description": description,
+        }
+        dim_criteria = criteria_by_dim.get(name)
+        if dim_criteria:
+            dim_dict["criteria"] = dim_criteria
+        dims.append(dim_dict)
 
     return dims
 
 
 def convert_rubric_kit_to_internal(rubric: Rubric, name: str = "Generated Rubric") -> dict:
     """Convert a rubric-kit Rubric object to internal rubric dict format.
+
+    Criteria from the rubric-kit ``Rubric`` are preserved per dimension as a
+    list of ``{name, criterion, weight}`` dicts.
 
     Args:
         rubric: A rubric-kit Rubric instance.
@@ -161,24 +236,36 @@ def convert_rubric_kit_to_internal(rubric: Rubric, name: str = "Generated Rubric
     Returns:
         Dict matching internal rubric schema.
     """
-    # Compute weights from criteria
+    # Group criteria by dimension and compute weights
+    criteria_by_dim: dict[str, list[dict]] = {}
     dim_weights: dict[str, float] = {}
+
     for criterion in rubric.criteria:
         w = criterion.weight if isinstance(criterion.weight, int) else 1
-        dim_weights[criterion.dimension] = dim_weights.get(criterion.dimension, 0) + float(w)
+        w = float(w)
+        dim_weights[criterion.dimension] = dim_weights.get(criterion.dimension, 0) + w
+        criteria_by_dim.setdefault(criterion.dimension, []).append(
+            {
+                "name": criterion.name,
+                "criterion": criterion.criterion,
+                "weight": w,
+            }
+        )
 
     total_weight = sum(dim_weights.values()) or 1.0
 
     dimensions = []
     for dim in rubric.dimensions:
         raw_w = dim_weights.get(dim.name, 1.0)
-        dimensions.append(
-            {
-                "name": dim.name,
-                "weight": round(raw_w / total_weight, 4),
-                "description": dim.description,
-            }
-        )
+        dim_dict: dict = {
+            "name": dim.name,
+            "weight": round(raw_w / total_weight, 4),
+            "description": dim.description,
+        }
+        dim_criteria = criteria_by_dim.get(dim.name)
+        if dim_criteria:
+            dim_dict["criteria"] = dim_criteria
+        dimensions.append(dim_dict)
 
     return {
         "name": name,

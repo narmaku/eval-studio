@@ -262,7 +262,11 @@ Respond with ONLY a JSON object:
     def _build_dimensions_prompt(dimensions: list[dict]) -> tuple[str, list[str]]:
         """Build the scoring rubric section and response schema from rubric dimensions.
 
-        Returns (dimensions_section, dimension_names).
+        When a dimension carries a non-empty ``criteria`` list, criteria
+        sub-items are appended below the dimension line so the judge LLM
+        can evaluate each criterion individually.
+
+        Returns (dimensions_section, response_schema, dimension_names).
         """
         lines = []
         names = []
@@ -272,6 +276,16 @@ Respond with ONLY a JSON object:
             weight = dim.get("weight", 1.0)
             lines.append(f"{i}. **{name}** (0.0-1.0, weight={weight}): {desc}")
             names.append(name)
+
+            criteria = dim.get("criteria") or []
+            if criteria:
+                lines.append("   Criteria:")
+                for crit in criteria:
+                    crit_name = crit.get("name", "unnamed")
+                    crit_text = crit.get("criterion", "")
+                    crit_weight = crit.get("weight", 1.0)
+                    lines.append(f"   - {crit_name} (weight {crit_weight}): {crit_text}")
+
         section = "\n".join(lines)
         schema = ", ".join(f'"{n}": <float>' for n in names)
         return section, schema, names
