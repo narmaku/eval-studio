@@ -59,7 +59,11 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    put?: never;
+    /**
+     * Update Api Key
+     * @description Update an API key's name or description.
+     */
+    put: operations['update_api_key_api_v1_api_keys__key_id__put'];
     post?: never;
     /**
      * Revoke Api Key
@@ -105,7 +109,11 @@ export interface paths {
      * @description Get artifact metadata by ID.
      */
     get: operations['get_artifact_api_v1_artifacts__artifact_id__get'];
-    put?: never;
+    /**
+     * Update Artifact
+     * @description Update an artifact's description.
+     */
+    put: operations['update_artifact_api_v1_artifacts__artifact_id__put'];
     post?: never;
     /**
      * Delete Artifact
@@ -335,7 +343,11 @@ export interface paths {
      * @description Get an evaluation by ID.
      */
     get: operations['get_evaluation_api_v1_evaluations__evaluation_id__get'];
-    put?: never;
+    /**
+     * Update Evaluation
+     * @description Update an evaluation's name, description, or tags.
+     */
+    put: operations['update_evaluation_api_v1_evaluations__evaluation_id__put'];
     post?: never;
     /**
      * Delete Evaluation
@@ -531,9 +543,17 @@ export interface paths {
      * @description Get a session by ID.
      */
     get: operations['get_session_api_v1_sessions__session_id__get'];
-    put?: never;
+    /**
+     * Update Session
+     * @description Update a session's name or tags.
+     */
+    put: operations['update_session_api_v1_sessions__session_id__put'];
     post?: never;
-    delete?: never;
+    /**
+     * Delete Session
+     * @description Delete a session and its linked results.
+     */
+    delete: operations['delete_session_api_v1_sessions__session_id__delete'];
     options?: never;
     head?: never;
     patch?: never;
@@ -944,9 +964,17 @@ export interface paths {
      * @description Get a result by ID.
      */
     get: operations['get_result_api_v1_results__result_id__get'];
-    put?: never;
+    /**
+     * Update Result
+     * @description Update a result's name or tags. Scores and reasoning are immutable.
+     */
+    put: operations['update_result_api_v1_results__result_id__put'];
     post?: never;
-    delete?: never;
+    /**
+     * Delete Result
+     * @description Delete a result.
+     */
+    delete: operations['delete_result_api_v1_results__result_id__delete'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1225,6 +1253,22 @@ export interface components {
       last_used_at: string | null;
     };
     /**
+     * ApiKeyUpdate
+     * @description Schema for updating an API key.
+     */
+    ApiKeyUpdate: {
+      /**
+       * Name
+       * @description Human-readable name.
+       */
+      name?: string | null;
+      /**
+       * Description
+       * @description Optional description of the key's purpose.
+       */
+      description?: string | null;
+    };
+    /**
      * ArenaContestantSummary
      * @description Summary of one contestant's results in an arena evaluation.
      */
@@ -1284,6 +1328,14 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+    };
+    /**
+     * ArtifactUpdate
+     * @description Schema for updating an artifact.
+     */
+    ArtifactUpdate: {
+      /** Description */
+      description?: string | null;
     };
     /** Body_analyze_files_api_v1_datasets_analyze_post */
     Body_analyze_files_api_v1_datasets_analyze_post: {
@@ -1555,6 +1607,11 @@ export interface components {
        * @description Human-readable evaluation name.
        */
       name: string;
+      /**
+       * Description
+       * @description Optional description of the evaluation.
+       */
+      description?: string | null;
       /** @description Evaluation mode: qa, rag, agent, or arena. */
       mode: components['schemas']['EvaluationMode'];
       /** @description Current evaluation status. */
@@ -1581,6 +1638,12 @@ export interface components {
       config: {
         [key: string]: unknown;
       };
+      /**
+       * Tags
+       * @description Tags for categorization.
+       * @default []
+       */
+      tags: string[];
       /**
        * Result Count
        * @description Number of results (populated on detail endpoint).
@@ -1614,6 +1677,27 @@ export interface components {
      * @enum {string}
      */
     EvaluationStatus: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+    /**
+     * EvaluationUpdate
+     * @description Schema for updating an evaluation.
+     */
+    EvaluationUpdate: {
+      /**
+       * Name
+       * @description Human-readable evaluation name.
+       */
+      name?: string | null;
+      /**
+       * Description
+       * @description Optional description of the evaluation.
+       */
+      description?: string | null;
+      /**
+       * Tags
+       * @description Tags for categorization.
+       */
+      tags?: string[] | null;
+    };
     /**
      * EvaluatorResponse
      * @description Response schema for a registered evaluator.
@@ -2191,6 +2275,8 @@ export interface components {
       dataset_item_id: string | null;
       /** Session Id */
       session_id: string | null;
+      /** Name */
+      name?: string | null;
       /** Contestant Model */
       contestant_model?: string | null;
       /** Score */
@@ -2212,10 +2298,27 @@ export interface components {
           }[]
         | null;
       /**
+       * Tags
+       * @default []
+       */
+      tags: string[];
+      /**
        * Created At
        * Format: date-time
        */
       created_at: string;
+      /** Updated At */
+      updated_at?: string | null;
+    };
+    /**
+     * ResultUpdate
+     * @description Schema for updating a result. Only name and tags are editable.
+     */
+    ResultUpdate: {
+      /** Name */
+      name?: string | null;
+      /** Tags */
+      tags?: string[] | null;
     };
     /**
      * RubricCreate
@@ -2242,6 +2345,21 @@ export interface components {
       prompt_template?: string | null;
     };
     /**
+     * RubricCriterion
+     * @description A single evaluation criterion within a rubric dimension.
+     */
+    RubricCriterion: {
+      /** Name */
+      name: string;
+      /** Criterion */
+      criterion: string;
+      /**
+       * Weight
+       * @default 1
+       */
+      weight: number;
+    };
+    /**
      * RubricDimension
      * @description A single scoring dimension within a rubric.
      */
@@ -2252,6 +2370,8 @@ export interface components {
       weight: number;
       /** Description */
       description: string;
+      /** Criteria */
+      criteria?: components['schemas']['RubricCriterion'][] | null;
     };
     /**
      * RubricGenerateRequest
@@ -2303,6 +2423,11 @@ export interface components {
       /** Prompt Template */
       prompt_template: string | null;
       /**
+       * Tags
+       * @default []
+       */
+      tags: string[];
+      /**
        * Created At
        * Format: date-time
        */
@@ -2330,6 +2455,8 @@ export interface components {
       aggregation?: string | null;
       /** Prompt Template */
       prompt_template?: string | null;
+      /** Tags */
+      tags?: string[] | null;
     };
     /**
      * RunRequest
@@ -2484,6 +2611,11 @@ export interface components {
       scores: {
         [key: string]: unknown;
       } | null;
+      /**
+       * Tags
+       * @default []
+       */
+      tags: string[];
       /** Error */
       error: string | null;
       /** Started At */
@@ -2495,12 +2627,24 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+      /** Updated At */
+      updated_at?: string | null;
     };
     /**
      * SessionStatus
      * @enum {string}
      */
     SessionStatus: 'active' | 'ended' | 'scoring' | 'completed';
+    /**
+     * SessionUpdate
+     * @description Schema for updating a session.
+     */
+    SessionUpdate: {
+      /** Name */
+      name?: string | null;
+      /** Tags */
+      tags?: string[] | null;
+    };
     /** StandaloneToolDefSchema */
     StandaloneToolDefSchema: {
       /** Name */
@@ -2733,6 +2877,41 @@ export interface operations {
       };
     };
   };
+  update_api_key_api_v1_api_keys__key_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ApiKeyUpdate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiKeyResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   revoke_api_key_api_v1_api_keys__key_id__delete: {
     parameters: {
       query?: never;
@@ -2806,6 +2985,41 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ArtifactResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_artifact_api_v1_artifacts__artifact_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        artifact_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ArtifactUpdate'];
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
@@ -3310,6 +3524,41 @@ export interface operations {
       };
     };
   };
+  update_evaluation_api_v1_evaluations__evaluation_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        evaluation_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EvaluationUpdate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EvaluationResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   delete_evaluation_api_v1_evaluations__evaluation_id__delete: {
     parameters: {
       query?: never;
@@ -3709,6 +3958,70 @@ export interface operations {
         content: {
           'application/json': components['schemas']['SessionResponse'];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_session_api_v1_sessions__session_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SessionUpdate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_session_api_v1_sessions__session_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
@@ -4496,6 +4809,70 @@ export interface operations {
         content: {
           'application/json': components['schemas']['ResultResponse'];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_result_api_v1_results__result_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        result_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResultUpdate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResultResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_result_api_v1_results__result_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        result_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

@@ -1,5 +1,6 @@
 import type { components } from './generated/api';
 
+export type RubricCriterion = components['schemas']['RubricCriterion'];
 export type RubricDimension = components['schemas']['RubricDimension'];
 export type Rubric = components['schemas']['RubricResponse'];
 export type ImportRubricRequest = components['schemas']['RubricImportRequest'];

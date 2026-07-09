@@ -158,6 +158,17 @@ export function RubricList() {
                   {rubric.dimensions.length}{' '}
                   {rubric.dimensions.length === 1 ? 'dimension' : 'dimensions'}
                 </span>
+                {(() => {
+                  const totalCriteria = rubric.dimensions.reduce(
+                    (sum, d) => sum + (d.criteria?.length ?? 0),
+                    0,
+                  );
+                  return totalCriteria > 0 ? (
+                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+                      {totalCriteria} {totalCriteria === 1 ? 'criterion' : 'criteria'}
+                    </span>
+                  ) : null;
+                })()}
                 <span className="rounded-[5px] bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-text-3">
                   {rubric.aggregation}
                 </span>
