@@ -259,7 +259,7 @@ Respond with ONLY a JSON object:
         return None
 
     @staticmethod
-    def _build_dimensions_prompt(dimensions: list[dict]) -> tuple[str, list[str]]:
+    def _build_dimensions_prompt(dimensions: list[dict]) -> tuple[str, str, list[str]]:
         """Build the scoring rubric section and response schema from rubric dimensions.
 
         When a dimension carries a non-empty ``criteria`` list, criteria
