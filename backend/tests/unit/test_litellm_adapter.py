@@ -393,6 +393,24 @@ class TestBuildDimensionsPrompt:
         section, _schema, _names = LiteLLMJudgeAdapter._build_dimensions_prompt(dims)
         assert "Criteria:" not in section
 
+    def test_build_dimensions_prompt_criteria_missing_fields(self):
+        """Criteria entries with missing fields use defaults."""
+        dims = [
+            {
+                "name": "accuracy",
+                "weight": 1.0,
+                "description": "Accuracy",
+                "criteria": [
+                    {},  # all fields missing
+                    {"name": "partial"},  # only name present
+                ],
+            },
+        ]
+        section, _schema, _names = LiteLLMJudgeAdapter._build_dimensions_prompt(dims)
+        assert "Criteria:" in section
+        assert "unnamed" in section  # default name for missing
+        assert "weight 1.0" in section  # default weight
+
 
 class TestParseJsonLenient:
     """Tests for _parse_json_lenient markdown fence stripping."""

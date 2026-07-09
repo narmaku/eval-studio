@@ -5,9 +5,11 @@ import textwrap
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from app.schemas.rubric import RubricCriterion, RubricDimension
 from app.services.rubric_service import (
+    _substitute_variables,
     clean_yaml_block,
     convert_rubric_kit_to_internal,
     generate_rubric,
@@ -659,3 +661,316 @@ class TestConvertRubricKitPreservesCriteria:
         assert clar_dim["criteria"] is not None
         assert len(clar_dim["criteria"]) == 1
         assert clar_dim["criteria"][0]["name"] == "readable"
+
+
+class TestSubstituteVariables:
+    """Tests for _substitute_variables helper."""
+
+    def test_replaces_single_variable(self):
+        result = _substitute_variables("Hello {{name}}", {"name": "World"})
+        assert result == "Hello World"
+
+    def test_replaces_multiple_variables(self):
+        result = _substitute_variables(
+            "{{product}} version {{version}}",
+            {"product": "RHEL", "version": "9.4"},
+        )
+        assert result == "RHEL version 9.4"
+
+    def test_replaces_repeated_placeholder(self):
+        result = _substitute_variables(
+            "{{x}} and {{x}} again",
+            {"x": "val"},
+        )
+        assert result == "val and val again"
+
+    def test_empty_variables_returns_text_unchanged(self):
+        assert _substitute_variables("{{keep}}", {}) == "{{keep}}"
+
+    def test_no_placeholders_returns_text_unchanged(self):
+        assert _substitute_variables("plain text", {"unused": "v"}) == "plain text"
+
+    def test_non_string_variable_values_converted(self):
+        result = _substitute_variables("count={{n}}", {"n": 42})
+        assert result == "count=42"
+
+    def test_empty_text_returns_empty(self):
+        assert _substitute_variables("", {"key": "val"}) == ""
+
+    def test_unresolved_placeholders_logged(self):
+        with patch("app.services.rubric_service.logger") as mock_logger:
+            result = _substitute_variables("{{known}} {{unknown}}", {"known": "ok"})
+        assert result == "ok {{unknown}}"
+        mock_logger.warning.assert_called_once()
+        assert "unknown" in mock_logger.warning.call_args[1]["unresolved_placeholders"]
+
+
+class TestRubricCriterionValidation:
+    """Pydantic validation edge cases for RubricCriterion."""
+
+    def test_empty_name_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricCriterion(name="", criterion="text")
+
+    def test_empty_criterion_text_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricCriterion(name="c", criterion="")
+
+    def test_zero_weight_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricCriterion(name="c", criterion="text", weight=0)
+
+    def test_negative_weight_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricCriterion(name="c", criterion="text", weight=-1.0)
+
+    def test_very_long_name_rejected(self):
+        with pytest.raises(ValidationError):
+            RubricCriterion(name="x" * 256, criterion="text")
+
+    def test_max_length_name_accepted(self):
+        c = RubricCriterion(name="x" * 255, criterion="text")
+        assert len(c.name) == 255
+
+
+class TestRubricKitCriteriaEdgeCases:
+    """Edge-case tests for rubric-kit criteria import paths."""
+
+    def test_criteria_as_dict_of_dicts(self):
+        """Criteria provided as a mapping keyed by criterion name."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              fact_check:
+                name: fact_check
+                weight: 2
+                dimension: accuracy
+                criterion: "Is it factually correct?"
+              source_check:
+                name: source_check
+                weight: 1
+                dimension: accuracy
+                criterion: "Does it cite sources?"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert acc_dim["criteria"] is not None
+        assert len(acc_dim["criteria"]) == 2
+
+    def test_criteria_with_string_weight_defaults_to_one(self):
+        """Non-numeric weight strings should fall back to 1."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: "high"
+                dimension: accuracy
+                criterion: "Some criterion."
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert acc_dim["criteria"][0]["weight"] == 1
+
+    def test_criterion_missing_name_defaults_to_unnamed(self):
+        """Criterion without a name field should get 'unnamed'."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - weight: 1
+                dimension: accuracy
+                criterion: "Unnamed criterion text."
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert acc_dim["criteria"][0]["name"] == "unnamed"
+
+    def test_criterion_missing_criterion_text_defaults_to_empty(self):
+        """Criterion without criterion text should default to empty string."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert acc_dim["criteria"][0]["criterion"] == ""
+
+    def test_dimension_without_criteria_has_no_criteria_key(self):
+        """Dimensions that have no matching criteria should omit the key."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+              - clarity: "Clarity"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "Only for accuracy."
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        clar_dim = next(d for d in dims if d["name"] == "clarity")
+        assert "criteria" in acc_dim
+        assert "criteria" not in clar_dim
+
+    def test_multiple_criteria_same_dimension(self):
+        """Multiple criteria mapping to a single dimension are all preserved."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "First criterion."
+              - name: c2
+                weight: 2
+                dimension: accuracy
+                criterion: "Second criterion."
+              - name: c3
+                weight: 3
+                dimension: accuracy
+                criterion: "Third criterion."
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert len(acc_dim["criteria"]) == 3
+        names = [c["name"] for c in acc_dim["criteria"]]
+        assert names == ["c1", "c2", "c3"]
+
+    def test_variables_none_treated_as_empty(self):
+        """variables: null in YAML should not break criteria import."""
+        yaml_content = textwrap.dedent("""\
+            variables: null
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "Criterion with {{placeholder}}."
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        # placeholder should remain unresolved since variables is null
+        assert "{{placeholder}}" in acc_dim["criteria"][0]["criterion"]
+
+    def test_all_criteria_reference_unknown_dimensions(self):
+        """When all criteria reference unknown dimensions, dimensions get no criteria."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: nonexistent
+                criterion: "This goes nowhere."
+        """)
+        with patch("app.services.rubric_service.logger"):
+            result = parse_rubric_yaml(yaml_content)
+        dims = result["dimensions"]
+        acc_dim = next(d for d in dims if d["name"] == "accuracy")
+        assert "criteria" not in acc_dim
+
+
+class TestConvertRubricKitEdgeCases:
+    """Edge-case tests for convert_rubric_kit_to_internal."""
+
+    def test_dimension_with_no_criteria_omits_key(self):
+        from rubric_kit import Criterion, Dimension, Rubric
+
+        rubric = Rubric(
+            dimensions=[
+                Dimension(name="d1", description="dim1", grading_type="score", scores={1: "Bad", 5: "Good"}),
+                Dimension(name="d2", description="dim2", grading_type="score", scores={1: "Bad", 5: "Good"}),
+            ],
+            criteria=[
+                Criterion(name="c1", weight=2, dimension="d1", criterion="Only for d1"),
+            ],
+        )
+        result = convert_rubric_kit_to_internal(rubric)
+        d1 = next(d for d in result["dimensions"] if d["name"] == "d1")
+        d2 = next(d for d in result["dimensions"] if d["name"] == "d2")
+        assert "criteria" in d1
+        assert len(d1["criteria"]) == 1
+        assert "criteria" not in d2
+
+    def test_criterion_with_from_scores_weight_defaults_to_one(self):
+        """rubric-kit Criterion with weight='from_scores' uses fallback of 1."""
+        from rubric_kit import Criterion, Dimension, Rubric
+
+        rubric = Rubric(
+            dimensions=[
+                Dimension(name="d1", description="dim1", grading_type="score", scores={1: "Bad", 5: "Good"}),
+            ],
+            criteria=[
+                Criterion(name="c1", weight="from_scores", dimension="d1", criterion="text"),
+            ],
+        )
+        result = convert_rubric_kit_to_internal(rubric)
+        d1 = next(d for d in result["dimensions"] if d["name"] == "d1")
+        # weight="from_scores" is not an int, so code defaults to 1
+        assert d1["criteria"][0]["weight"] == 1.0
+
+    def test_custom_name_used(self):
+        from rubric_kit import Criterion, Dimension, Rubric
+
+        rubric = Rubric(
+            dimensions=[
+                Dimension(name="d1", description="dim1", grading_type="score", scores={1: "Bad", 5: "Good"}),
+            ],
+            criteria=[
+                Criterion(name="c1", weight=1, dimension="d1", criterion="text"),
+            ],
+        )
+        result = convert_rubric_kit_to_internal(rubric, name="Custom Name")
+        assert result["name"] == "Custom Name"
