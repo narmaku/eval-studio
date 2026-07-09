@@ -37,7 +37,7 @@ export function DatasetDetailView({ datasetId, open, onOpenChange }: DatasetDeta
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" size="wide" className="overflow-y-auto">
         {isLoading ? (
           <div className="flex justify-center py-12" data-testid="detail-loading">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

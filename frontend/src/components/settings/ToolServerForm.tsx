@@ -31,7 +31,7 @@ export function ToolServerForm({ open, onOpenChange, toolServer, onSaved }: Tool
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" size="wide" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{toolServer ? 'Edit Tool Server' : 'New Tool Server'}</SheetTitle>
         </SheetHeader>

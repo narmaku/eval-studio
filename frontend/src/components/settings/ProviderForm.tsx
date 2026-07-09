@@ -43,7 +43,7 @@ export function ProviderForm({ open, onOpenChange, provider, onSaved }: Provider
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" size="wide" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{provider ? 'Edit Provider' : 'New Provider'}</SheetTitle>
         </SheetHeader>
