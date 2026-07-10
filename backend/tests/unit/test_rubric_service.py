@@ -11,6 +11,7 @@ from app.schemas.rubric import RubricCriterion, RubricDimension
 from app.services.rubric_service import (
     clean_yaml_block,
     convert_rubric_kit_to_internal,
+    detect_rubric_format,
     generate_rubric,
     parse_rubric_yaml,
     refine_rubric,
@@ -1079,3 +1080,96 @@ class TestRubricKitLoadRubricIntegration:
         # grading_type: score without scores dict triggers RubricValidationError
         with pytest.raises(ValueError):
             parse_rubric_yaml(yaml_content)
+
+
+class TestDetectRubricFormat:
+    """Tests for detect_rubric_format heuristics."""
+
+    def test_detect_ls_eval_system_config(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:cla_tests_metric": {
+                        "criteria": "Evaluate...",
+                        "evaluation_steps": ["Step 1"],
+                        "threshold": 0.9,
+                    }
+                }
+            }
+        }
+        assert detect_rubric_format(data) == "ls_eval_system_config"
+
+    def test_detect_ls_eval_system_config_conversation_level(self):
+        data = {
+            "metrics_metadata": {
+                "conversation_level": {
+                    "geval:coherence": {
+                        "criteria": "Evaluate coherence...",
+                    }
+                }
+            }
+        }
+        assert detect_rubric_format(data) == "ls_eval_system_config"
+
+    def test_detect_geval_with_steps(self):
+        data = {
+            "criteria": "Evaluate correctness of the answer.",
+            "evaluation_steps": ["Check factual accuracy", "Compare with reference"],
+            "threshold": 0.9,
+        }
+        assert detect_rubric_format(data) == "geval"
+
+    def test_detect_geval_with_params(self):
+        data = {
+            "criteria": "Evaluate the answer.",
+            "evaluation_params": {"model": "gpt-4"},
+        }
+        assert detect_rubric_format(data) == "geval"
+
+    def test_detect_geval_criteria_only(self):
+        """Standalone geval with criteria string but no dimensions."""
+        data = {
+            "criteria": "Evaluate the response quality.",
+        }
+        assert detect_rubric_format(data) == "geval"
+
+    def test_geval_not_detected_when_dimensions_present(self):
+        """When dimensions key is present, geval is not detected even if criteria string exists."""
+        data = {
+            "criteria": "Evaluate...",
+            "dimensions": [{"name": "d1", "description": "dim1"}],
+        }
+        # criteria is a string but dimensions exist: NOT geval, falls to simple
+        assert detect_rubric_format(data) == "simple"
+
+    def test_detect_rubric_kit_format(self):
+        data = {
+            "dimensions": [
+                {
+                    "accuracy": "Factual accuracy",
+                    "grading_type": "score",
+                    "scores": {1: "Bad", 5: "Good"},
+                }
+            ],
+            "criteria": [{"name": "c1", "weight": 1, "dimension": "accuracy", "criterion": "text"}],
+        }
+        assert detect_rubric_format(data) == "rubric_kit"
+
+    def test_detect_simple_format(self):
+        data = {"dimensions": [{"name": "quality", "weight": 1.0, "description": "Overall quality"}]}
+        assert detect_rubric_format(data) == "simple"
+
+    def test_detect_unknown_format(self):
+        data = {"name": "something", "other_key": "value"}
+        assert detect_rubric_format(data) == "unknown"
+
+    def test_detect_empty_dict(self):
+        assert detect_rubric_format({}) == "unknown"
+
+    def test_geval_criteria_must_be_string(self):
+        """If criteria is a list (rubric-kit style), it's not detected as geval."""
+        data = {
+            "criteria": [{"name": "c1", "criterion": "text"}],
+            "evaluation_steps": ["Step 1"],
+        }
+        assert detect_rubric_format(data) != "geval"

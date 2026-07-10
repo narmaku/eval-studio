@@ -34,6 +34,46 @@ def clean_yaml_block(text: str) -> str:
     return text.strip()
 
 
+def detect_rubric_format(data: dict) -> str:
+    """Detect the format of parsed rubric YAML data.
+
+    Returns one of: ``"ls_eval_system_config"``, ``"geval"``,
+    ``"rubric_kit"``, ``"simple"``, or ``"unknown"``.
+
+    Detection heuristics (evaluated in order):
+    - ``ls_eval_system_config``: has ``metrics_metadata`` key with
+      ``turn_level`` or ``conversation_level`` containing ``geval:`` keys.
+    - ``geval``: has a string ``criteria`` key AND (has ``evaluation_steps``
+      OR has ``evaluation_params``) AND no ``dimensions`` key.  Also matches
+      a standalone ``criteria`` string without ``dimensions``.
+    - ``rubric_kit``: has ``dimensions`` list where any element has ``grading_type``.
+    - ``simple``: has ``dimensions`` list (without ``grading_type``).
+    - ``unknown``: none of the above.
+    """
+    # ls-eval system config
+    metrics_metadata = data.get("metrics_metadata")
+    if isinstance(metrics_metadata, dict):
+        for level_key in ("turn_level", "conversation_level"):
+            level = metrics_metadata.get(level_key)
+            if isinstance(level, dict) and any(str(k).startswith("geval:") for k in level):
+                return "ls_eval_system_config"
+
+    # geval: criteria must be a string (not a list, which is rubric-kit style)
+    criteria = data.get("criteria")
+    has_dimensions = bool(data.get("dimensions"))
+    if isinstance(criteria, str) and not has_dimensions:
+        return "geval"
+
+    # rubric_kit / simple: requires dimensions list
+    raw_dims = data.get("dimensions")
+    if isinstance(raw_dims, list) and raw_dims:
+        if any(isinstance(d, dict) and "grading_type" in d for d in raw_dims):
+            return "rubric_kit"
+        return "simple"
+
+    return "unknown"
+
+
 def parse_rubric_yaml(yaml_content: str) -> dict:
     """Parse YAML content into internal rubric dict.
 
