@@ -37,13 +37,13 @@ def clean_yaml_block(text: str) -> str:
 def detect_rubric_format(data: dict) -> str:
     """Detect the format of parsed rubric YAML data.
 
-    Returns one of: ``"ls_eval_system_config"``, ``"geval"``,
+    Returns one of: ``"ls_eval_system_config"``, ``"ls_eval_metric"``,
     ``"rubric_kit"``, ``"simple"``, or ``"unknown"``.
 
     Detection heuristics (evaluated in order):
     - ``ls_eval_system_config``: has ``metrics_metadata`` key with
       ``turn_level`` or ``conversation_level`` containing ``geval:`` keys.
-    - ``geval``: has a string ``criteria`` key AND no ``dimensions`` key.
+    - ``ls_eval_metric``: has a string ``criteria`` key AND no ``dimensions`` key.
     - ``rubric_kit``: has ``dimensions`` list where any element has ``grading_type``.
     - ``simple``: has ``dimensions`` list (without ``grading_type``).
     - ``unknown``: none of the above.
@@ -56,11 +56,11 @@ def detect_rubric_format(data: dict) -> str:
             if isinstance(level, dict) and any(str(k).startswith("geval:") for k in level):
                 return "ls_eval_system_config"
 
-    # geval: criteria must be a string (not a list, which is rubric-kit style)
+    # ls-eval metric: criteria must be a string (not a list, which is rubric-kit style)
     criteria = data.get("criteria")
     has_dimensions = bool(data.get("dimensions"))
     if isinstance(criteria, str) and not has_dimensions:
-        return "geval"
+        return "ls_eval_metric"
 
     # rubric_kit / simple: requires dimensions list
     raw_dims = data.get("dimensions")
@@ -72,7 +72,7 @@ def detect_rubric_format(data: dict) -> str:
     return "unknown"
 
 
-def _parse_geval_format(data: dict, name: str | None = None) -> dict:
+def _parse_ls_eval_metric_format(data: dict, name: str | None = None) -> dict:
     """Convert a Geval metric dict to internal rubric format.
 
     Args:
@@ -171,7 +171,7 @@ def _parse_system_config(data: dict, metric_id: str | None = None) -> dict:
     """
     metrics = _extract_system_config_metrics(data)
     if not metrics:
-        raise ValueError("No geval metrics found in system config")
+        raise ValueError("No ls-eval metrics found in system config")
 
     if metric_id is not None:
         target = next((m for m in metrics if m["metric_id"] == metric_id), None)
@@ -181,7 +181,7 @@ def _parse_system_config(data: dict, metric_id: str | None = None) -> dict:
     else:
         target = metrics[0]
 
-    return _parse_geval_format(target["metric_data"])
+    return _parse_ls_eval_metric_format(target["metric_data"])
 
 
 def _build_dimension_previews(dimensions: list[dict]) -> list[dict]:
@@ -195,12 +195,19 @@ def _build_dimension_previews(dimensions: list[dict]) -> list[dict]:
     """
     previews = []
     for dim in dimensions:
+        raw_criteria = dim.get("criteria", [])
+        criteria_preview = [
+            {"name": c.get("name", ""), "criterion": c.get("criterion", "")}
+            for c in raw_criteria
+            if isinstance(c, dict)
+        ]
         previews.append(
             {
                 "name": dim.get("name", "unnamed"),
                 "description": dim.get("description", ""),
                 "weight": dim.get("weight", 1.0),
-                "criteria_count": len(dim.get("criteria", [])),
+                "criteria_count": len(raw_criteria),
+                "criteria": criteria_preview,
             }
         )
     return previews
@@ -239,7 +246,7 @@ def analyze_rubric_yaml(yaml_content: str) -> dict:
         extracted = _extract_system_config_metrics(rubric_data)
         metrics_list = []
         for m in extracted:
-            parsed = _parse_geval_format(m["metric_data"])
+            parsed = _parse_ls_eval_metric_format(m["metric_data"])
             total_criteria = sum(len(d.get("criteria", [])) for d in parsed["dimensions"])
             metrics_list.append(
                 {
@@ -253,8 +260,8 @@ def analyze_rubric_yaml(yaml_content: str) -> dict:
             )
         return {"detected_format": fmt, "metrics": metrics_list}
 
-    if fmt == "geval":
-        parsed = _parse_geval_format(rubric_data)
+    if fmt == "ls_eval_metric":
+        parsed = _parse_ls_eval_metric_format(rubric_data)
         total_criteria = sum(len(d.get("criteria", [])) for d in parsed["dimensions"])
         return {
             "detected_format": fmt,
@@ -345,8 +352,8 @@ def parse_rubric_yaml(yaml_content: str, metric_id: str | None = None) -> dict:
     if fmt == "ls_eval_system_config":
         return _parse_system_config(rubric_data, metric_id=metric_id)
 
-    if fmt == "geval":
-        return _parse_geval_format(rubric_data)
+    if fmt == "ls_eval_metric":
+        return _parse_ls_eval_metric_format(rubric_data)
 
     if fmt == "rubric_kit":
         return _parse_rubric_kit_format(rubric_data)

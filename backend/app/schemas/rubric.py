@@ -77,6 +77,13 @@ class RubricImportRequest(BaseModel):
     metric_id: str | None = None
 
 
+class CriterionPreview(BaseModel):
+    """Preview of a single criterion within a dimension."""
+
+    name: str
+    criterion: str
+
+
 class DimensionPreview(BaseModel):
     """Preview of a rubric dimension for the analyze response."""
 
@@ -84,6 +91,7 @@ class DimensionPreview(BaseModel):
     description: str
     weight: float
     criteria_count: int
+    criteria: list[CriterionPreview] = []
 
 
 class DetectedMetric(BaseModel):
@@ -106,7 +114,7 @@ class RubricAnalyzeRequest(BaseModel):
 class RubricAnalyzeResponse(BaseModel):
     """Response from analyzing rubric YAML content."""
 
-    detected_format: str  # "rubric_kit", "geval", "ls_eval_system_config", "simple", "unknown"
+    detected_format: str  # "rubric_kit", "ls_eval_metric", "ls_eval_system_config", "simple", "unknown"
     metrics: list[DetectedMetric]
 
 

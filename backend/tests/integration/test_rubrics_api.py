@@ -560,8 +560,8 @@ async def test_analyze_rubric_simple_format(client):
 
 
 @pytest.mark.asyncio
-async def test_analyze_rubric_geval_format(client):
-    """POST /rubrics/analyze detects Geval format."""
+async def test_analyze_rubric_ls_eval_metric_format(client):
+    """POST /rubrics/analyze detects ls-eval metric format."""
     yaml_content = textwrap.dedent("""\
         criteria: "Evaluate correctness..."
         evaluation_steps:
@@ -573,7 +573,7 @@ async def test_analyze_rubric_geval_format(client):
     response = await client.post("/api/v1/rubrics/analyze", json={"yaml_content": yaml_content})
     assert response.status_code == 200
     data = response.json()
-    assert data["detected_format"] == "geval"
+    assert data["detected_format"] == "ls_eval_metric"
     assert len(data["metrics"]) == 1
     assert data["metrics"][0]["criteria_count"] == 2
     assert data["metrics"][0]["pass_threshold"] == 0.9

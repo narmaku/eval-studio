@@ -52,12 +52,21 @@ function makeSingleMetricAnalysis(
             description: 'How accurate the answer is',
             weight: 1.0,
             criteria_count: 3,
+            criteria: [
+              { name: 'factual', criterion: 'Is the answer factually correct?' },
+              { name: 'precise', criterion: 'Is the answer precise?' },
+              { name: 'sourced', criterion: 'Are claims properly sourced?' },
+            ],
           },
           {
             name: 'clarity',
             description: 'How clear the answer is',
             weight: 0.5,
             criteria_count: 2,
+            criteria: [
+              { name: 'readable', criterion: 'Is it easy to read?' },
+              { name: 'structured', criterion: 'Is it well structured?' },
+            ],
           },
         ],
         criteria_count: 5,
@@ -77,7 +86,16 @@ function makeMultiMetricAnalysis(): RubricAnalyzeResponse {
         suggested_name: 'Metric A',
         suggested_description: 'First metric',
         dimensions_preview: [
-          { name: 'dim_a1', description: 'Dimension A1', weight: 1.0, criteria_count: 2 },
+          {
+            name: 'dim_a1',
+            description: 'Dimension A1',
+            weight: 1.0,
+            criteria_count: 2,
+            criteria: [
+              { name: 'c1', criterion: 'Check A' },
+              { name: 'c2', criterion: 'Check B' },
+            ],
+          },
         ],
         criteria_count: 2,
         pass_threshold: 0.7,
@@ -87,7 +105,18 @@ function makeMultiMetricAnalysis(): RubricAnalyzeResponse {
         suggested_name: 'Metric B',
         suggested_description: 'Second metric',
         dimensions_preview: [
-          { name: 'dim_b1', description: 'Dimension B1', weight: 1.0, criteria_count: 4 },
+          {
+            name: 'dim_b1',
+            description: 'Dimension B1',
+            weight: 1.0,
+            criteria_count: 4,
+            criteria: [
+              { name: 'c1', criterion: 'Check C' },
+              { name: 'c2', criterion: 'Check D' },
+              { name: 'c3', criterion: 'Check E' },
+              { name: 'c4', criterion: 'Check F' },
+            ],
+          },
         ],
         criteria_count: 4,
         pass_threshold: 0.9,
@@ -163,7 +192,7 @@ describe('RubricImportDialog', () => {
 
   it('shows detected format badge on step 2', async () => {
     const user = userEvent.setup();
-    const analysis = makeSingleMetricAnalysis({ detected_format: 'geval' });
+    const analysis = makeSingleMetricAnalysis({ detected_format: 'ls_eval_metric' });
 
     mockAnalyzeRubric.mockImplementation(async () => {
       mockAnalyzeResult = analysis;
@@ -176,7 +205,7 @@ describe('RubricImportDialog', () => {
     rerender(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
 
     const badge = screen.getByTestId('format-badge');
-    expect(badge).toHaveTextContent('geval');
+    expect(badge).toHaveTextContent('ls-eval metric');
   });
 
   it('pre-fills name from analyze response', async () => {
