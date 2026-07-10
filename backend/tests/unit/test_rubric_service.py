@@ -9,6 +9,9 @@ from pydantic import ValidationError
 
 from app.schemas.rubric import RubricCriterion, RubricDimension
 from app.services.rubric_service import (
+    _extract_system_config_metrics,
+    _parse_geval_format,
+    _parse_system_config,
     clean_yaml_block,
     convert_rubric_kit_to_internal,
     detect_rubric_format,
@@ -1173,3 +1176,198 @@ class TestDetectRubricFormat:
             "evaluation_steps": ["Step 1"],
         }
         assert detect_rubric_format(data) != "geval"
+
+
+class TestParseGevalFormat:
+    """Tests for _parse_geval_format conversion."""
+
+    def test_geval_with_evaluation_steps(self):
+        data = {
+            "criteria": "Evaluate correctness of the response.",
+            "evaluation_steps": [
+                "Check factual accuracy",
+                "Compare with reference answer",
+            ],
+            "threshold": 0.9,
+            "description": "Answer correctness metric",
+        }
+        result = _parse_geval_format(data)
+        assert result["name"] == "Answer correctness metric"
+        assert result["description"] == "Answer correctness metric"
+        assert result["pass_threshold"] == 0.9
+        assert len(result["dimensions"]) == 1
+
+        dim = result["dimensions"][0]
+        assert dim["name"] == "evaluation"
+        assert dim["weight"] == 1.0
+        assert dim["description"] == "Evaluate correctness of the response."
+        assert len(dim["criteria"]) == 2
+        assert dim["criteria"][0]["name"] == "step_1"
+        assert dim["criteria"][0]["criterion"] == "Check factual accuracy"
+        assert dim["criteria"][0]["weight"] == 1.0
+        assert dim["criteria"][1]["name"] == "step_2"
+        assert dim["criteria"][1]["criterion"] == "Compare with reference answer"
+
+    def test_geval_criteria_only_no_steps(self):
+        """When no evaluation_steps, creates a single criterion from criteria text."""
+        data = {
+            "criteria": "Evaluate the quality of the response.",
+        }
+        result = _parse_geval_format(data)
+        assert len(result["dimensions"]) == 1
+        dim = result["dimensions"][0]
+        assert len(dim["criteria"]) == 1
+        assert dim["criteria"][0]["name"] == "step_1"
+        assert dim["criteria"][0]["criterion"] == "Evaluate the quality of the response."
+
+    def test_geval_with_custom_name(self):
+        data = {
+            "criteria": "Evaluate...",
+            "description": "Original name",
+        }
+        result = _parse_geval_format(data, name="Custom Name")
+        assert result["name"] == "Custom Name"
+
+    def test_geval_defaults(self):
+        data = {"criteria": "Evaluate..."}
+        result = _parse_geval_format(data)
+        assert result["name"] == "Imported Rubric"
+        assert result["pass_threshold"] == 0.7
+        assert result["aggregation"] == "weighted_average"
+        assert result["prompt_template"] is None
+
+    def test_geval_name_from_description(self):
+        data = {"criteria": "Evaluate...", "description": "My Metric"}
+        result = _parse_geval_format(data)
+        assert result["name"] == "My Metric"
+        assert result["description"] == "My Metric"
+
+
+class TestExtractSystemConfigMetrics:
+    """Tests for _extract_system_config_metrics."""
+
+    def test_extract_turn_level_metrics(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:cla_tests_metric": {
+                        "criteria": "Evaluate CLA tests...",
+                        "evaluation_steps": ["Step 1"],
+                        "threshold": 0.9,
+                    },
+                    "geval:technical_accuracy": {
+                        "criteria": "Evaluate technical...",
+                        "threshold": 0.7,
+                    },
+                }
+            }
+        }
+        metrics = _extract_system_config_metrics(data)
+        assert len(metrics) == 2
+        ids = {m["metric_id"] for m in metrics}
+        assert "geval:cla_tests_metric" in ids
+        assert "geval:technical_accuracy" in ids
+        assert all(m["level"] == "turn_level" for m in metrics)
+
+    def test_extract_conversation_level_metrics(self):
+        data = {
+            "metrics_metadata": {
+                "conversation_level": {
+                    "geval:coherence": {
+                        "criteria": "Evaluate conversation coherence...",
+                    }
+                }
+            }
+        }
+        metrics = _extract_system_config_metrics(data)
+        assert len(metrics) == 1
+        assert metrics[0]["metric_id"] == "geval:coherence"
+        assert metrics[0]["level"] == "conversation_level"
+
+    def test_extract_both_levels(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {"criteria": "Evaluate accuracy..."},
+                },
+                "conversation_level": {
+                    "geval:coherence": {"criteria": "Evaluate coherence..."},
+                },
+            }
+        }
+        metrics = _extract_system_config_metrics(data)
+        assert len(metrics) == 2
+
+    def test_skips_non_geval_metrics(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {"criteria": "Evaluate..."},
+                    "bleu_score": {"some_param": "value"},
+                }
+            }
+        }
+        metrics = _extract_system_config_metrics(data)
+        assert len(metrics) == 1
+        assert metrics[0]["metric_id"] == "geval:accuracy"
+
+    def test_empty_metrics_metadata(self):
+        data = {"metrics_metadata": {}}
+        metrics = _extract_system_config_metrics(data)
+        assert metrics == []
+
+
+class TestParseSystemConfig:
+    """Tests for _parse_system_config."""
+
+    def test_parse_specific_metric(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {
+                        "criteria": "Evaluate factual accuracy.",
+                        "evaluation_steps": ["Check facts", "Verify sources"],
+                        "threshold": 0.9,
+                        "description": "Accuracy metric",
+                    },
+                    "geval:coherence": {
+                        "criteria": "Evaluate coherence...",
+                    },
+                }
+            }
+        }
+        result = _parse_system_config(data, metric_id="geval:accuracy")
+        assert result["name"] == "Accuracy metric"
+        assert result["pass_threshold"] == 0.9
+        assert len(result["dimensions"]) == 1
+        assert len(result["dimensions"][0]["criteria"]) == 2
+
+    def test_parse_first_metric_when_none_specified(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {
+                        "criteria": "Evaluate...",
+                        "description": "First metric",
+                    },
+                }
+            }
+        }
+        result = _parse_system_config(data)
+        assert result["name"] == "First metric"
+
+    def test_parse_unknown_metric_id_raises(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {"criteria": "Evaluate..."},
+                }
+            }
+        }
+        with pytest.raises(ValueError, match="not found"):
+            _parse_system_config(data, metric_id="geval:nonexistent")
+
+    def test_parse_no_metrics_raises(self):
+        data = {"metrics_metadata": {}}
+        with pytest.raises(ValueError, match="No geval metrics"):
+            _parse_system_config(data)

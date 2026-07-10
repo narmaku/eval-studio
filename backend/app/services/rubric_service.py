@@ -74,6 +74,118 @@ def detect_rubric_format(data: dict) -> str:
     return "unknown"
 
 
+def _parse_geval_format(data: dict, name: str | None = None) -> dict:
+    """Convert a Geval metric dict to internal rubric format.
+
+    Args:
+        data: Parsed Geval metric YAML dict with ``criteria`` string
+            and optional ``evaluation_steps`` list.
+        name: Optional override for the rubric name.
+
+    Returns:
+        Dict matching internal rubric schema.
+    """
+    criteria_text = data.get("criteria", "")
+    evaluation_steps = data.get("evaluation_steps", [])
+    threshold = data.get("threshold")
+    description = data.get("description")
+
+    # Determine the rubric name
+    if name:
+        rubric_name = name
+    elif description:
+        rubric_name = description
+    else:
+        rubric_name = "Imported Rubric"
+
+    # Build criteria list from evaluation_steps or the criteria text itself
+    if evaluation_steps:
+        criteria = [
+            {"name": f"step_{i + 1}", "criterion": step, "weight": 1.0} for i, step in enumerate(evaluation_steps)
+        ]
+    else:
+        criteria = [{"name": "step_1", "criterion": criteria_text, "weight": 1.0}]
+
+    dimension = {
+        "name": "evaluation",
+        "weight": 1.0,
+        "description": criteria_text,
+        "criteria": criteria,
+    }
+
+    return {
+        "name": rubric_name,
+        "description": description,
+        "dimensions": [dimension],
+        "pass_threshold": threshold if threshold is not None else 0.7,
+        "aggregation": "weighted_average",
+        "prompt_template": None,
+    }
+
+
+def _extract_system_config_metrics(data: dict) -> list[dict]:
+    """Extract geval metrics from an ls-eval system config.
+
+    Walks ``metrics_metadata.turn_level`` and
+    ``metrics_metadata.conversation_level``, returning each ``geval:*``
+    metric.
+
+    Args:
+        data: Parsed system.yaml dict.
+
+    Returns:
+        List of ``{"metric_id": str, "level": str, "metric_data": dict}``.
+    """
+    metrics: list[dict] = []
+    mm = data.get("metrics_metadata", {})
+    if not isinstance(mm, dict):
+        return metrics
+
+    for level_key in ("turn_level", "conversation_level"):
+        level = mm.get(level_key)
+        if not isinstance(level, dict):
+            continue
+        for key, metric_data in level.items():
+            if str(key).startswith("geval:") and isinstance(metric_data, dict):
+                metrics.append(
+                    {
+                        "metric_id": str(key),
+                        "level": level_key,
+                        "metric_data": metric_data,
+                    }
+                )
+    return metrics
+
+
+def _parse_system_config(data: dict, metric_id: str | None = None) -> dict:
+    """Extract and parse a specific geval metric from a system config.
+
+    Args:
+        data: Parsed system.yaml dict.
+        metric_id: The metric key to extract (e.g. ``"geval:accuracy"``).
+            If ``None``, uses the first available metric.
+
+    Returns:
+        Dict matching internal rubric schema.
+
+    Raises:
+        ValueError: If no geval metrics found or metric_id not found.
+    """
+    metrics = _extract_system_config_metrics(data)
+    if not metrics:
+        raise ValueError("No geval metrics found in system config")
+
+    if metric_id is not None:
+        target = next((m for m in metrics if m["metric_id"] == metric_id), None)
+        if target is None:
+            available = [m["metric_id"] for m in metrics]
+            raise ValueError(f"Metric '{metric_id}' not found in system config. Available: {available}")
+    else:
+        target = metrics[0]
+
+    return _parse_geval_format(target["metric_data"])
+
+
 def parse_rubric_yaml(yaml_content: str) -> dict:
     """Parse YAML content into internal rubric dict.
 
