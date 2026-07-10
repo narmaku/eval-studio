@@ -1,5 +1,7 @@
 import pytest
 
+from app.core.config import settings
+
 
 @pytest.mark.asyncio
 async def test_health_endpoint(client):
@@ -7,7 +9,7 @@ async def test_health_endpoint(client):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["version"] == "0.1.0"
+    assert data["version"] == settings.app_version
 
 
 @pytest.mark.asyncio

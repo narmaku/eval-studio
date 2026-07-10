@@ -34,6 +34,9 @@ sed -i "s/^version = \".*\"/version = \"$VERSION\"/" "$SCRIPT_DIR/backend/pyproj
 sed -i "s/app_version: str = \".*\"/app_version: str = \"$VERSION\"/" "$SCRIPT_DIR/backend/app/core/config.py"
 sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" "$SCRIPT_DIR/frontend/package.json"
 
+# Sync package-lock.json with the new version (without fetching packages)
+(cd "$SCRIPT_DIR/frontend" && npm install --package-lock-only --ignore-scripts) >/dev/null 2>&1
+
 grep -q "version = \"$VERSION\"" "$SCRIPT_DIR/backend/pyproject.toml" || { echo "FAILED: pyproject.toml"; exit 1; }
 grep -q "app_version: str = \"$VERSION\"" "$SCRIPT_DIR/backend/app/core/config.py" || { echo "FAILED: config.py"; exit 1; }
 grep -q "\"version\": \"$VERSION\"" "$SCRIPT_DIR/frontend/package.json" || { echo "FAILED: package.json"; exit 1; }
@@ -41,11 +44,13 @@ grep -q "\"version\": \"$VERSION\"" "$SCRIPT_DIR/frontend/package.json" || { ech
 echo "  backend/pyproject.toml   -> $VERSION"
 echo "  backend/app/core/config.py -> $VERSION"
 echo "  frontend/package.json    -> $VERSION"
+echo "  frontend/package-lock.json -> $VERSION"
 
 git add \
     "$SCRIPT_DIR/backend/pyproject.toml" \
     "$SCRIPT_DIR/backend/app/core/config.py" \
-    "$SCRIPT_DIR/frontend/package.json"
+    "$SCRIPT_DIR/frontend/package.json" \
+    "$SCRIPT_DIR/frontend/package-lock.json"
 
 if git diff --cached --quiet; then
     echo "  (no changes needed — already at $VERSION)"
@@ -56,7 +61,7 @@ fi
 git tag -a "v$VERSION" -m "Release v$VERSION"
 
 echo ""
-echo "Version $VERSION committed and tagged."
+echo "Pushing release..."
+git push origin main "v$VERSION"
 echo ""
-echo "To trigger the release workflow, push the tag:"
-echo "  git push origin main v$VERSION"
+echo "Release v$VERSION pushed. The release workflow will handle the rest."
