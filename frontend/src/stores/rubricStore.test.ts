@@ -8,6 +8,7 @@ vi.mock('@/services/api', () => ({
     updateRubric: vi.fn(),
     deleteRubric: vi.fn(),
     importRubric: vi.fn(),
+    analyzeRubric: vi.fn(),
     generateRubric: vi.fn(),
     refineRubric: vi.fn(),
   },
@@ -38,6 +39,8 @@ describe('rubricStore', () => {
       rubrics: [],
       isLoading: false,
       error: null,
+      analyzeResult: null,
+      isAnalyzing: false,
     });
     vi.clearAllMocks();
   });
@@ -244,6 +247,60 @@ describe('rubricStore', () => {
         feedback: 'Add clarity dimension',
         provider_id: 'openai-gpt4',
       });
+    });
+  });
+
+  describe('analyzeRubric', () => {
+    it('sets isAnalyzing, stores result, and clears isAnalyzing on success', async () => {
+      const analyzeResponse = {
+        detected_format: 'rubric_kit',
+        metrics: [
+          {
+            metric_id: null,
+            suggested_name: 'Test',
+            suggested_description: 'A test',
+            dimensions_preview: [],
+            criteria_count: 3,
+            pass_threshold: 0.8,
+          },
+        ],
+      };
+      mockedApi.analyzeRubric.mockResolvedValue(analyzeResponse);
+
+      const promise = useRubricStore.getState().analyzeRubric('name: test');
+      expect(useRubricStore.getState().isAnalyzing).toBe(true);
+      expect(useRubricStore.getState().error).toBeNull();
+
+      await promise;
+
+      expect(useRubricStore.getState().isAnalyzing).toBe(false);
+      expect(useRubricStore.getState().analyzeResult).toEqual(analyzeResponse);
+      expect(mockedApi.analyzeRubric).toHaveBeenCalledWith({ yaml_content: 'name: test' });
+    });
+
+    it('sets error and clears isAnalyzing on failure, re-throws', async () => {
+      mockedApi.analyzeRubric.mockRejectedValue(new Error('Bad YAML'));
+
+      await expect(useRubricStore.getState().analyzeRubric('bad')).rejects.toThrow('Bad YAML');
+
+      expect(useRubricStore.getState().isAnalyzing).toBe(false);
+      expect(useRubricStore.getState().error).toBe('Bad YAML');
+      expect(useRubricStore.getState().analyzeResult).toBeNull();
+    });
+  });
+
+  describe('clearAnalysis', () => {
+    it('resets analyzeResult to null', () => {
+      useRubricStore.setState({
+        analyzeResult: {
+          detected_format: 'rubric_kit',
+          metrics: [],
+        },
+      });
+
+      useRubricStore.getState().clearAnalysis();
+
+      expect(useRubricStore.getState().analyzeResult).toBeNull();
     });
   });
 });

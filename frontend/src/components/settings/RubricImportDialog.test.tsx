@@ -411,4 +411,164 @@ describe('RubricImportDialog', () => {
 
     expect(await screen.findByText(/server error/i)).toBeInTheDocument();
   });
+
+  it('populates textarea from file upload', async () => {
+    const user = userEvent.setup();
+    render(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    const fileInput = screen.getByLabelText(/upload yaml file/i);
+    const file = new File(['name: from-file'], 'rubric.yaml', { type: 'application/x-yaml' });
+    await user.upload(fileInput, file);
+
+    // FileReader is async; wait for the analyze button to become enabled
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('analyze-button')).not.toBeDisabled();
+    });
+  });
+
+  it('shows analyzing spinner and disables button while analyzing', async () => {
+    mockIsAnalyzing = true;
+    render(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    // Even if there were content, analyzing state disables the button
+    const analyzeButton = screen.getByTestId('analyze-button');
+    expect(analyzeButton).toBeDisabled();
+    expect(screen.getByText('Analyzing...')).toBeInTheDocument();
+  });
+
+  it('pre-fills description from analysis response', async () => {
+    const user = userEvent.setup();
+    const analysis = makeSingleMetricAnalysis();
+
+    mockAnalyzeRubric.mockImplementation(async () => {
+      mockAnalyzeResult = analysis;
+    });
+
+    const { rerender } = render(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.type(screen.getByPlaceholderText(/paste yaml/i), 'name: test');
+    await user.click(screen.getByTestId('analyze-button'));
+    rerender(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    const descInput = screen.getByPlaceholderText(/optional description/i);
+    expect(descInput).toHaveValue('A test rubric description');
+  });
+
+  it('shows ls-eval system config format label', async () => {
+    const user = userEvent.setup();
+    const analysis = makeMultiMetricAnalysis(); // uses ls_eval_system_config
+
+    mockAnalyzeRubric.mockImplementation(async () => {
+      mockAnalyzeResult = analysis;
+    });
+
+    const { rerender } = render(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.type(screen.getByPlaceholderText(/paste yaml/i), 'name: test');
+    await user.click(screen.getByTestId('analyze-button'));
+    rerender(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    const badge = screen.getByTestId('format-badge');
+    expect(badge).toHaveTextContent('ls-eval system config');
+  });
+
+  it('passes metric_id on import when metric has one', async () => {
+    const user = userEvent.setup();
+    const analysis = makeMultiMetricAnalysis(); // metrics have metric_id
+
+    mockAnalyzeRubric.mockImplementation(async () => {
+      mockAnalyzeResult = analysis;
+    });
+    mockImportRubric.mockResolvedValue({ id: 'r-1', name: 'Metric A' });
+
+    const onImported = vi.fn();
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <RubricImportDialog open={true} onOpenChange={onOpenChange} onImported={onImported} />,
+    );
+
+    await user.type(screen.getByPlaceholderText(/paste yaml/i), 'name: test');
+    await user.click(screen.getByTestId('analyze-button'));
+    rerender(
+      <RubricImportDialog open={true} onOpenChange={onOpenChange} onImported={onImported} />,
+    );
+
+    await user.click(screen.getByTestId('import-button'));
+
+    expect(mockImportRubric).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metric_id: 'geval:metric_a',
+      }),
+    );
+  });
+
+  it('shows fallback error message for non-Error thrown during analyze', async () => {
+    const user = userEvent.setup();
+    mockAnalyzeRubric.mockRejectedValue('string error');
+
+    render(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.type(screen.getByPlaceholderText(/paste yaml/i), 'bad yaml');
+    await user.click(screen.getByTestId('analyze-button'));
+
+    expect(await screen.findByText(/analysis failed/i)).toBeInTheDocument();
+  });
+
+  it('shows fallback error message for non-Error thrown during import', async () => {
+    const user = userEvent.setup();
+    const analysis = makeSingleMetricAnalysis();
+
+    mockAnalyzeRubric.mockImplementation(async () => {
+      mockAnalyzeResult = analysis;
+    });
+    mockImportRubric.mockRejectedValue(42);
+
+    const { rerender } = render(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.type(screen.getByPlaceholderText(/paste yaml/i), 'name: test');
+    await user.click(screen.getByTestId('analyze-button'));
+    rerender(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.click(screen.getByTestId('import-button'));
+
+    expect(await screen.findByText(/import failed/i)).toBeInTheDocument();
+  });
+
+  it('clears error when typing new content in step 1', async () => {
+    const user = userEvent.setup();
+    mockAnalyzeRubric.mockRejectedValue(new Error('Parse error'));
+
+    render(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.type(screen.getByPlaceholderText(/paste yaml/i), 'bad');
+    await user.click(screen.getByTestId('analyze-button'));
+
+    expect(await screen.findByText(/parse error/i)).toBeInTheDocument();
+
+    // Typing more content should clear the error
+    await user.type(screen.getByPlaceholderText(/paste yaml/i), ' yaml');
+    expect(screen.queryByText(/parse error/i)).not.toBeInTheDocument();
+  });
+
+  it('back button clears error from step 2', async () => {
+    const user = userEvent.setup();
+    const analysis = makeSingleMetricAnalysis();
+
+    mockAnalyzeRubric.mockImplementation(async () => {
+      mockAnalyzeResult = analysis;
+    });
+    mockImportRubric.mockRejectedValue(new Error('Import conflict'));
+
+    const { rerender } = render(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.type(screen.getByPlaceholderText(/paste yaml/i), 'name: test');
+    await user.click(screen.getByTestId('analyze-button'));
+    rerender(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.click(screen.getByTestId('import-button'));
+    expect(await screen.findByText(/import conflict/i)).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('back-button'));
+    expect(screen.queryByText(/import conflict/i)).not.toBeInTheDocument();
+  });
 });
