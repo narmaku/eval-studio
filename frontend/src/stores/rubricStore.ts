@@ -6,6 +6,7 @@ import type {
   ImportRubricRequest,
   GenerateRubricRequest,
   RefineRubricRequest,
+  RubricAnalyzeResponse,
 } from '@/types';
 import { api } from '@/services/api';
 
@@ -13,6 +14,8 @@ interface RubricStore {
   rubrics: Rubric[];
   isLoading: boolean;
   error: string | null;
+  analyzeResult: RubricAnalyzeResponse | null;
+  isAnalyzing: boolean;
 
   clearError: () => void;
   fetchRubrics: (nameFilter?: string) => Promise<void>;
@@ -20,6 +23,8 @@ interface RubricStore {
   updateRubric: (id: string, data: UpdateRubricRequest) => Promise<Rubric>;
   deleteRubric: (id: string) => Promise<void>;
   importRubric: (data: ImportRubricRequest) => Promise<Rubric>;
+  analyzeRubric: (yamlContent: string) => Promise<void>;
+  clearAnalysis: () => void;
   generateRubric: (data: GenerateRubricRequest) => Promise<Rubric>;
   refineRubric: (id: string, data: RefineRubricRequest) => Promise<Rubric>;
 }
@@ -28,6 +33,8 @@ export const useRubricStore = create<RubricStore>((set) => ({
   rubrics: [],
   isLoading: false,
   error: null,
+  analyzeResult: null,
+  isAnalyzing: false,
 
   clearError: () => set({ error: null }),
 
@@ -100,6 +107,20 @@ export const useRubricStore = create<RubricStore>((set) => ({
       throw err;
     }
   },
+
+  analyzeRubric: async (yamlContent: string) => {
+    set({ isAnalyzing: true, error: null });
+    try {
+      const result = await api.analyzeRubric({ yaml_content: yamlContent });
+      set({ analyzeResult: result, isAnalyzing: false });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to analyze rubric';
+      set({ error: message, isAnalyzing: false });
+      throw err;
+    }
+  },
+
+  clearAnalysis: () => set({ analyzeResult: null }),
 
   generateRubric: async (data: GenerateRubricRequest) => {
     set({ error: null });

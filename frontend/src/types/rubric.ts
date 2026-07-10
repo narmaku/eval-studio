@@ -3,9 +3,16 @@ import type { components } from './generated/api';
 export type RubricCriterion = components['schemas']['RubricCriterion'];
 export type RubricDimension = components['schemas']['RubricDimension'];
 export type Rubric = components['schemas']['RubricResponse'];
-export type ImportRubricRequest = components['schemas']['RubricImportRequest'];
 export type GenerateRubricRequest = components['schemas']['RubricGenerateRequest'];
 export type RefineRubricRequest = components['schemas']['RubricRefineRequest'];
+
+export interface ImportRubricRequest {
+  yaml_content: string;
+  name?: string;
+  description?: string;
+  tags?: string[];
+  metric_id?: string;
+}
 
 export interface CreateRubricRequest {
   name: string;
@@ -17,3 +24,28 @@ export interface CreateRubricRequest {
 }
 
 export type UpdateRubricRequest = Partial<CreateRubricRequest>;
+
+export interface DimensionPreview {
+  name: string;
+  description: string;
+  weight: number;
+  criteria_count: number;
+}
+
+export interface DetectedMetric {
+  metric_id: string | null;
+  suggested_name: string;
+  suggested_description: string | null;
+  dimensions_preview: DimensionPreview[];
+  criteria_count: number;
+  pass_threshold: number | null;
+}
+
+export interface RubricAnalyzeRequest {
+  yaml_content: string;
+}
+
+export interface RubricAnalyzeResponse {
+  detected_format: string;
+  metrics: DetectedMetric[];
+}
