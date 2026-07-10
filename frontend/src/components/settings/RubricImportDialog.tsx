@@ -24,6 +24,8 @@ import {
 import { useRubricStore } from '@/stores/rubricStore';
 import type { DetectedMetric } from '@/types';
 
+const STEP_LABELS = ['Import Rubric', 'Preview & Confirm'] as const;
+
 const FORMAT_LABELS: Record<string, string> = {
   rubric_kit: 'rubric-kit',
   geval: 'geval',
@@ -170,8 +172,6 @@ export function RubricImportDialog({ open, onOpenChange, onImported }: RubricImp
     setError(null);
   }, []);
 
-  const STEP_LABELS = ['Import Rubric', 'Preview & Confirm'] as const;
-
   const stepIndicator = (
     <div
       className="flex items-center justify-center gap-2 mb-4"
@@ -312,6 +312,8 @@ export function RubricImportDialog({ open, onOpenChange, onImported }: RubricImp
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Rubric name"
+                required
+                aria-required="true"
                 data-testid="rubric-name-input"
               />
             </div>
