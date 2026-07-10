@@ -252,7 +252,7 @@ async def test_import_rubric_no_dimensions(client):
     """POST /rubrics/import returns 400 when no dimensions in YAML."""
     response = await client.post("/api/v1/rubrics/import", json={"yaml_content": "name: No Dims"})
     assert response.status_code == 400
-    assert "No dimensions" in response.json()["detail"]
+    assert "Unrecognized rubric format" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -414,6 +414,203 @@ async def test_refine_rubric_not_found(client):
         json={"feedback": "test", "provider_id": "__test__"},
     )
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_with_name_override(client):
+    """POST /rubrics/import with name overrides YAML-derived name."""
+    yaml_content = textwrap.dedent("""\
+        name: "YAML Name"
+        dimensions:
+          - name: quality
+            weight: 1.0
+            description: "Quality"
+    """)
+    response = await client.post(
+        "/api/v1/rubrics/import",
+        json={"yaml_content": yaml_content, "name": "Custom Name"},
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Custom Name"
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_with_description_override(client):
+    """POST /rubrics/import with description overrides YAML-derived description."""
+    yaml_content = textwrap.dedent("""\
+        name: "Test"
+        description: "YAML desc"
+        dimensions:
+          - name: quality
+            weight: 1.0
+            description: "Quality"
+    """)
+    response = await client.post(
+        "/api/v1/rubrics/import",
+        json={"yaml_content": yaml_content, "description": "Custom desc"},
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["description"] == "Custom desc"
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_with_tags(client):
+    """POST /rubrics/import with tags normalizes and stores them."""
+    yaml_content = textwrap.dedent("""\
+        name: "Tagged"
+        dimensions:
+          - name: quality
+            weight: 1.0
+            description: "Quality"
+    """)
+    response = await client.post(
+        "/api/v1/rubrics/import",
+        json={"yaml_content": yaml_content, "tags": ["RAG", "  Quality "]},
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["tags"] == ["rag", "quality"]
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_geval_format(client):
+    """POST /rubrics/import creates a rubric from Geval format YAML."""
+    yaml_content = textwrap.dedent("""\
+        criteria: "Evaluate the correctness of the answer."
+        evaluation_steps:
+          - "Check factual accuracy"
+          - "Compare with reference answer"
+        threshold: 0.9
+        description: "Correctness metric"
+    """)
+    response = await client.post("/api/v1/rubrics/import", json={"yaml_content": yaml_content})
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Correctness metric"
+    assert data["pass_threshold"] == 0.9
+    assert len(data["dimensions"]) == 1
+    assert data["dimensions"][0]["name"] == "evaluation"
+    assert len(data["dimensions"][0]["criteria"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_system_config_format(client):
+    """POST /rubrics/import creates a rubric from ls-eval system config YAML."""
+    yaml_content = textwrap.dedent("""\
+        metrics_metadata:
+          turn_level:
+            "geval:accuracy":
+              criteria: "Evaluate accuracy..."
+              evaluation_steps:
+                - "Check facts"
+              threshold: 0.8
+              description: "Accuracy"
+    """)
+    response = await client.post("/api/v1/rubrics/import", json={"yaml_content": yaml_content})
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Accuracy"
+    assert data["pass_threshold"] == 0.8
+
+
+@pytest.mark.asyncio
+async def test_import_rubric_system_config_with_metric_id(client):
+    """POST /rubrics/import with metric_id selects specific metric from system config."""
+    yaml_content = textwrap.dedent("""\
+        metrics_metadata:
+          turn_level:
+            "geval:accuracy":
+              criteria: "Evaluate accuracy..."
+              description: "Accuracy"
+            "geval:coherence":
+              criteria: "Evaluate coherence..."
+              description: "Coherence"
+    """)
+    response = await client.post(
+        "/api/v1/rubrics/import",
+        json={"yaml_content": yaml_content, "metric_id": "geval:coherence"},
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Coherence"
+
+
+# --- Analyze endpoint tests ---
+
+
+@pytest.mark.asyncio
+async def test_analyze_rubric_simple_format(client):
+    """POST /rubrics/analyze detects simple format."""
+    yaml_content = textwrap.dedent("""\
+        name: "Simple"
+        description: "Simple desc"
+        dimensions:
+          - name: quality
+            weight: 1.0
+            description: "Quality"
+    """)
+    response = await client.post("/api/v1/rubrics/analyze", json={"yaml_content": yaml_content})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["detected_format"] == "simple"
+    assert len(data["metrics"]) == 1
+    assert data["metrics"][0]["suggested_name"] == "Simple"
+
+
+@pytest.mark.asyncio
+async def test_analyze_rubric_geval_format(client):
+    """POST /rubrics/analyze detects Geval format."""
+    yaml_content = textwrap.dedent("""\
+        criteria: "Evaluate correctness..."
+        evaluation_steps:
+          - "Step 1"
+          - "Step 2"
+        threshold: 0.9
+        description: "Correctness"
+    """)
+    response = await client.post("/api/v1/rubrics/analyze", json={"yaml_content": yaml_content})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["detected_format"] == "geval"
+    assert len(data["metrics"]) == 1
+    assert data["metrics"][0]["criteria_count"] == 2
+    assert data["metrics"][0]["pass_threshold"] == 0.9
+
+
+@pytest.mark.asyncio
+async def test_analyze_rubric_system_config_format(client):
+    """POST /rubrics/analyze detects ls-eval system config and returns all metrics."""
+    yaml_content = textwrap.dedent("""\
+        metrics_metadata:
+          turn_level:
+            "geval:accuracy":
+              criteria: "Evaluate accuracy..."
+              description: "Accuracy"
+            "geval:coherence":
+              criteria: "Evaluate coherence..."
+              description: "Coherence"
+    """)
+    response = await client.post("/api/v1/rubrics/analyze", json={"yaml_content": yaml_content})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["detected_format"] == "ls_eval_system_config"
+    assert len(data["metrics"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_analyze_rubric_invalid_yaml(client):
+    """POST /rubrics/analyze returns 400 for invalid YAML."""
+    response = await client.post("/api/v1/rubrics/analyze", json={"yaml_content": "key: [unclosed"})
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_analyze_rubric_empty_body(client):
+    """POST /rubrics/analyze returns 422 for empty yaml_content."""
+    response = await client.post("/api/v1/rubrics/analyze", json={"yaml_content": ""})
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio

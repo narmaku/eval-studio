@@ -9,8 +9,17 @@ from pydantic import ValidationError
 
 from app.schemas.rubric import RubricCriterion, RubricDimension
 from app.services.rubric_service import (
+    _api_key_env_patch,
+    _build_dimension_previews,
+    _extract_system_config_metrics,
+    _normalize_simple_dimensions,
+    _parse_geval_format,
+    _parse_system_config,
+    _to_rubric_kit_format,
+    analyze_rubric_yaml,
     clean_yaml_block,
     convert_rubric_kit_to_internal,
+    detect_rubric_format,
     generate_rubric,
     parse_rubric_yaml,
     refine_rubric,
@@ -121,7 +130,7 @@ class TestParseRubricYaml:
 
     def test_no_dimensions_raises(self):
         yaml_content = "name: No Dims"
-        with pytest.raises(ValueError, match="No dimensions"):
+        with pytest.raises(ValueError, match="Unrecognized rubric format"):
             parse_rubric_yaml(yaml_content)
 
     def test_prompt_template_included(self):
@@ -1079,3 +1088,805 @@ class TestRubricKitLoadRubricIntegration:
         # grading_type: score without scores dict triggers RubricValidationError
         with pytest.raises(ValueError):
             parse_rubric_yaml(yaml_content)
+
+
+class TestDetectRubricFormat:
+    """Tests for detect_rubric_format heuristics."""
+
+    def test_detect_ls_eval_system_config(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:cla_tests_metric": {
+                        "criteria": "Evaluate...",
+                        "evaluation_steps": ["Step 1"],
+                        "threshold": 0.9,
+                    }
+                }
+            }
+        }
+        assert detect_rubric_format(data) == "ls_eval_system_config"
+
+    def test_detect_ls_eval_system_config_conversation_level(self):
+        data = {
+            "metrics_metadata": {
+                "conversation_level": {
+                    "geval:coherence": {
+                        "criteria": "Evaluate coherence...",
+                    }
+                }
+            }
+        }
+        assert detect_rubric_format(data) == "ls_eval_system_config"
+
+    def test_detect_geval_with_steps(self):
+        data = {
+            "criteria": "Evaluate correctness of the answer.",
+            "evaluation_steps": ["Check factual accuracy", "Compare with reference"],
+            "threshold": 0.9,
+        }
+        assert detect_rubric_format(data) == "geval"
+
+    def test_detect_geval_with_params(self):
+        data = {
+            "criteria": "Evaluate the answer.",
+            "evaluation_params": {"model": "gpt-4"},
+        }
+        assert detect_rubric_format(data) == "geval"
+
+    def test_detect_geval_criteria_only(self):
+        """Standalone geval with criteria string but no dimensions."""
+        data = {
+            "criteria": "Evaluate the response quality.",
+        }
+        assert detect_rubric_format(data) == "geval"
+
+    def test_geval_not_detected_when_dimensions_present(self):
+        """When dimensions key is present, geval is not detected even if criteria string exists."""
+        data = {
+            "criteria": "Evaluate...",
+            "dimensions": [{"name": "d1", "description": "dim1"}],
+        }
+        # criteria is a string but dimensions exist: NOT geval, falls to simple
+        assert detect_rubric_format(data) == "simple"
+
+    def test_detect_rubric_kit_format(self):
+        data = {
+            "dimensions": [
+                {
+                    "accuracy": "Factual accuracy",
+                    "grading_type": "score",
+                    "scores": {1: "Bad", 5: "Good"},
+                }
+            ],
+            "criteria": [{"name": "c1", "weight": 1, "dimension": "accuracy", "criterion": "text"}],
+        }
+        assert detect_rubric_format(data) == "rubric_kit"
+
+    def test_detect_simple_format(self):
+        data = {"dimensions": [{"name": "quality", "weight": 1.0, "description": "Overall quality"}]}
+        assert detect_rubric_format(data) == "simple"
+
+    def test_detect_unknown_format(self):
+        data = {"name": "something", "other_key": "value"}
+        assert detect_rubric_format(data) == "unknown"
+
+    def test_detect_empty_dict(self):
+        assert detect_rubric_format({}) == "unknown"
+
+    def test_geval_criteria_must_be_string(self):
+        """If criteria is a list (rubric-kit style), it's not detected as geval."""
+        data = {
+            "criteria": [{"name": "c1", "criterion": "text"}],
+            "evaluation_steps": ["Step 1"],
+        }
+        assert detect_rubric_format(data) != "geval"
+
+
+class TestParseGevalFormat:
+    """Tests for _parse_geval_format conversion."""
+
+    def test_geval_with_evaluation_steps(self):
+        data = {
+            "criteria": "Evaluate correctness of the response.",
+            "evaluation_steps": [
+                "Check factual accuracy",
+                "Compare with reference answer",
+            ],
+            "threshold": 0.9,
+            "description": "Answer correctness metric",
+        }
+        result = _parse_geval_format(data)
+        assert result["name"] == "Answer correctness metric"
+        assert result["description"] == "Answer correctness metric"
+        assert result["pass_threshold"] == 0.9
+        assert len(result["dimensions"]) == 1
+
+        dim = result["dimensions"][0]
+        assert dim["name"] == "evaluation"
+        assert dim["weight"] == 1.0
+        assert dim["description"] == "Evaluate correctness of the response."
+        assert len(dim["criteria"]) == 2
+        assert dim["criteria"][0]["name"] == "step_1"
+        assert dim["criteria"][0]["criterion"] == "Check factual accuracy"
+        assert dim["criteria"][0]["weight"] == 1.0
+        assert dim["criteria"][1]["name"] == "step_2"
+        assert dim["criteria"][1]["criterion"] == "Compare with reference answer"
+
+    def test_geval_criteria_only_no_steps(self):
+        """When no evaluation_steps, creates a single criterion from criteria text."""
+        data = {
+            "criteria": "Evaluate the quality of the response.",
+        }
+        result = _parse_geval_format(data)
+        assert len(result["dimensions"]) == 1
+        dim = result["dimensions"][0]
+        assert len(dim["criteria"]) == 1
+        assert dim["criteria"][0]["name"] == "step_1"
+        assert dim["criteria"][0]["criterion"] == "Evaluate the quality of the response."
+
+    def test_geval_with_custom_name(self):
+        data = {
+            "criteria": "Evaluate...",
+            "description": "Original name",
+        }
+        result = _parse_geval_format(data, name="Custom Name")
+        assert result["name"] == "Custom Name"
+
+    def test_geval_defaults(self):
+        data = {"criteria": "Evaluate..."}
+        result = _parse_geval_format(data)
+        assert result["name"] == "Imported Rubric"
+        assert result["pass_threshold"] == 0.7
+        assert result["aggregation"] == "weighted_average"
+        assert result["prompt_template"] is None
+
+    def test_geval_name_from_description(self):
+        data = {"criteria": "Evaluate...", "description": "My Metric"}
+        result = _parse_geval_format(data)
+        assert result["name"] == "My Metric"
+        assert result["description"] == "My Metric"
+
+
+class TestExtractSystemConfigMetrics:
+    """Tests for _extract_system_config_metrics."""
+
+    def test_extract_turn_level_metrics(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:cla_tests_metric": {
+                        "criteria": "Evaluate CLA tests...",
+                        "evaluation_steps": ["Step 1"],
+                        "threshold": 0.9,
+                    },
+                    "geval:technical_accuracy": {
+                        "criteria": "Evaluate technical...",
+                        "threshold": 0.7,
+                    },
+                }
+            }
+        }
+        metrics = _extract_system_config_metrics(data)
+        assert len(metrics) == 2
+        ids = {m["metric_id"] for m in metrics}
+        assert "geval:cla_tests_metric" in ids
+        assert "geval:technical_accuracy" in ids
+        assert all(m["level"] == "turn_level" for m in metrics)
+
+    def test_extract_conversation_level_metrics(self):
+        data = {
+            "metrics_metadata": {
+                "conversation_level": {
+                    "geval:coherence": {
+                        "criteria": "Evaluate conversation coherence...",
+                    }
+                }
+            }
+        }
+        metrics = _extract_system_config_metrics(data)
+        assert len(metrics) == 1
+        assert metrics[0]["metric_id"] == "geval:coherence"
+        assert metrics[0]["level"] == "conversation_level"
+
+    def test_extract_both_levels(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {"criteria": "Evaluate accuracy..."},
+                },
+                "conversation_level": {
+                    "geval:coherence": {"criteria": "Evaluate coherence..."},
+                },
+            }
+        }
+        metrics = _extract_system_config_metrics(data)
+        assert len(metrics) == 2
+
+    def test_skips_non_geval_metrics(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {"criteria": "Evaluate..."},
+                    "bleu_score": {"some_param": "value"},
+                }
+            }
+        }
+        metrics = _extract_system_config_metrics(data)
+        assert len(metrics) == 1
+        assert metrics[0]["metric_id"] == "geval:accuracy"
+
+    def test_empty_metrics_metadata(self):
+        data = {"metrics_metadata": {}}
+        metrics = _extract_system_config_metrics(data)
+        assert metrics == []
+
+
+class TestParseSystemConfig:
+    """Tests for _parse_system_config."""
+
+    def test_parse_specific_metric(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {
+                        "criteria": "Evaluate factual accuracy.",
+                        "evaluation_steps": ["Check facts", "Verify sources"],
+                        "threshold": 0.9,
+                        "description": "Accuracy metric",
+                    },
+                    "geval:coherence": {
+                        "criteria": "Evaluate coherence...",
+                    },
+                }
+            }
+        }
+        result = _parse_system_config(data, metric_id="geval:accuracy")
+        assert result["name"] == "Accuracy metric"
+        assert result["pass_threshold"] == 0.9
+        assert len(result["dimensions"]) == 1
+        assert len(result["dimensions"][0]["criteria"]) == 2
+
+    def test_parse_first_metric_when_none_specified(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {
+                        "criteria": "Evaluate...",
+                        "description": "First metric",
+                    },
+                }
+            }
+        }
+        result = _parse_system_config(data)
+        assert result["name"] == "First metric"
+
+    def test_parse_unknown_metric_id_raises(self):
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": {"criteria": "Evaluate..."},
+                }
+            }
+        }
+        with pytest.raises(ValueError, match="not found"):
+            _parse_system_config(data, metric_id="geval:nonexistent")
+
+    def test_parse_no_metrics_raises(self):
+        data = {"metrics_metadata": {}}
+        with pytest.raises(ValueError, match="No geval metrics"):
+            _parse_system_config(data)
+
+
+class TestAnalyzeRubricYaml:
+    """Tests for the analyze_rubric_yaml service function."""
+
+    def test_analyze_simple_format(self):
+        yaml_content = textwrap.dedent("""\
+            name: "Simple Rubric"
+            description: "A simple rubric"
+            dimensions:
+              - name: accuracy
+                weight: 0.6
+                description: "Factual accuracy"
+              - name: completeness
+                weight: 0.4
+                description: "Completeness"
+            pass_threshold: 0.8
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "simple"
+        assert len(result["metrics"]) == 1
+        metric = result["metrics"][0]
+        assert metric["suggested_name"] == "Simple Rubric"
+        assert metric["suggested_description"] == "A simple rubric"
+        assert len(metric["dimensions_preview"]) == 2
+        assert metric["dimensions_preview"][0]["name"] == "accuracy"
+        assert metric["pass_threshold"] == 0.8
+
+    def test_analyze_rubric_kit_format(self):
+        yaml_content = textwrap.dedent("""\
+            name: "Kit Rubric"
+            dimensions:
+              - accuracy: "Factual accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 2
+                dimension: accuracy
+                criterion: "Is it accurate?"
+              - name: c2
+                weight: 1
+                dimension: accuracy
+                criterion: "Does it cite sources?"
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "rubric_kit"
+        assert len(result["metrics"]) == 1
+        metric = result["metrics"][0]
+        assert metric["suggested_name"] == "Kit Rubric"
+        assert len(metric["dimensions_preview"]) == 1
+        assert metric["dimensions_preview"][0]["criteria_count"] == 2
+
+    def test_analyze_geval_format(self):
+        yaml_content = textwrap.dedent("""\
+            criteria: "Evaluate the correctness of the response."
+            evaluation_steps:
+              - "Check factual accuracy"
+              - "Compare with reference"
+            threshold: 0.9
+            description: "Correctness metric"
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "geval"
+        assert len(result["metrics"]) == 1
+        metric = result["metrics"][0]
+        assert metric["suggested_name"] == "Correctness metric"
+        assert metric["pass_threshold"] == 0.9
+        assert metric["criteria_count"] == 2
+
+    def test_analyze_system_config(self):
+        yaml_content = textwrap.dedent("""\
+            metrics_metadata:
+              turn_level:
+                "geval:accuracy":
+                  criteria: "Evaluate accuracy..."
+                  evaluation_steps:
+                    - "Step 1"
+                    - "Step 2"
+                  threshold: 0.9
+                  description: "Accuracy metric"
+                "geval:coherence":
+                  criteria: "Evaluate coherence..."
+                  description: "Coherence metric"
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "ls_eval_system_config"
+        assert len(result["metrics"]) == 2
+        names = {m["suggested_name"] for m in result["metrics"]}
+        assert "Accuracy metric" in names
+        assert "Coherence metric" in names
+        # Each metric should have a metric_id
+        ids = {m["metric_id"] for m in result["metrics"]}
+        assert "geval:accuracy" in ids
+        assert "geval:coherence" in ids
+
+    def test_analyze_invalid_yaml(self):
+        with pytest.raises(ValueError, match="Invalid YAML"):
+            analyze_rubric_yaml("::invalid yaml: [")
+
+    def test_analyze_unknown_format(self):
+        yaml_content = "name: just a name"
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "unknown"
+        assert result["metrics"] == []
+
+
+class TestParseRubricYamlMultiFormat:
+    """Tests for parse_rubric_yaml with geval and system config formats."""
+
+    def test_parse_geval_format(self):
+        yaml_content = textwrap.dedent("""\
+            criteria: "Evaluate the correctness of the response."
+            evaluation_steps:
+              - "Check factual accuracy"
+              - "Compare with reference"
+            threshold: 0.9
+            description: "Correctness metric"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert result["name"] == "Correctness metric"
+        assert result["pass_threshold"] == 0.9
+        assert len(result["dimensions"]) == 1
+        assert result["dimensions"][0]["name"] == "evaluation"
+        assert len(result["dimensions"][0]["criteria"]) == 2
+
+    def test_parse_system_config_format(self):
+        yaml_content = textwrap.dedent("""\
+            metrics_metadata:
+              turn_level:
+                "geval:accuracy":
+                  criteria: "Evaluate accuracy..."
+                  evaluation_steps:
+                    - "Check facts"
+                  threshold: 0.8
+                  description: "Accuracy"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert result["name"] == "Accuracy"
+        assert result["pass_threshold"] == 0.8
+
+    def test_parse_system_config_with_metric_id(self):
+        yaml_content = textwrap.dedent("""\
+            metrics_metadata:
+              turn_level:
+                "geval:accuracy":
+                  criteria: "Evaluate accuracy..."
+                  description: "Accuracy"
+                "geval:coherence":
+                  criteria: "Evaluate coherence..."
+                  description: "Coherence"
+        """)
+        result = parse_rubric_yaml(yaml_content, metric_id="geval:coherence")
+        assert result["name"] == "Coherence"
+
+    def test_parse_unknown_format_raises(self):
+        yaml_content = "name: just a name"
+        with pytest.raises(ValueError, match="Unrecognized rubric format"):
+            parse_rubric_yaml(yaml_content)
+
+    def test_existing_simple_format_still_works(self):
+        """Backward compatibility: simple format with dimensions still parses."""
+        yaml_content = textwrap.dedent("""\
+            name: "Simple"
+            dimensions:
+              - name: quality
+                weight: 1.0
+                description: "Quality"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert result["name"] == "Simple"
+        assert len(result["dimensions"]) == 1
+
+    def test_existing_rubric_kit_format_still_works(self):
+        """Backward compatibility: rubric-kit format still parses."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "Accurate?"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert len(result["dimensions"]) == 1
+        assert result["dimensions"][0]["name"] == "accuracy"
+
+
+class TestExtractSystemConfigMetricsEdgeCases:
+    """Edge cases for _extract_system_config_metrics."""
+
+    def test_non_dict_metrics_metadata_returns_empty(self):
+        """When metrics_metadata is not a dict (e.g., a list), return empty list."""
+        data = {"metrics_metadata": ["not", "a", "dict"]}
+        assert _extract_system_config_metrics(data) == []
+
+    def test_non_dict_metric_data_skipped(self):
+        """When a geval metric value is not a dict, it is skipped."""
+        data = {
+            "metrics_metadata": {
+                "turn_level": {
+                    "geval:accuracy": "just a string, not a dict",
+                    "geval:coherence": {"criteria": "Evaluate..."},
+                }
+            }
+        }
+        metrics = _extract_system_config_metrics(data)
+        assert len(metrics) == 1
+        assert metrics[0]["metric_id"] == "geval:coherence"
+
+    def test_non_dict_level_value_skipped(self):
+        """When a level value (turn_level/conversation_level) is not a dict, skip it."""
+        data = {"metrics_metadata": {"turn_level": "not a dict"}}
+        assert _extract_system_config_metrics(data) == []
+
+    def test_missing_metrics_metadata_returns_empty(self):
+        """When metrics_metadata key is absent, return empty list."""
+        data = {"other_key": "value"}
+        assert _extract_system_config_metrics(data) == []
+
+
+class TestAnalyzeRubricYamlEdgeCases:
+    """Edge cases for analyze_rubric_yaml."""
+
+    def test_analyze_non_dict_yaml_returns_unknown(self):
+        """YAML that parses to a scalar (not dict) returns unknown format."""
+        result = analyze_rubric_yaml("just a plain string")
+        assert result["detected_format"] == "unknown"
+        assert result["metrics"] == []
+
+    def test_analyze_null_yaml_returns_unknown(self):
+        """YAML null returns unknown format."""
+        result = analyze_rubric_yaml("null")
+        assert result["detected_format"] == "unknown"
+        assert result["metrics"] == []
+
+    def test_analyze_list_yaml_returns_unknown(self):
+        """YAML that parses to a list returns unknown format."""
+        result = analyze_rubric_yaml("- item1\n- item2")
+        assert result["detected_format"] == "unknown"
+        assert result["metrics"] == []
+
+    def test_analyze_rubric_kit_format_validation_failure_returns_empty_metrics(self):
+        """When rubric-kit parsing fails, analyze returns format with empty metrics."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - broken: "Missing scores for score type"
+                grading_type: score
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: broken
+                criterion: "Some criterion."
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "rubric_kit"
+        assert result["metrics"] == []
+
+    def test_analyze_with_nested_rubric_key(self):
+        """Analyze correctly unwraps nested 'rubric:' key."""
+        yaml_content = textwrap.dedent("""\
+            rubric:
+              name: "Nested"
+              dimensions:
+                - name: quality
+                  weight: 1.0
+                  description: "Quality"
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "simple"
+        assert result["metrics"][0]["suggested_name"] == "Nested"
+
+
+class TestNormalizeSimpleDimensionsEdgeCases:
+    """Edge cases for _normalize_simple_dimensions."""
+
+    def test_non_dict_entries_skipped(self):
+        """Non-dict items in the dimensions list are skipped."""
+        dims = _normalize_simple_dimensions(
+            [
+                {"name": "quality", "weight": 1.0, "description": "Quality"},
+                "not a dict",
+                42,
+                None,
+            ]
+        )
+        assert len(dims) == 1
+        assert dims[0]["name"] == "quality"
+
+    def test_empty_list_returns_empty(self):
+        """Empty dimensions list returns empty."""
+        assert _normalize_simple_dimensions([]) == []
+
+    def test_missing_fields_use_defaults(self):
+        """Dimensions without name/weight/description get defaults."""
+        dims = _normalize_simple_dimensions([{}])
+        assert len(dims) == 1
+        assert dims[0]["name"] == "unnamed"
+        assert dims[0]["weight"] == 1.0
+        assert dims[0]["description"] == "unnamed"
+
+
+class TestToRubricKitFormat:
+    """Tests for _to_rubric_kit_format conversion."""
+
+    def test_converts_dimensions_with_name_description(self):
+        """Dimensions with explicit name/description are converted to key-based format."""
+        data = {
+            "dimensions": [
+                {"name": "accuracy", "description": "Factual accuracy", "grading_type": "score", "scores": {1: "Bad"}}
+            ],
+        }
+        result = _to_rubric_kit_format(data)
+        dim = result["dimensions"][0]
+        assert "accuracy" in dim
+        assert dim["accuracy"] == "Factual accuracy"
+        assert "name" not in dim
+        assert "description" not in dim
+        assert dim["grading_type"] == "score"
+
+    def test_dimension_without_name_passed_through(self):
+        """Dict dimensions without name field are passed through as-is."""
+        data = {
+            "dimensions": [{"accuracy": "Factual accuracy", "grading_type": "score"}],
+        }
+        result = _to_rubric_kit_format(data)
+        assert result["dimensions"][0]["accuracy"] == "Factual accuracy"
+
+    def test_non_dict_dimension_passed_through(self):
+        """Non-dict entries in dimensions are appended as-is."""
+        data = {"dimensions": ["a string entry", 42]}
+        result = _to_rubric_kit_format(data)
+        assert result["dimensions"] == ["a string entry", 42]
+
+    def test_criteria_list_converted_to_dict(self):
+        """Criteria as a list of dicts is converted to dict-of-dicts format."""
+        data = {
+            "criteria": [
+                {"name": "c1", "weight": 1, "dimension": "d1", "criterion": "text1"},
+                {"name": "c2", "weight": 2, "dimension": "d1", "criterion": "text2"},
+            ]
+        }
+        result = _to_rubric_kit_format(data)
+        assert "c1" in result["criteria"]
+        assert "c2" in result["criteria"]
+        assert "name" not in result["criteria"]["c1"]
+        assert result["criteria"]["c1"]["weight"] == 1
+
+    def test_criteria_without_name_gets_generated_name(self):
+        """Criteria without a name field get auto-generated names."""
+        data = {
+            "criteria": [
+                {"weight": 1, "dimension": "d1", "criterion": "text1"},
+            ]
+        }
+        result = _to_rubric_kit_format(data)
+        assert "criterion_0" in result["criteria"]
+
+    def test_criteria_dict_passed_through(self):
+        """Criteria already as a dict is passed through unchanged."""
+        data = {"criteria": {"c1": {"weight": 1, "dimension": "d1", "criterion": "text"}}}
+        result = _to_rubric_kit_format(data)
+        assert result["criteria"] == data["criteria"]
+
+    def test_variables_copied(self):
+        """Variables key is copied to result."""
+        data = {"variables": {"product": "RHEL"}}
+        result = _to_rubric_kit_format(data)
+        assert result["variables"] == {"product": "RHEL"}
+
+    def test_no_variables_key_omitted(self):
+        """When no variables key exists, it is not in result."""
+        data = {"dimensions": []}
+        result = _to_rubric_kit_format(data)
+        assert "variables" not in result
+
+
+class TestBuildDimensionPreviews:
+    """Tests for _build_dimension_previews helper."""
+
+    def test_builds_previews_from_dimensions(self):
+        dimensions = [
+            {"name": "accuracy", "description": "Factual accuracy", "weight": 0.6, "criteria": [{"name": "c1"}]},
+            {"name": "clarity", "description": "Clear writing", "weight": 0.4, "criteria": []},
+        ]
+        previews = _build_dimension_previews(dimensions)
+        assert len(previews) == 2
+        assert previews[0]["name"] == "accuracy"
+        assert previews[0]["criteria_count"] == 1
+        assert previews[1]["name"] == "clarity"
+        assert previews[1]["criteria_count"] == 0
+
+    def test_missing_fields_use_defaults(self):
+        """Dimensions missing optional fields get default values."""
+        dimensions = [{}]
+        previews = _build_dimension_previews(dimensions)
+        assert previews[0]["name"] == "unnamed"
+        assert previews[0]["description"] == ""
+        assert previews[0]["weight"] == 1.0
+        assert previews[0]["criteria_count"] == 0
+
+
+class TestConvertRubricKitToInternalEdgeCases:
+    """Tests for edge cases in convert_rubric_kit_to_internal."""
+
+    def test_criterion_with_non_int_weight_defaults_to_one(self):
+        """Non-int, non-from_scores weight falls back to 1.0 in convert_rubric_kit_to_internal."""
+        from unittest.mock import MagicMock
+
+        # rubric-kit Criterion validates weight strictly, so use a mock
+        # to exercise the defensive else branch in convert_rubric_kit_to_internal
+        from rubric_kit import Dimension, Rubric
+
+        dim = Dimension(name="d1", description="dim1", grading_type="score", scores={1: "Bad", 5: "Good"})
+        crit = MagicMock()
+        crit.name = "c1"
+        crit.weight = "some_string"
+        crit.dimension = "d1"
+        crit.criterion = "text"
+
+        rubric = MagicMock(spec=Rubric)
+        rubric.dimensions = [dim]
+        rubric.criteria = [crit]
+
+        result = convert_rubric_kit_to_internal(rubric)
+        d = result["dimensions"][0]
+        assert d["criteria"][0]["weight"] == 1.0
+
+    def test_criterion_none_text_without_scores_defaults_to_empty(self):
+        """When criterion text is None and dimension has no scores, defaults to empty string."""
+        from rubric_kit import Criterion, Dimension, Rubric
+
+        rubric = Rubric(
+            dimensions=[
+                Dimension(name="d1", description="dim1", grading_type="binary"),
+            ],
+            criteria=[
+                Criterion(name="c1", weight=1, dimension="d1", criterion=None),
+            ],
+        )
+        result = convert_rubric_kit_to_internal(rubric)
+        dim = result["dimensions"][0]
+        assert dim["criteria"][0]["criterion"] == ""
+
+    def test_from_scores_weight_without_scores_defaults_to_one(self):
+        """weight: from_scores on dimension with no scores falls back to 1.0."""
+        from rubric_kit import Criterion, Dimension, Rubric
+
+        rubric = Rubric(
+            dimensions=[
+                Dimension(name="d1", description="dim1", grading_type="binary"),
+            ],
+            criteria=[
+                Criterion(name="c1", weight="from_scores", dimension="d1", criterion="text"),
+            ],
+        )
+        result = convert_rubric_kit_to_internal(rubric)
+        dim = result["dimensions"][0]
+        assert dim["criteria"][0]["weight"] == 1.0
+
+    def test_from_scores_text_without_scores_defaults_to_empty(self):
+        """criterion: from_scores on dimension with no scores defaults to empty string."""
+        from rubric_kit import Criterion, Dimension, Rubric
+
+        rubric = Rubric(
+            dimensions=[
+                Dimension(name="d1", description="dim1", grading_type="binary"),
+            ],
+            criteria=[
+                Criterion(name="c1", weight=1, dimension="d1", criterion="from_scores"),
+            ],
+        )
+        result = convert_rubric_kit_to_internal(rubric)
+        dim = result["dimensions"][0]
+        assert dim["criteria"][0]["criterion"] == ""
+
+
+class TestApiKeyEnvPatch:
+    """Tests for _api_key_env_patch context manager."""
+
+    def test_no_api_key_is_noop(self):
+        """When api_key is None, env is not modified."""
+        original = os.environ.get("LITELLM_API_KEY")
+        with _api_key_env_patch(None):
+            assert os.environ.get("LITELLM_API_KEY") == original
+
+    def test_sets_and_clears_env_var(self):
+        """When api_key is set and no prior value, env var is set then cleared."""
+        os.environ.pop("LITELLM_API_KEY", None)
+        with _api_key_env_patch("test-key-123"):
+            assert os.environ["LITELLM_API_KEY"] == "test-key-123"
+        assert "LITELLM_API_KEY" not in os.environ
+
+    def test_restores_previous_env_var(self):
+        """When there was a prior LITELLM_API_KEY, it is restored after context."""
+        os.environ["LITELLM_API_KEY"] = "original-key"
+        try:
+            with _api_key_env_patch("temp-key"):
+                assert os.environ["LITELLM_API_KEY"] == "temp-key"
+            assert os.environ["LITELLM_API_KEY"] == "original-key"
+        finally:
+            os.environ.pop("LITELLM_API_KEY", None)
+
+    def test_empty_string_api_key_is_noop(self):
+        """Empty string api_key is falsy, so context is a no-op."""
+        with _api_key_env_patch(""):
+            pass  # Should not raise

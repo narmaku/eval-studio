@@ -15,6 +15,8 @@ from app.core.security import require_auth
 from app.models.rubric import Rubric
 from app.schemas.common import PaginatedResponse
 from app.schemas.rubric import (
+    RubricAnalyzeRequest,
+    RubricAnalyzeResponse,
     RubricCreate,
     RubricGenerateRequest,
     RubricImportRequest,
@@ -22,7 +24,12 @@ from app.schemas.rubric import (
     RubricResponse,
     RubricUpdate,
 )
-from app.services.rubric_service import generate_rubric, parse_rubric_yaml, refine_rubric
+from app.services.rubric_service import (
+    analyze_rubric_yaml,
+    generate_rubric,
+    parse_rubric_yaml,
+    refine_rubric,
+)
 
 logger = structlog.get_logger()
 
@@ -37,25 +44,53 @@ async def import_rubric(
     payload: RubricImportRequest,
     db: AsyncSession = Depends(get_db),
 ) -> RubricResponse:
-    """Import a rubric from YAML content (rubric-kit format)."""
+    """Import a rubric from YAML content.
+
+    Supports rubric-kit, Geval metric, ls-eval system config, and simple
+    formats.  Optional ``name``, ``description``, ``tags``, and
+    ``metric_id`` fields override YAML-derived values.
+    """
     try:
-        rubric_data = parse_rubric_yaml(payload.yaml_content)
+        rubric_data = parse_rubric_yaml(payload.yaml_content, metric_id=payload.metric_id)
     except ValueError as exc:
         raise AppException(400, "Bad Request", str(exc)) from None
 
+    # Apply user overrides
+    name = payload.name if payload.name else rubric_data["name"]
+    description = payload.description if payload.description is not None else rubric_data.get("description")
+    tags = [t.lower().strip() for t in payload.tags] if payload.tags else []
+
     rubric = Rubric(
-        name=rubric_data["name"],
-        description=rubric_data.get("description"),
+        name=name,
+        description=description,
         dimensions=rubric_data["dimensions"],
         pass_threshold=rubric_data.get("pass_threshold", 0.7),
         aggregation=rubric_data.get("aggregation", "weighted_average"),
         prompt_template=rubric_data.get("prompt_template"),
+        tags=tags,
     )
     db.add(rubric)
     await db.commit()
     await db.refresh(rubric)
     logger.info("rubric.imported", id=rubric.id, name=rubric.name)
     return RubricResponse.model_validate(rubric)
+
+
+@router.post("/analyze", response_model=RubricAnalyzeResponse)
+async def analyze_rubric(
+    payload: RubricAnalyzeRequest,
+) -> RubricAnalyzeResponse:
+    """Analyze YAML content and return format detection + preview.
+
+    Does not create a rubric -- returns detected format and preview
+    information about the metrics/dimensions found.
+    """
+    try:
+        result = analyze_rubric_yaml(payload.yaml_content)
+    except ValueError as exc:
+        raise AppException(400, "Bad Request", str(exc)) from None
+
+    return RubricAnalyzeResponse(**result)
 
 
 @router.post("/generate", response_model=RubricResponse, status_code=201)
