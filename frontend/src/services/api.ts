@@ -29,6 +29,8 @@ import type {
   ImportRubricRequest,
   GenerateRubricRequest,
   RefineRubricRequest,
+  RubricAnalyzeRequest,
+  RubricAnalyzeResponse,
   EvaluatorInfo,
   ToolServer,
   CreateToolServerRequest,
@@ -252,6 +254,11 @@ export const api = {
   updateRubric: (id: string, data: UpdateRubricRequest) =>
     request<Rubric>(`/api/v1/rubrics/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteRubric: (id: string) => request<void>(`/api/v1/rubrics/${id}`, { method: 'DELETE' }),
+  analyzeRubric: (data: RubricAnalyzeRequest) =>
+    request<RubricAnalyzeResponse>('/api/v1/rubrics/analyze', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   importRubric: (data: ImportRubricRequest) =>
     request<Rubric>('/api/v1/rubrics/import', { method: 'POST', body: JSON.stringify(data) }),
   generateRubric: (data: GenerateRubricRequest) =>
