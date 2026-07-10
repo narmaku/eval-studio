@@ -83,8 +83,10 @@ export function RubricImportDialog({ open, onOpenChange, onImported }: RubricImp
       const result = useRubricStore.getState().analyzeResult;
       if (result && result.metrics.length > 0) {
         const firstMetric = result.metrics[0];
-        setName(firstMetric.suggested_name);
-        setDescription(firstMetric.suggested_description ?? '');
+        if (firstMetric) {
+          setName(firstMetric.suggested_name);
+          setDescription(firstMetric.suggested_description ?? '');
+        }
         setSelectedMetricIndex(0);
       }
       setStep(2);
