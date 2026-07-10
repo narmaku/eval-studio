@@ -9,7 +9,7 @@ class RubricCriterion(BaseModel):
     """A single evaluation criterion within a rubric dimension."""
 
     name: str = Field(min_length=1, max_length=255)
-    criterion: str = Field(min_length=1)
+    criterion: str = Field(default="", min_length=0)
     weight: float = Field(default=1.0, gt=0)
 
 

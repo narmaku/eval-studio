@@ -284,7 +284,6 @@ describe('RubricBuilder', () => {
     await user.click(screen.getByRole('button', { name: /save/i }));
 
     expect(screen.getByText(/name is required/i)).toBeInTheDocument();
-    expect(screen.getByText(/criterion text is required/i)).toBeInTheDocument();
     expect(mockCreateRubric).not.toHaveBeenCalled();
   });
 

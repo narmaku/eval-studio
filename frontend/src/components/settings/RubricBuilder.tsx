@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,8 +91,8 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
       weight: String(d.weight),
       description: d.description,
       criteria: (d.criteria ?? []).map((c) => ({
-        name: c.name,
-        criterion: c.criterion,
+        name: c.name ?? '',
+        criterion: c.criterion ?? '',
         weight: String(c.weight ?? 1),
       })),
     })) ?? [],
@@ -170,6 +170,8 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
     );
   };
 
+  const formRef = useRef<HTMLDivElement>(null);
+
   const validate = (): boolean => {
     const newErrors: string[] = [];
 
@@ -190,9 +192,6 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
         if (!c.name.trim()) {
           newErrors.push(`Dimension ${i + 1}, Criterion ${j + 1}: name is required`);
         }
-        if (!c.criterion.trim()) {
-          newErrors.push(`Dimension ${i + 1}, Criterion ${j + 1}: criterion text is required`);
-        }
         const cWeight = parseFloat(c.weight);
         if (isNaN(cWeight) || cWeight <= 0) {
           newErrors.push(`Dimension ${i + 1}, Criterion ${j + 1}: weight must be positive`);
@@ -201,6 +200,9 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
     });
 
     setErrors(newErrors);
+    if (newErrors.length > 0) {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     return newErrors.length === 0;
   };
 
@@ -209,18 +211,22 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
 
     setIsSaving(true);
     try {
-      const parsedDimensions: RubricDimension[] = dimensions.map((d) => ({
-        name: d.name,
-        weight: parseFloat(d.weight) || 1.0,
-        description: d.description,
-        ...(d.criteria.length > 0 && {
-          criteria: d.criteria.map((c) => ({
+      const parsedDimensions: RubricDimension[] = dimensions.map((d) => {
+        const validCriteria = d.criteria
+          .filter((c) => c.name.trim() || c.criterion.trim())
+          .map((c) => ({
             name: c.name,
-            criterion: c.criterion,
+            criterion: c.criterion || c.name,
             weight: parseFloat(c.weight) || 1.0,
-          })),
-        }),
-      }));
+          }));
+
+        return {
+          name: d.name,
+          weight: parseFloat(d.weight) || 1.0,
+          description: d.description,
+          ...(validCriteria.length > 0 && { criteria: validCriteria }),
+        };
+      });
 
       const data: CreateRubricRequest = {
         name: name.trim(),
@@ -241,13 +247,14 @@ function RubricForm({ rubric, onSaved, onClose }: RubricFormProps) {
       onClose();
     } catch {
       setErrors(['Failed to save rubric. Please try again.']);
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="space-y-6 px-4 pb-4">
+    <div ref={formRef} className="space-y-6 px-4 pb-4">
       {errors.length > 0 && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
           {errors.map((e, i) => (
