@@ -43,9 +43,7 @@ def detect_rubric_format(data: dict) -> str:
     Detection heuristics (evaluated in order):
     - ``ls_eval_system_config``: has ``metrics_metadata`` key with
       ``turn_level`` or ``conversation_level`` containing ``geval:`` keys.
-    - ``geval``: has a string ``criteria`` key AND (has ``evaluation_steps``
-      OR has ``evaluation_params``) AND no ``dimensions`` key.  Also matches
-      a standalone ``criteria`` string without ``dimensions``.
+    - ``geval``: has a string ``criteria`` key AND no ``dimensions`` key.
     - ``rubric_kit``: has ``dimensions`` list where any element has ``grading_type``.
     - ``simple``: has ``dimensions`` list (without ``grading_type``).
     - ``unknown``: none of the above.
@@ -285,7 +283,7 @@ def analyze_rubric_yaml(yaml_content: str) -> dict:
                     "dimensions": dims,
                     "pass_threshold": rubric_data.get("pass_threshold", 0.7),
                 }
-        except (ValueError, Exception):
+        except ValueError:
             return {"detected_format": fmt, "metrics": []}
 
         total_criteria = sum(len(d.get("criteria", [])) for d in parsed["dimensions"])
