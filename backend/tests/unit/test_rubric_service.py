@@ -12,6 +12,7 @@ from app.services.rubric_service import (
     _extract_system_config_metrics,
     _parse_geval_format,
     _parse_system_config,
+    analyze_rubric_yaml,
     clean_yaml_block,
     convert_rubric_kit_to_internal,
     detect_rubric_format,
@@ -125,7 +126,7 @@ class TestParseRubricYaml:
 
     def test_no_dimensions_raises(self):
         yaml_content = "name: No Dims"
-        with pytest.raises(ValueError, match="No dimensions"):
+        with pytest.raises(ValueError, match="Unrecognized rubric format"):
             parse_rubric_yaml(yaml_content)
 
     def test_prompt_template_included(self):
@@ -1371,3 +1372,196 @@ class TestParseSystemConfig:
         data = {"metrics_metadata": {}}
         with pytest.raises(ValueError, match="No geval metrics"):
             _parse_system_config(data)
+
+
+class TestAnalyzeRubricYaml:
+    """Tests for the analyze_rubric_yaml service function."""
+
+    def test_analyze_simple_format(self):
+        yaml_content = textwrap.dedent("""\
+            name: "Simple Rubric"
+            description: "A simple rubric"
+            dimensions:
+              - name: accuracy
+                weight: 0.6
+                description: "Factual accuracy"
+              - name: completeness
+                weight: 0.4
+                description: "Completeness"
+            pass_threshold: 0.8
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "simple"
+        assert len(result["metrics"]) == 1
+        metric = result["metrics"][0]
+        assert metric["suggested_name"] == "Simple Rubric"
+        assert metric["suggested_description"] == "A simple rubric"
+        assert len(metric["dimensions_preview"]) == 2
+        assert metric["dimensions_preview"][0]["name"] == "accuracy"
+        assert metric["pass_threshold"] == 0.8
+
+    def test_analyze_rubric_kit_format(self):
+        yaml_content = textwrap.dedent("""\
+            name: "Kit Rubric"
+            dimensions:
+              - accuracy: "Factual accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 2
+                dimension: accuracy
+                criterion: "Is it accurate?"
+              - name: c2
+                weight: 1
+                dimension: accuracy
+                criterion: "Does it cite sources?"
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "rubric_kit"
+        assert len(result["metrics"]) == 1
+        metric = result["metrics"][0]
+        assert metric["suggested_name"] == "Kit Rubric"
+        assert len(metric["dimensions_preview"]) == 1
+        assert metric["dimensions_preview"][0]["criteria_count"] == 2
+
+    def test_analyze_geval_format(self):
+        yaml_content = textwrap.dedent("""\
+            criteria: "Evaluate the correctness of the response."
+            evaluation_steps:
+              - "Check factual accuracy"
+              - "Compare with reference"
+            threshold: 0.9
+            description: "Correctness metric"
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "geval"
+        assert len(result["metrics"]) == 1
+        metric = result["metrics"][0]
+        assert metric["suggested_name"] == "Correctness metric"
+        assert metric["pass_threshold"] == 0.9
+        assert metric["criteria_count"] == 2
+
+    def test_analyze_system_config(self):
+        yaml_content = textwrap.dedent("""\
+            metrics_metadata:
+              turn_level:
+                "geval:accuracy":
+                  criteria: "Evaluate accuracy..."
+                  evaluation_steps:
+                    - "Step 1"
+                    - "Step 2"
+                  threshold: 0.9
+                  description: "Accuracy metric"
+                "geval:coherence":
+                  criteria: "Evaluate coherence..."
+                  description: "Coherence metric"
+        """)
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "ls_eval_system_config"
+        assert len(result["metrics"]) == 2
+        names = {m["suggested_name"] for m in result["metrics"]}
+        assert "Accuracy metric" in names
+        assert "Coherence metric" in names
+        # Each metric should have a metric_id
+        ids = {m["metric_id"] for m in result["metrics"]}
+        assert "geval:accuracy" in ids
+        assert "geval:coherence" in ids
+
+    def test_analyze_invalid_yaml(self):
+        with pytest.raises(ValueError, match="Invalid YAML"):
+            analyze_rubric_yaml("::invalid yaml: [")
+
+    def test_analyze_unknown_format(self):
+        yaml_content = "name: just a name"
+        result = analyze_rubric_yaml(yaml_content)
+        assert result["detected_format"] == "unknown"
+        assert result["metrics"] == []
+
+
+class TestParseRubricYamlMultiFormat:
+    """Tests for parse_rubric_yaml with geval and system config formats."""
+
+    def test_parse_geval_format(self):
+        yaml_content = textwrap.dedent("""\
+            criteria: "Evaluate the correctness of the response."
+            evaluation_steps:
+              - "Check factual accuracy"
+              - "Compare with reference"
+            threshold: 0.9
+            description: "Correctness metric"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert result["name"] == "Correctness metric"
+        assert result["pass_threshold"] == 0.9
+        assert len(result["dimensions"]) == 1
+        assert result["dimensions"][0]["name"] == "evaluation"
+        assert len(result["dimensions"][0]["criteria"]) == 2
+
+    def test_parse_system_config_format(self):
+        yaml_content = textwrap.dedent("""\
+            metrics_metadata:
+              turn_level:
+                "geval:accuracy":
+                  criteria: "Evaluate accuracy..."
+                  evaluation_steps:
+                    - "Check facts"
+                  threshold: 0.8
+                  description: "Accuracy"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert result["name"] == "Accuracy"
+        assert result["pass_threshold"] == 0.8
+
+    def test_parse_system_config_with_metric_id(self):
+        yaml_content = textwrap.dedent("""\
+            metrics_metadata:
+              turn_level:
+                "geval:accuracy":
+                  criteria: "Evaluate accuracy..."
+                  description: "Accuracy"
+                "geval:coherence":
+                  criteria: "Evaluate coherence..."
+                  description: "Coherence"
+        """)
+        result = parse_rubric_yaml(yaml_content, metric_id="geval:coherence")
+        assert result["name"] == "Coherence"
+
+    def test_parse_unknown_format_raises(self):
+        yaml_content = "name: just a name"
+        with pytest.raises(ValueError, match="Unrecognized rubric format"):
+            parse_rubric_yaml(yaml_content)
+
+    def test_existing_simple_format_still_works(self):
+        """Backward compatibility: simple format with dimensions still parses."""
+        yaml_content = textwrap.dedent("""\
+            name: "Simple"
+            dimensions:
+              - name: quality
+                weight: 1.0
+                description: "Quality"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert result["name"] == "Simple"
+        assert len(result["dimensions"]) == 1
+
+    def test_existing_rubric_kit_format_still_works(self):
+        """Backward compatibility: rubric-kit format still parses."""
+        yaml_content = textwrap.dedent("""\
+            dimensions:
+              - accuracy: "Accuracy"
+                grading_type: score
+                scores:
+                  1: "Bad"
+                  5: "Good"
+            criteria:
+              - name: c1
+                weight: 1
+                dimension: accuracy
+                criterion: "Accurate?"
+        """)
+        result = parse_rubric_yaml(yaml_content)
+        assert len(result["dimensions"]) == 1
+        assert result["dimensions"][0]["name"] == "accuracy"

@@ -252,7 +252,7 @@ async def test_import_rubric_no_dimensions(client):
     """POST /rubrics/import returns 400 when no dimensions in YAML."""
     response = await client.post("/api/v1/rubrics/import", json={"yaml_content": "name: No Dims"})
     assert response.status_code == 400
-    assert "No dimensions" in response.json()["detail"]
+    assert "Unrecognized rubric format" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
