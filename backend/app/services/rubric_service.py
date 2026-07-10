@@ -157,7 +157,11 @@ def _convert_rubric_kit_dims_and_criteria(
     # Criteria can be a dict of dicts (keyed by criterion name) or a list
     criteria_items: list[dict] = []
     if isinstance(raw_criteria, dict):
-        criteria_items = [v for v in raw_criteria.values() if isinstance(v, dict)]
+        for key, val in raw_criteria.items():
+            if isinstance(val, dict):
+                if "name" not in val:
+                    val = {**val, "name": key}
+                criteria_items.append(val)
     elif isinstance(raw_criteria, list):
         criteria_items = [c for c in raw_criteria if isinstance(c, dict)]
 
@@ -190,7 +194,9 @@ def _convert_rubric_kit_dims_and_criteria(
         weight = float(weight)
 
         criterion_text = c.get("criterion", "")
-        if variables:
+        if criterion_text == "from_scores":
+            criterion_text = ""
+        if variables and criterion_text:
             criterion_text = _substitute_variables(criterion_text, variables)
 
         criteria_by_dim.setdefault(dim_name, []).append(
@@ -244,10 +250,15 @@ def convert_rubric_kit_to_internal(rubric: Rubric, name: str = "Generated Rubric
         w = criterion.weight if isinstance(criterion.weight, int) else 1
         w = float(w)
         dim_weights[criterion.dimension] = dim_weights.get(criterion.dimension, 0) + w
+
+        crit_text = criterion.criterion
+        if crit_text == "from_scores" or crit_text is None:
+            crit_text = ""
+
         criteria_by_dim.setdefault(criterion.dimension, []).append(
             {
                 "name": criterion.name,
-                "criterion": criterion.criterion,
+                "criterion": crit_text,
                 "weight": w,
             }
         )

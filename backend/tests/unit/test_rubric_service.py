@@ -712,9 +712,9 @@ class TestRubricCriterionValidation:
         with pytest.raises(ValidationError):
             RubricCriterion(name="", criterion="text")
 
-    def test_empty_criterion_text_rejected(self):
-        with pytest.raises(ValidationError):
-            RubricCriterion(name="c", criterion="")
+    def test_empty_criterion_text_allowed(self):
+        c = RubricCriterion(name="c", criterion="")
+        assert c.criterion == ""
 
     def test_zero_weight_rejected(self):
         with pytest.raises(ValidationError):
