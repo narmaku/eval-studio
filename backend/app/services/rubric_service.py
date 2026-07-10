@@ -165,13 +165,17 @@ def _convert_rubric_kit_dims_and_criteria(
     elif isinstance(raw_criteria, list):
         criteria_items = [c for c in raw_criteria if isinstance(c, dict)]
 
-    # Build set of known dimension names for validation
+    # Build dimension lookup: name → (scores dict, grading_type)
+    dim_info: dict[str, tuple[dict, str]] = {}
     dim_names: set[str] = set()
     for d in raw_dims:
         if not isinstance(d, dict):
             continue
         name, _ = _extract_dim_name_and_desc(d)
         dim_names.add(name)
+        raw_scores = d.get("scores", {})
+        scores = {int(k): str(v) for k, v in raw_scores.items()} if isinstance(raw_scores, dict) else {}
+        dim_info[name] = (scores, d.get("grading_type", ""))
 
     # Group criteria by dimension, applying variable substitution
     criteria_by_dim: dict[str, list[dict]] = {}
@@ -188,13 +192,19 @@ def _convert_rubric_kit_dims_and_criteria(
             )
             continue
 
+        scores, _grading_type = dim_info.get(dim_name, ({}, ""))
+
         weight = c.get("weight", 1)
-        if isinstance(weight, str):
+        if weight == "from_scores":
+            weight = max(scores.keys()) if scores else 1
+        elif isinstance(weight, str):
             weight = 1
         weight = float(weight)
 
         criterion_text = c.get("criterion", "")
-        if criterion_text == "from_scores":
+        if criterion_text == "from_scores" and scores:
+            criterion_text = "\n".join(f"{k}: {v}" for k, v in sorted(scores.items()))
+        elif criterion_text == "from_scores":
             criterion_text = ""
         if variables and criterion_text:
             criterion_text = _substitute_variables(criterion_text, variables)
@@ -246,13 +256,27 @@ def convert_rubric_kit_to_internal(rubric: Rubric, name: str = "Generated Rubric
     criteria_by_dim: dict[str, list[dict]] = {}
     dim_weights: dict[str, float] = {}
 
+    # Build dimension scores lookup for resolving from_scores
+    dim_scores: dict[str, dict[int, str]] = {}
+    for dim in rubric.dimensions:
+        if dim.scores:
+            dim_scores[dim.name] = {int(k): str(v) for k, v in dim.scores.items()}
+
     for criterion in rubric.criteria:
-        w = criterion.weight if isinstance(criterion.weight, int) else 1
-        w = float(w)
+        scores = dim_scores.get(criterion.dimension, {})
+
+        if criterion.weight == "from_scores":
+            w = float(max(scores.keys())) if scores else 1.0
+        elif isinstance(criterion.weight, int):
+            w = float(criterion.weight)
+        else:
+            w = 1.0
         dim_weights[criterion.dimension] = dim_weights.get(criterion.dimension, 0) + w
 
         crit_text = criterion.criterion
-        if crit_text == "from_scores" or crit_text is None:
+        if (crit_text == "from_scores" or crit_text is None) and scores:
+            crit_text = "\n".join(f"{k}: {v}" for k, v in sorted(scores.items()))
+        elif crit_text == "from_scores" or crit_text is None:
             crit_text = ""
 
         criteria_by_dim.setdefault(criterion.dimension, []).append(
