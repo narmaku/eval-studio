@@ -77,6 +77,13 @@ class RubricImportRequest(BaseModel):
     metric_id: str | None = None
 
 
+class CriterionPreview(BaseModel):
+    """Preview of a single criterion within a dimension."""
+
+    name: str
+    criterion: str
+
+
 class DimensionPreview(BaseModel):
     """Preview of a rubric dimension for the analyze response."""
 
@@ -84,6 +91,7 @@ class DimensionPreview(BaseModel):
     description: str
     weight: float
     criteria_count: int
+    criteria: list[CriterionPreview] = []
 
 
 class DetectedMetric(BaseModel):

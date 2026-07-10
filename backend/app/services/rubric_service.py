@@ -195,12 +195,19 @@ def _build_dimension_previews(dimensions: list[dict]) -> list[dict]:
     """
     previews = []
     for dim in dimensions:
+        raw_criteria = dim.get("criteria", [])
+        criteria_preview = [
+            {"name": c.get("name", ""), "criterion": c.get("criterion", "")}
+            for c in raw_criteria
+            if isinstance(c, dict)
+        ]
         previews.append(
             {
                 "name": dim.get("name", "unnamed"),
                 "description": dim.get("description", ""),
                 "weight": dim.get("weight", 1.0),
-                "criteria_count": len(dim.get("criteria", [])),
+                "criteria_count": len(raw_criteria),
+                "criteria": criteria_preview,
             }
         )
     return previews

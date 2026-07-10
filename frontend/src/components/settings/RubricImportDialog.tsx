@@ -287,19 +287,26 @@ export function RubricImportDialog({ open, onOpenChange, onImported }: RubricImp
                   Dimensions ({selectedMetric.dimensions_preview.length}) &middot;{' '}
                   {selectedMetric.criteria_count} criteria total
                 </Label>
-                <div className="space-y-1">
+                <div className="space-y-2 max-h-[40vh] overflow-y-auto">
                   {selectedMetric.dimensions_preview.map((dim) => (
-                    <div
-                      key={dim.name}
-                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                    >
-                      <span className="font-medium truncate">{dim.name}</span>
-                      <Badge variant="secondary" className="shrink-0 text-xs">
-                        {dim.criteria_count} criteria
-                      </Badge>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {dim.description}
-                      </span>
+                    <div key={dim.name} className="rounded-md border px-3 py-2 text-sm space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{dim.name}</span>
+                        <Badge variant="secondary" className="shrink-0 text-xs">
+                          {dim.criteria_count} criteria
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{dim.description}</p>
+                      {dim.criteria?.length > 0 && (
+                        <ul className="text-xs text-muted-foreground space-y-0.5 pl-3 border-l-2 border-muted">
+                          {dim.criteria.map((c) => (
+                            <li key={c.name}>
+                              <span className="font-medium text-foreground/70">{c.name}:</span>{' '}
+                              {c.criterion}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   ))}
                 </div>

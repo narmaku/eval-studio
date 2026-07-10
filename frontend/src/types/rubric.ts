@@ -25,11 +25,17 @@ export interface CreateRubricRequest {
 
 export type UpdateRubricRequest = Partial<CreateRubricRequest>;
 
+export interface CriterionPreview {
+  name: string;
+  criterion: string;
+}
+
 export interface DimensionPreview {
   name: string;
   description: string;
   weight: number;
   criteria_count: number;
+  criteria: CriterionPreview[];
 }
 
 export interface DetectedMetric {
