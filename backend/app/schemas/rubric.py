@@ -71,6 +71,43 @@ class RubricImportRequest(BaseModel):
     """Schema for importing a rubric from YAML content."""
 
     yaml_content: str = Field(min_length=1)
+    name: str | None = None
+    description: str | None = None
+    tags: list[str] = []
+    metric_id: str | None = None
+
+
+class DimensionPreview(BaseModel):
+    """Preview of a rubric dimension for the analyze response."""
+
+    name: str
+    description: str
+    weight: float
+    criteria_count: int
+
+
+class DetectedMetric(BaseModel):
+    """A detected metric/rubric from analyzed YAML content."""
+
+    metric_id: str | None = None
+    suggested_name: str
+    suggested_description: str | None = None
+    dimensions_preview: list[DimensionPreview]
+    criteria_count: int
+    pass_threshold: float | None = None
+
+
+class RubricAnalyzeRequest(BaseModel):
+    """Schema for analyzing rubric YAML content without importing."""
+
+    yaml_content: str = Field(min_length=1)
+
+
+class RubricAnalyzeResponse(BaseModel):
+    """Response from analyzing rubric YAML content."""
+
+    detected_format: str  # "rubric_kit", "geval", "ls_eval_system_config", "simple", "unknown"
+    metrics: list[DetectedMetric]
 
 
 class RubricGenerateRequest(BaseModel):
