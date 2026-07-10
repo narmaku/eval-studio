@@ -944,8 +944,8 @@ class TestConvertRubricKitEdgeCases:
         assert len(d1["criteria"]) == 1
         assert "criteria" not in d2
 
-    def test_criterion_with_from_scores_weight_defaults_to_one(self):
-        """rubric-kit Criterion with weight='from_scores' uses fallback of 1."""
+    def test_criterion_with_from_scores_weight_resolves_to_max_score(self):
+        """rubric-kit Criterion with weight='from_scores' resolves to max score value."""
         from rubric_kit import Criterion, Dimension, Rubric
 
         rubric = Rubric(
@@ -958,8 +958,7 @@ class TestConvertRubricKitEdgeCases:
         )
         result = convert_rubric_kit_to_internal(rubric)
         d1 = next(d for d in result["dimensions"] if d["name"] == "d1")
-        # weight="from_scores" is not an int, so code defaults to 1
-        assert d1["criteria"][0]["weight"] == 1.0
+        assert d1["criteria"][0]["weight"] == 5.0
 
     def test_custom_name_used(self):
         from rubric_kit import Criterion, Dimension, Rubric
