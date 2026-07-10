@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "eval-studio"
-    app_version: str = "0.1.0"
+    app_version: str = "0.1.1"
     debug: bool = False
     log_level: str = "INFO"
 
