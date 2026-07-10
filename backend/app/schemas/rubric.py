@@ -114,7 +114,7 @@ class RubricAnalyzeRequest(BaseModel):
 class RubricAnalyzeResponse(BaseModel):
     """Response from analyzing rubric YAML content."""
 
-    detected_format: str  # "rubric_kit", "geval", "ls_eval_system_config", "simple", "unknown"
+    detected_format: str  # "rubric_kit", "ls_eval_metric", "ls_eval_system_config", "simple", "unknown"
     metrics: list[DetectedMetric]
 
 

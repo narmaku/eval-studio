@@ -192,7 +192,7 @@ describe('RubricImportDialog', () => {
 
   it('shows detected format badge on step 2', async () => {
     const user = userEvent.setup();
-    const analysis = makeSingleMetricAnalysis({ detected_format: 'geval' });
+    const analysis = makeSingleMetricAnalysis({ detected_format: 'ls_eval_metric' });
 
     mockAnalyzeRubric.mockImplementation(async () => {
       mockAnalyzeResult = analysis;
@@ -205,7 +205,7 @@ describe('RubricImportDialog', () => {
     rerender(<RubricImportDialog open={true} onOpenChange={vi.fn()} />);
 
     const badge = screen.getByTestId('format-badge');
-    expect(badge).toHaveTextContent('geval');
+    expect(badge).toHaveTextContent('ls-eval metric');
   });
 
   it('pre-fills name from analyze response', async () => {

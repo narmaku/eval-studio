@@ -28,7 +28,7 @@ const STEP_LABELS = ['Import Rubric', 'Preview & Confirm'] as const;
 
 const FORMAT_LABELS: Record<string, string> = {
   rubric_kit: 'rubric-kit',
-  geval: 'geval',
+  ls_eval_metric: 'ls-eval metric',
   ls_eval_system_config: 'ls-eval system config',
   simple: 'simple',
   unknown: 'unknown',

@@ -13,7 +13,7 @@ from app.services.rubric_service import (
     _build_dimension_previews,
     _extract_system_config_metrics,
     _normalize_simple_dimensions,
-    _parse_geval_format,
+    _parse_ls_eval_metric_format,
     _parse_system_config,
     _to_rubric_kit_format,
     analyze_rubric_yaml,
@@ -1119,35 +1119,35 @@ class TestDetectRubricFormat:
         }
         assert detect_rubric_format(data) == "ls_eval_system_config"
 
-    def test_detect_geval_with_steps(self):
+    def test_detect_ls_eval_metric_with_steps(self):
         data = {
             "criteria": "Evaluate correctness of the answer.",
             "evaluation_steps": ["Check factual accuracy", "Compare with reference"],
             "threshold": 0.9,
         }
-        assert detect_rubric_format(data) == "geval"
+        assert detect_rubric_format(data) == "ls_eval_metric"
 
-    def test_detect_geval_with_params(self):
+    def test_detect_ls_eval_metric_with_params(self):
         data = {
             "criteria": "Evaluate the answer.",
             "evaluation_params": {"model": "gpt-4"},
         }
-        assert detect_rubric_format(data) == "geval"
+        assert detect_rubric_format(data) == "ls_eval_metric"
 
-    def test_detect_geval_criteria_only(self):
-        """Standalone geval with criteria string but no dimensions."""
+    def test_detect_ls_eval_metric_criteria_only(self):
+        """Standalone ls-eval metric with criteria string but no dimensions."""
         data = {
             "criteria": "Evaluate the response quality.",
         }
-        assert detect_rubric_format(data) == "geval"
+        assert detect_rubric_format(data) == "ls_eval_metric"
 
-    def test_geval_not_detected_when_dimensions_present(self):
-        """When dimensions key is present, geval is not detected even if criteria string exists."""
+    def test_ls_eval_metric_not_detected_when_dimensions_present(self):
+        """When dimensions key is present, ls_eval_metric is not detected even if criteria string exists."""
         data = {
             "criteria": "Evaluate...",
             "dimensions": [{"name": "d1", "description": "dim1"}],
         }
-        # criteria is a string but dimensions exist: NOT geval, falls to simple
+        # criteria is a string but dimensions exist: NOT ls_eval_metric, falls to simple
         assert detect_rubric_format(data) == "simple"
 
     def test_detect_rubric_kit_format(self):
@@ -1174,19 +1174,19 @@ class TestDetectRubricFormat:
     def test_detect_empty_dict(self):
         assert detect_rubric_format({}) == "unknown"
 
-    def test_geval_criteria_must_be_string(self):
-        """If criteria is a list (rubric-kit style), it's not detected as geval."""
+    def test_ls_eval_metric_criteria_must_be_string(self):
+        """If criteria is a list (rubric-kit style), it's not detected as ls_eval_metric."""
         data = {
             "criteria": [{"name": "c1", "criterion": "text"}],
             "evaluation_steps": ["Step 1"],
         }
-        assert detect_rubric_format(data) != "geval"
+        assert detect_rubric_format(data) != "ls_eval_metric"
 
 
 class TestParseGevalFormat:
-    """Tests for _parse_geval_format conversion."""
+    """Tests for _parse_ls_eval_metric_format conversion."""
 
-    def test_geval_with_evaluation_steps(self):
+    def test_metric_with_evaluation_steps(self):
         data = {
             "criteria": "Evaluate correctness of the response.",
             "evaluation_steps": [
@@ -1196,7 +1196,7 @@ class TestParseGevalFormat:
             "threshold": 0.9,
             "description": "Answer correctness metric",
         }
-        result = _parse_geval_format(data)
+        result = _parse_ls_eval_metric_format(data)
         assert result["name"] == "Answer correctness metric"
         assert result["description"] == "Answer correctness metric"
         assert result["pass_threshold"] == 0.9
@@ -1213,37 +1213,37 @@ class TestParseGevalFormat:
         assert dim["criteria"][1]["name"] == "step_2"
         assert dim["criteria"][1]["criterion"] == "Compare with reference answer"
 
-    def test_geval_criteria_only_no_steps(self):
+    def test_metric_criteria_only_no_steps(self):
         """When no evaluation_steps, creates a single criterion from criteria text."""
         data = {
             "criteria": "Evaluate the quality of the response.",
         }
-        result = _parse_geval_format(data)
+        result = _parse_ls_eval_metric_format(data)
         assert len(result["dimensions"]) == 1
         dim = result["dimensions"][0]
         assert len(dim["criteria"]) == 1
         assert dim["criteria"][0]["name"] == "step_1"
         assert dim["criteria"][0]["criterion"] == "Evaluate the quality of the response."
 
-    def test_geval_with_custom_name(self):
+    def test_metric_with_custom_name(self):
         data = {
             "criteria": "Evaluate...",
             "description": "Original name",
         }
-        result = _parse_geval_format(data, name="Custom Name")
+        result = _parse_ls_eval_metric_format(data, name="Custom Name")
         assert result["name"] == "Custom Name"
 
-    def test_geval_defaults(self):
+    def test_metric_defaults(self):
         data = {"criteria": "Evaluate..."}
-        result = _parse_geval_format(data)
+        result = _parse_ls_eval_metric_format(data)
         assert result["name"] == "Imported Rubric"
         assert result["pass_threshold"] == 0.7
         assert result["aggregation"] == "weighted_average"
         assert result["prompt_template"] is None
 
-    def test_geval_name_from_description(self):
+    def test_metric_name_from_description(self):
         data = {"criteria": "Evaluate...", "description": "My Metric"}
-        result = _parse_geval_format(data)
+        result = _parse_ls_eval_metric_format(data)
         assert result["name"] == "My Metric"
         assert result["description"] == "My Metric"
 
@@ -1303,7 +1303,7 @@ class TestExtractSystemConfigMetrics:
         metrics = _extract_system_config_metrics(data)
         assert len(metrics) == 2
 
-    def test_skips_non_geval_metrics(self):
+    def test_skips_non_ls_eval_metrics(self):
         data = {
             "metrics_metadata": {
                 "turn_level": {
@@ -1374,7 +1374,7 @@ class TestParseSystemConfig:
 
     def test_parse_no_metrics_raises(self):
         data = {"metrics_metadata": {}}
-        with pytest.raises(ValueError, match="No geval metrics"):
+        with pytest.raises(ValueError, match="No ls-eval metrics"):
             _parse_system_config(data)
 
 
@@ -1431,7 +1431,7 @@ class TestAnalyzeRubricYaml:
         assert len(metric["dimensions_preview"]) == 1
         assert metric["dimensions_preview"][0]["criteria_count"] == 2
 
-    def test_analyze_geval_format(self):
+    def test_analyze_ls_eval_metric_format(self):
         yaml_content = textwrap.dedent("""\
             criteria: "Evaluate the correctness of the response."
             evaluation_steps:
@@ -1441,7 +1441,7 @@ class TestAnalyzeRubricYaml:
             description: "Correctness metric"
         """)
         result = analyze_rubric_yaml(yaml_content)
-        assert result["detected_format"] == "geval"
+        assert result["detected_format"] == "ls_eval_metric"
         assert len(result["metrics"]) == 1
         metric = result["metrics"][0]
         assert metric["suggested_name"] == "Correctness metric"
@@ -1486,9 +1486,9 @@ class TestAnalyzeRubricYaml:
 
 
 class TestParseRubricYamlMultiFormat:
-    """Tests for parse_rubric_yaml with geval and system config formats."""
+    """Tests for parse_rubric_yaml with ls-eval metric and system config formats."""
 
-    def test_parse_geval_format(self):
+    def test_parse_ls_eval_metric_format(self):
         yaml_content = textwrap.dedent("""\
             criteria: "Evaluate the correctness of the response."
             evaluation_steps:
@@ -1580,7 +1580,7 @@ class TestExtractSystemConfigMetricsEdgeCases:
         assert _extract_system_config_metrics(data) == []
 
     def test_non_dict_metric_data_skipped(self):
-        """When a geval metric value is not a dict, it is skipped."""
+        """When a metric value is not a dict, it is skipped."""
         data = {
             "metrics_metadata": {
                 "turn_level": {
