@@ -137,7 +137,8 @@ describe('ArtifactsList', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('{"key": "value"}')).toBeInTheDocument();
+      expect(screen.getByText('"key"')).toBeInTheDocument();
+      expect(screen.getByText('"value"')).toBeInTheDocument();
     });
   });
 
