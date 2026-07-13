@@ -106,6 +106,20 @@ describe('RunDetailsPanel', () => {
     // title (1) + description (1) + 2 metadata entries with keys = 4
     expect(screen.getByText('4 set')).toBeInTheDocument();
   });
+
+  it('hides description and metadata when props are omitted', () => {
+    render(<RunDetailsPanel title="Title Only" onTitleChange={vi.fn()} />);
+    fireEvent.click(screen.getByText('Run Details'));
+    expect(screen.getByLabelText('Title')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Description')).not.toBeInTheDocument();
+    expect(screen.queryByText('Metadata')).not.toBeInTheDocument();
+    expect(screen.queryByText('Add')).not.toBeInTheDocument();
+  });
+
+  it('counts only title for active badge when description/metadata omitted', () => {
+    render(<RunDetailsPanel title="My Title" onTitleChange={vi.fn()} />);
+    expect(screen.getByText('1 set')).toBeInTheDocument();
+  });
 });
 
 describe('metadataEntriesToRecord', () => {

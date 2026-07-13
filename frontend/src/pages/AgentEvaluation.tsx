@@ -85,8 +85,6 @@ export default function AgentEvaluation() {
   const [selectedHarnessType, setSelectedHarnessType] = useState<string>('builtin');
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
   const [runTitle, setRunTitle] = useState('');
-  const [runDescription, setRunDescription] = useState('');
-  const [runMetadata, setRunMetadata] = useState<{ key: string; value: string }[]>([]);
 
   const { isLoading: evalLoading, setLoading: setEvalLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
@@ -282,8 +280,6 @@ export default function AgentEvaluation() {
     setSelectedHarnessType('builtin');
     setSelectedToolId(null);
     setRunTitle('');
-    setRunDescription('');
-    setRunMetadata([]);
     useEvaluatorStore.getState().resetSelection();
   }, [resetSession]);
 
@@ -386,14 +382,7 @@ export default function AgentEvaluation() {
               <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
             </div>
           </div>
-          <RunDetailsPanel
-            title={runTitle}
-            onTitleChange={setRunTitle}
-            description={runDescription}
-            onDescriptionChange={setRunDescription}
-            metadata={runMetadata}
-            onMetadataChange={setRunMetadata}
-          />
+          <RunDetailsPanel title={runTitle} onTitleChange={setRunTitle} />
           <button
             className="flex w-full items-center justify-center gap-2 rounded-[9px] bg-primary px-4 py-3 text-[13px] font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
             disabled={!isConfigValid || evalLoading}

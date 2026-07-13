@@ -14,10 +14,12 @@ const MAX_VALUE_LENGTH = 200;
 interface RunDetailsPanelProps {
   title: string;
   onTitleChange: (title: string) => void;
-  description: string;
-  onDescriptionChange: (description: string) => void;
-  metadata: MetadataEntry[];
-  onMetadataChange: (entries: MetadataEntry[]) => void;
+  /** When omitted, the description field is hidden. */
+  description?: string;
+  onDescriptionChange?: (description: string) => void;
+  /** When omitted, the metadata section is hidden. */
+  metadata?: MetadataEntry[];
+  onMetadataChange?: (entries: MetadataEntry[]) => void;
 }
 
 export function RunDetailsPanel({
@@ -30,18 +32,23 @@ export function RunDetailsPanel({
 }: RunDetailsPanelProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
 
+  const showDescription = description !== undefined && onDescriptionChange !== undefined;
+  const showMetadata = metadata !== undefined && onMetadataChange !== undefined;
+
   const activeCount =
     (title.trim() ? 1 : 0) +
-    (description.trim() ? 1 : 0) +
-    metadata.filter((e) => e.key.trim()).length;
+    (showDescription && description.trim() ? 1 : 0) +
+    (showMetadata ? metadata.filter((e) => e.key.trim()).length : 0);
 
   const handleAddEntry = useCallback(() => {
+    if (!metadata || !onMetadataChange) return;
     if (metadata.length >= MAX_METADATA_ENTRIES) return;
     onMetadataChange([...metadata, { key: '', value: '' }]);
   }, [metadata, onMetadataChange]);
 
   const handleRemoveEntry = useCallback(
     (index: number) => {
+      if (!metadata || !onMetadataChange) return;
       onMetadataChange(metadata.filter((_, i) => i !== index));
     },
     [metadata, onMetadataChange],
@@ -49,6 +56,7 @@ export function RunDetailsPanel({
 
   const handleEntryChange = useCallback(
     (index: number, field: 'key' | 'value', raw: string) => {
+      if (!metadata || !onMetadataChange) return;
       const maxLen = field === 'key' ? MAX_KEY_LENGTH : MAX_VALUE_LENGTH;
       const value = raw.slice(0, maxLen);
       const updated = metadata.map((entry, i) =>
@@ -90,69 +98,73 @@ export function RunDetailsPanel({
             />
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="run-description" className="text-xs">
-              Description
-            </Label>
-            <Textarea
-              id="run-description"
-              value={description}
-              onChange={(e) => onDescriptionChange(e.target.value)}
-              placeholder="Optional description for this evaluation run..."
-              rows={2}
-              className="text-sm"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Metadata</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={handleAddEntry}
-                disabled={metadata.length >= MAX_METADATA_ENTRIES}
-              >
-                <Plus className="mr-1 h-3 w-3" />
-                Add
-              </Button>
+          {showDescription && (
+            <div className="space-y-1">
+              <Label htmlFor="run-description" className="text-xs">
+                Description
+              </Label>
+              <Textarea
+                id="run-description"
+                value={description}
+                onChange={(e) => onDescriptionChange(e.target.value)}
+                placeholder="Optional description for this evaluation run..."
+                rows={2}
+                className="text-sm"
+              />
             </div>
+          )}
 
-            {metadata.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                No metadata entries. Click Add to include key-value pairs.
-              </p>
-            )}
-
-            {metadata.map((entry, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Input
-                  value={entry.key}
-                  onChange={(e) => handleEntryChange(index, 'key', e.target.value)}
-                  placeholder="Key"
-                  className="h-7 text-xs flex-1"
-                  aria-label={`Metadata key ${index + 1}`}
-                />
-                <Input
-                  value={entry.value}
-                  onChange={(e) => handleEntryChange(index, 'value', e.target.value)}
-                  placeholder="Value"
-                  className="h-7 text-xs flex-[2]"
-                  aria-label={`Metadata value ${index + 1}`}
-                />
-                <button
+          {showMetadata && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Metadata</Label>
+                <Button
                   type="button"
-                  onClick={() => handleRemoveEntry(index)}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label={`Remove metadata entry ${index + 1}`}
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={handleAddEntry}
+                  disabled={metadata.length >= MAX_METADATA_ENTRIES}
                 >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add
+                </Button>
               </div>
-            ))}
-          </div>
+
+              {metadata.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No metadata entries. Click Add to include key-value pairs.
+                </p>
+              )}
+
+              {metadata.map((entry, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    value={entry.key}
+                    onChange={(e) => handleEntryChange(index, 'key', e.target.value)}
+                    placeholder="Key"
+                    className="h-7 text-xs flex-1"
+                    aria-label={`Metadata key ${index + 1}`}
+                  />
+                  <Input
+                    value={entry.value}
+                    onChange={(e) => handleEntryChange(index, 'value', e.target.value)}
+                    placeholder="Value"
+                    className="h-7 text-xs flex-[2]"
+                    aria-label={`Metadata value ${index + 1}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveEntry(index)}
+                    className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label={`Remove metadata entry ${index + 1}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </CollapsibleContent>
     </Collapsible>
