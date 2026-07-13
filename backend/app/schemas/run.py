@@ -12,10 +12,12 @@ class RunRequest(BaseModel):
     """Request body for creating and running an evaluation in one call."""
 
     name: str = Field(description="Human-readable evaluation name.")
+    description: str | None = Field(default=None, description="Optional description of the evaluation.")
     mode: EvaluationMode = Field(description="Evaluation mode: qa, rag, agent, or arena.")
     dataset_id: str = Field(description="ID of the dataset to evaluate against.")
     rubric_id: str | None = Field(default=None, description="ID of the rubric to use for dimension-based scoring.")
     config: dict[str, Any] = Field(default={}, description="Mode-specific configuration (e.g., contestants for arena).")
+    metadata: dict[str, str] | None = Field(default=None, description="User-defined key-value metadata.")
     pass_threshold: float = Field(
         default=0.7, ge=0, le=1, description="Score threshold for pass/fail verdict (0.0--1.0)."
     )
