@@ -1,15 +1,11 @@
-import { useState, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { MetadataEditor } from '@/components/ui/MetadataEditor';
 import type { MetadataEntry } from './runDetailsUtils';
-
-const MAX_METADATA_ENTRIES = 20;
-const MAX_KEY_LENGTH = 50;
-const MAX_VALUE_LENGTH = 200;
 
 interface RunDetailsPanelProps {
   title: string;
@@ -39,33 +35,6 @@ export function RunDetailsPanel({
     (title.trim() ? 1 : 0) +
     (showDescription && description.trim() ? 1 : 0) +
     (showMetadata ? metadata.filter((e) => e.key.trim()).length : 0);
-
-  const handleAddEntry = useCallback(() => {
-    if (!metadata || !onMetadataChange) return;
-    if (metadata.length >= MAX_METADATA_ENTRIES) return;
-    onMetadataChange([...metadata, { key: '', value: '' }]);
-  }, [metadata, onMetadataChange]);
-
-  const handleRemoveEntry = useCallback(
-    (index: number) => {
-      if (!metadata || !onMetadataChange) return;
-      onMetadataChange(metadata.filter((_, i) => i !== index));
-    },
-    [metadata, onMetadataChange],
-  );
-
-  const handleEntryChange = useCallback(
-    (index: number, field: 'key' | 'value', raw: string) => {
-      if (!metadata || !onMetadataChange) return;
-      const maxLen = field === 'key' ? MAX_KEY_LENGTH : MAX_VALUE_LENGTH;
-      const value = raw.slice(0, maxLen);
-      const updated = metadata.map((entry, i) =>
-        i === index ? { ...entry, [field]: value } : entry,
-      );
-      onMetadataChange(updated);
-    },
-    [metadata, onMetadataChange],
-  );
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -114,57 +83,7 @@ export function RunDetailsPanel({
             </div>
           )}
 
-          {showMetadata && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Metadata</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={handleAddEntry}
-                  disabled={metadata.length >= MAX_METADATA_ENTRIES}
-                >
-                  <Plus className="mr-1 h-3 w-3" />
-                  Add
-                </Button>
-              </div>
-
-              {metadata.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  No metadata entries. Click Add to include key-value pairs.
-                </p>
-              )}
-
-              {metadata.map((entry, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    value={entry.key}
-                    onChange={(e) => handleEntryChange(index, 'key', e.target.value)}
-                    placeholder="Key"
-                    className="h-7 text-xs flex-1"
-                    aria-label={`Metadata key ${index + 1}`}
-                  />
-                  <Input
-                    value={entry.value}
-                    onChange={(e) => handleEntryChange(index, 'value', e.target.value)}
-                    placeholder="Value"
-                    className="h-7 text-xs flex-[2]"
-                    aria-label={`Metadata value ${index + 1}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveEntry(index)}
-                    className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label={`Remove metadata entry ${index + 1}`}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          {showMetadata && <MetadataEditor entries={metadata} onChange={onMetadataChange} />}
         </div>
       </CollapsibleContent>
     </Collapsible>

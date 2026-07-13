@@ -59,18 +59,15 @@ async def _create_validated_evaluation(payload: EvaluationCreate | RunRequest, d
         if not contestants or len(contestants) < 2:
             raise ValidationException("Arena evaluations require at least 2 contestants in config.contestants.")
 
-    description = getattr(payload, "description", None)
-    user_metadata = getattr(payload, "metadata", None)
-
     evaluation = Evaluation(
         name=payload.name,
-        description=description,
+        description=payload.description,
         mode=payload.mode.value,
         status=EvaluationStatus.PENDING,
         dataset_id=payload.dataset_id,
         rubric_id=rubric_id,
         config=payload.config,
-        user_metadata=user_metadata,
+        user_metadata=payload.metadata,
     )
     db.add(evaluation)
     await db.commit()

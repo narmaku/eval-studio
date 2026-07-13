@@ -25,7 +25,7 @@ export function recordToMetadataEntries(
 }
 
 /**
- * Build auto-populated metadata from the current config state.
+ * Build auto-populated metadata from the current QA config state.
  */
 export function buildAutoMetadata(config: {
   providerName?: string;
@@ -36,6 +36,46 @@ export function buildAutoMetadata(config: {
   const entries: MetadataEntry[] = [];
   if (config.providerName) entries.push({ key: 'provider', value: config.providerName });
   if (config.modelName) entries.push({ key: 'model', value: config.modelName });
+  if (config.temperature !== undefined)
+    entries.push({ key: 'temperature', value: String(config.temperature) });
+  if (config.topP !== undefined) entries.push({ key: 'top_p', value: String(config.topP) });
+  return entries;
+}
+
+/**
+ * Build auto-populated metadata from the current RAG endpoint config.
+ */
+export function buildRAGAutoMetadata(config: {
+  backendType?: string;
+  endpointUrl?: string;
+  tableName?: string;
+  embeddingModel?: string;
+  generatorProviderId?: string;
+}): MetadataEntry[] {
+  const entries: MetadataEntry[] = [];
+  if (config.backendType) entries.push({ key: 'backend_type', value: config.backendType });
+  if (config.endpointUrl) entries.push({ key: 'endpoint_url', value: config.endpointUrl });
+  if (config.tableName) entries.push({ key: 'table_name', value: config.tableName });
+  if (config.embeddingModel) entries.push({ key: 'embedding_model', value: config.embeddingModel });
+  if (config.generatorProviderId)
+    entries.push({ key: 'generator_provider', value: config.generatorProviderId });
+  return entries;
+}
+
+/**
+ * Build auto-populated metadata from the current Arena config.
+ */
+export function buildArenaAutoMetadata(config: {
+  contestantCount?: number;
+  contestantModels?: string[];
+  temperature?: number;
+  topP?: number;
+}): MetadataEntry[] {
+  const entries: MetadataEntry[] = [];
+  if (config.contestantCount !== undefined)
+    entries.push({ key: 'contestant_count', value: String(config.contestantCount) });
+  if (config.contestantModels && config.contestantModels.length > 0)
+    entries.push({ key: 'contestant_models', value: config.contestantModels.join(', ') });
   if (config.temperature !== undefined)
     entries.push({ key: 'temperature', value: String(config.temperature) });
   if (config.topP !== undefined) entries.push({ key: 'top_p', value: String(config.topP) });

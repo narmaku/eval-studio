@@ -10,7 +10,10 @@ import { ArenaLeaderboard } from '@/components/evaluation/ArenaLeaderboard';
 import { ArenaResultsGrid } from '@/components/evaluation/ArenaResultsGrid';
 import { ContestantScoreChart, RadarComparisonChart } from '@/components/results';
 import { RunDetailsPanel } from '@/components/evaluation/RunDetailsPanel';
-import { metadataEntriesToRecord } from '@/components/evaluation/runDetailsUtils';
+import {
+  metadataEntriesToRecord,
+  buildArenaAutoMetadata,
+} from '@/components/evaluation/runDetailsUtils';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationRun } from '@/hooks/useEvaluationRun';
@@ -37,6 +40,24 @@ export default function ArenaComparison() {
 
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results } = useResultStore();
+
+  const handleContestantsChange = useCallback(
+    (newContestants: ModelEndpoint[]) => {
+      setContestants(newContestants);
+      const valid = newContestants.filter((c) => c.name && (c.default_model || c.single_model));
+      if (valid.length > 0) {
+        setRunMetadata(
+          buildArenaAutoMetadata({
+            contestantCount: valid.length,
+            contestantModels: valid.map((c) => c.default_model),
+            temperature: modelParams.temperature,
+            topP: modelParams.top_p,
+          }),
+        );
+      }
+    },
+    [modelParams.temperature, modelParams.top_p],
+  );
 
   const onCompleted = useCallback((evaluationId: string) => {
     void api
@@ -132,7 +153,7 @@ export default function ArenaComparison() {
                 </h2>
                 <DatasetSelector value={selectedDatasetId} onChange={setSelectedDatasetId} />
               </div>
-              <ContestantSelector value={contestants} onChange={setContestants} />
+              <ContestantSelector value={contestants} onChange={handleContestantsChange} />
             </div>
             <div className="space-y-4">
               <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />

@@ -5,6 +5,8 @@ import {
   metadataEntriesToRecord,
   recordToMetadataEntries,
   buildAutoMetadata,
+  buildRAGAutoMetadata,
+  buildArenaAutoMetadata,
 } from './runDetailsUtils';
 
 describe('RunDetailsPanel', () => {
@@ -179,5 +181,73 @@ describe('buildAutoMetadata', () => {
 
   it('returns empty array for no params', () => {
     expect(buildAutoMetadata({})).toEqual([]);
+  });
+});
+
+describe('buildRAGAutoMetadata', () => {
+  it('builds entries from RAG config params', () => {
+    const result = buildRAGAutoMetadata({
+      backendType: 'http',
+      endpointUrl: 'https://rag.example.com/query',
+      embeddingModel: 'bge-large',
+      generatorProviderId: 'openai',
+    });
+    expect(result).toEqual([
+      { key: 'backend_type', value: 'http' },
+      { key: 'endpoint_url', value: 'https://rag.example.com/query' },
+      { key: 'embedding_model', value: 'bge-large' },
+      { key: 'generator_provider', value: 'openai' },
+    ]);
+  });
+
+  it('includes table_name for pgvector backend', () => {
+    const result = buildRAGAutoMetadata({
+      backendType: 'pgvector',
+      tableName: 'embeddings',
+    });
+    expect(result).toEqual([
+      { key: 'backend_type', value: 'pgvector' },
+      { key: 'table_name', value: 'embeddings' },
+    ]);
+  });
+
+  it('skips undefined params', () => {
+    const result = buildRAGAutoMetadata({ backendType: 'http' });
+    expect(result).toEqual([{ key: 'backend_type', value: 'http' }]);
+  });
+
+  it('returns empty array for no params', () => {
+    expect(buildRAGAutoMetadata({})).toEqual([]);
+  });
+});
+
+describe('buildArenaAutoMetadata', () => {
+  it('builds entries from arena config', () => {
+    const result = buildArenaAutoMetadata({
+      contestantCount: 3,
+      contestantModels: ['gpt-4o', 'claude-3.5-sonnet', 'gemini-pro'],
+      temperature: 0.5,
+      topP: 0.95,
+    });
+    expect(result).toEqual([
+      { key: 'contestant_count', value: '3' },
+      { key: 'contestant_models', value: 'gpt-4o, claude-3.5-sonnet, gemini-pro' },
+      { key: 'temperature', value: '0.5' },
+      { key: 'top_p', value: '0.95' },
+    ]);
+  });
+
+  it('skips undefined params', () => {
+    const result = buildArenaAutoMetadata({ contestantCount: 2 });
+    expect(result).toEqual([{ key: 'contestant_count', value: '2' }]);
+  });
+
+  it('skips empty contestant models array', () => {
+    const result = buildArenaAutoMetadata({ contestantModels: [] });
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array for no params', () => {
+    expect(buildArenaAutoMetadata({})).toEqual([]);
   });
 });

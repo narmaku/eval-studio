@@ -11,7 +11,10 @@ import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { RAGResultsTable } from '@/components/evaluation/RAGResultsTable';
 import { RAGResultDetailDrawer } from '@/components/evaluation/RAGResultDetailDrawer';
 import { RunDetailsPanel } from '@/components/evaluation/RunDetailsPanel';
-import { metadataEntriesToRecord } from '@/components/evaluation/runDetailsUtils';
+import {
+  metadataEntriesToRecord,
+  buildRAGAutoMetadata,
+} from '@/components/evaluation/runDetailsUtils';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationRun } from '@/hooks/useEvaluationRun';
@@ -40,6 +43,21 @@ export default function RAGEvaluation() {
 
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchAggregateMetrics } = useResultStore();
+
+  const handleRagEndpointChange = useCallback((endpoint: RAGEndpointSettings | undefined) => {
+    setRagEndpoint(endpoint);
+    if (endpoint) {
+      setRunMetadata(
+        buildRAGAutoMetadata({
+          backendType: endpoint.backend_type,
+          endpointUrl: endpoint.endpoint_url,
+          tableName: endpoint.table_name,
+          embeddingModel: endpoint.embedding_model,
+          generatorProviderId: endpoint.generator_provider_id,
+        }),
+      );
+    }
+  }, []);
 
   const onCompleted = useCallback(
     (evaluationId: string) => {
@@ -174,7 +192,7 @@ export default function RAGEvaluation() {
                 </h2>
                 <DatasetSelector value={selectedDatasetId} onChange={setSelectedDatasetId} />
               </div>
-              <RAGEndpointConfig value={ragEndpoint} onChange={setRagEndpoint} />
+              <RAGEndpointConfig value={ragEndpoint} onChange={handleRagEndpointChange} />
             </div>
             <div className="space-y-4">
               <RAGMetricsSelector value={selectedMetrics} onChange={setSelectedMetrics} />
