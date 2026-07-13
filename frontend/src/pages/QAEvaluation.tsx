@@ -8,6 +8,11 @@ import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { QAResultsTable } from '@/components/evaluation/QAResultsTable';
 import { ResultDetailDrawer } from '@/components/evaluation/ResultDetailDrawer';
+import { RunDetailsPanel } from '@/components/evaluation/RunDetailsPanel';
+import {
+  metadataEntriesToRecord,
+  buildAutoMetadata,
+} from '@/components/evaluation/runDetailsUtils';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationRun } from '@/hooks/useEvaluationRun';
@@ -31,9 +36,29 @@ export default function QAEvaluation() {
   const [selectedResult, setSelectedResult] = useState<Result | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
+  const [runTitle, setRunTitle] = useState('');
+  const [runDescription, setRunDescription] = useState('');
+  const [runMetadata, setRunMetadata] = useState<{ key: string; value: string }[]>([]);
 
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchAggregateMetrics } = useResultStore();
+
+  const handleModelEndpointChange = useCallback(
+    (endpoint: ModelEndpoint | undefined) => {
+      setModelEndpoint(endpoint);
+      if (endpoint) {
+        setRunMetadata(
+          buildAutoMetadata({
+            providerName: endpoint.provider_id ?? endpoint.name,
+            modelName: endpoint.default_model,
+            temperature: modelParams.temperature,
+            topP: modelParams.top_p,
+          }),
+        );
+      }
+    },
+    [modelParams.temperature, modelParams.top_p],
+  );
 
   const onCompleted = useCallback(
     (evaluationId: string) => {
@@ -64,8 +89,11 @@ export default function QAEvaluation() {
   const handleStart = async () => {
     if (!selectedDatasetId || !modelEndpoint || !judgeConfig) return;
 
+    const effectiveName = runTitle.trim() || `Q&A Eval - ${modelEndpoint.name}`;
+
     const request: CreateEvaluationRequest = {
-      name: `Q&A Eval - ${modelEndpoint.name}`,
+      name: effectiveName,
+      ...(runDescription.trim() && { description: runDescription.trim() }),
       mode: 'qa',
       dataset_id: selectedDatasetId,
       rubric_id: judgeConfig.rubric_id,
@@ -76,6 +104,7 @@ export default function QAEvaluation() {
         ...(Object.keys(modelParams).length > 0 && { model_params: modelParams }),
         ...(Object.keys(judgeParams).length > 0 && { judge_params: judgeParams }),
       },
+      metadata: metadataEntriesToRecord(runMetadata),
     };
 
     await start(request);
@@ -96,6 +125,9 @@ export default function QAEvaluation() {
     setSelectedResult(null);
     setDrawerOpen(false);
     setDatasetItems([]);
+    setRunTitle('');
+    setRunDescription('');
+    setRunMetadata([]);
   };
 
   return (
@@ -134,7 +166,7 @@ export default function QAEvaluation() {
                 </h2>
                 <DatasetSelector value={selectedDatasetId} onChange={setSelectedDatasetId} />
               </div>
-              <ProviderSelector value={modelEndpoint} onChange={setModelEndpoint} />
+              <ProviderSelector value={modelEndpoint} onChange={handleModelEndpointChange} />
             </div>
             <div className="space-y-4">
               <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
@@ -152,6 +184,14 @@ export default function QAEvaluation() {
               onChange={setJudgeParams}
             />
           </div>
+          <RunDetailsPanel
+            title={runTitle}
+            onTitleChange={setRunTitle}
+            description={runDescription}
+            onDescriptionChange={setRunDescription}
+            metadata={runMetadata}
+            onMetadataChange={setRunMetadata}
+          />
           <button
             className="flex w-full items-center justify-center gap-2 rounded-[9px] bg-primary px-4 py-3 text-[13px] font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
             disabled={!isConfigValid || isLoading}

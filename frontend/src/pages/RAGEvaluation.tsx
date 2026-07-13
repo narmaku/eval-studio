@@ -10,6 +10,8 @@ import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { RAGResultsTable } from '@/components/evaluation/RAGResultsTable';
 import { RAGResultDetailDrawer } from '@/components/evaluation/RAGResultDetailDrawer';
+import { RunDetailsPanel } from '@/components/evaluation/RunDetailsPanel';
+import { metadataEntriesToRecord } from '@/components/evaluation/runDetailsUtils';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationRun } from '@/hooks/useEvaluationRun';
@@ -32,6 +34,9 @@ export default function RAGEvaluation() {
   const [selectedResult, setSelectedResult] = useState<Result | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [datasetItems, setDatasetItems] = useState<DatasetItem[]>([]);
+  const [runTitle, setRunTitle] = useState('');
+  const [runDescription, setRunDescription] = useState('');
+  const [runMetadata, setRunMetadata] = useState<{ key: string; value: string }[]>([]);
 
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results, fetchAggregateMetrics } = useResultStore();
@@ -77,16 +82,19 @@ export default function RAGEvaluation() {
   const handleStart = async () => {
     if (!selectedDatasetId || !ragEndpoint || !judgeConfig || !isRagEndpointValid) return;
 
-    const evalName =
+    const autoName =
       ragEndpoint.backend_type === 'pgvector'
         ? `RAG Eval - pgvector:${ragEndpoint.table_name ?? ''}`
         : `RAG Eval - ${ragEndpoint.endpoint_url ?? ''}`;
+
+    const effectiveName = runTitle.trim() || autoName;
 
     const modelApiBase =
       ragEndpoint.backend_type === 'pgvector' ? undefined : ragEndpoint.endpoint_url;
 
     const request: CreateEvaluationRequest = {
-      name: evalName,
+      name: effectiveName,
+      ...(runDescription.trim() && { description: runDescription.trim() }),
       mode: 'rag',
       dataset_id: selectedDatasetId,
       rubric_id: judgeConfig.rubric_id,
@@ -102,6 +110,7 @@ export default function RAGEvaluation() {
         rag_metrics: selectedMetrics,
         ...(Object.keys(judgeParams).length > 0 && { judge_params: judgeParams }),
       },
+      metadata: metadataEntriesToRecord(runMetadata),
     };
 
     await start(request);
@@ -122,6 +131,9 @@ export default function RAGEvaluation() {
     setSelectedResult(null);
     setDrawerOpen(false);
     setDatasetItems([]);
+    setRunTitle('');
+    setRunDescription('');
+    setRunMetadata([]);
   };
 
   return (
@@ -170,6 +182,14 @@ export default function RAGEvaluation() {
             </div>
           </div>
           <LLMParamsPanel label="Judge Parameters" value={judgeParams} onChange={setJudgeParams} />
+          <RunDetailsPanel
+            title={runTitle}
+            onTitleChange={setRunTitle}
+            description={runDescription}
+            onDescriptionChange={setRunDescription}
+            metadata={runMetadata}
+            onMetadataChange={setRunMetadata}
+          />
           <button
             className="flex w-full items-center justify-center gap-2 rounded-[9px] bg-primary px-4 py-3 text-[13px] font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
             disabled={!isConfigValid || isLoading}

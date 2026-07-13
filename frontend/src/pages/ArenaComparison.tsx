@@ -9,6 +9,8 @@ import { EvaluationProgress } from '@/components/evaluation/EvaluationProgress';
 import { ArenaLeaderboard } from '@/components/evaluation/ArenaLeaderboard';
 import { ArenaResultsGrid } from '@/components/evaluation/ArenaResultsGrid';
 import { ContestantScoreChart, RadarComparisonChart } from '@/components/results';
+import { RunDetailsPanel } from '@/components/evaluation/RunDetailsPanel';
+import { metadataEntriesToRecord } from '@/components/evaluation/runDetailsUtils';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationRun } from '@/hooks/useEvaluationRun';
@@ -29,6 +31,9 @@ export default function ArenaComparison() {
   const [modelParams, setModelParams] = useState<LLMParams>({});
   const [judgeParams, setJudgeParams] = useState<LLMParams>({});
   const [leaderboard, setLeaderboard] = useState<ArenaLeaderboardResponse | null>(null);
+  const [runTitle, setRunTitle] = useState('');
+  const [runDescription, setRunDescription] = useState('');
+  const [runMetadata, setRunMetadata] = useState<{ key: string; value: string }[]>([]);
 
   const { selectedEvaluatorId } = useEvaluatorStore();
   const { results } = useResultStore();
@@ -54,9 +59,12 @@ export default function ArenaComparison() {
     if (!selectedDatasetId || !judgeConfig || validContestants.length < 2) return;
 
     const primaryEndpoint = validContestants[0]!;
+    const autoName = `Arena - ${validContestants.map((c) => c.name).join(' vs ')}`;
+    const effectiveName = runTitle.trim() || autoName;
 
     const request: CreateEvaluationRequest = {
-      name: `Arena - ${validContestants.map((c) => c.name).join(' vs ')}`,
+      name: effectiveName,
+      ...(runDescription.trim() && { description: runDescription.trim() }),
       mode: 'arena',
       dataset_id: selectedDatasetId,
       rubric_id: judgeConfig.rubric_id,
@@ -68,6 +76,7 @@ export default function ArenaComparison() {
         ...(Object.keys(modelParams).length > 0 && { model_params: modelParams }),
         ...(Object.keys(judgeParams).length > 0 && { judge_params: judgeParams }),
       },
+      metadata: metadataEntriesToRecord(runMetadata),
     };
 
     await start(request);
@@ -81,6 +90,9 @@ export default function ArenaComparison() {
     setModelParams({});
     setJudgeParams({});
     setLeaderboard(null);
+    setRunTitle('');
+    setRunDescription('');
+    setRunMetadata([]);
   };
 
   const contestantModels = validContestants.map((c) => c.default_model);
@@ -138,6 +150,14 @@ export default function ArenaComparison() {
               onChange={setJudgeParams}
             />
           </div>
+          <RunDetailsPanel
+            title={runTitle}
+            onTitleChange={setRunTitle}
+            description={runDescription}
+            onDescriptionChange={setRunDescription}
+            metadata={runMetadata}
+            onMetadataChange={setRunMetadata}
+          />
           <button
             className="flex w-full items-center justify-center gap-2 rounded-[9px] bg-primary px-4 py-3 text-[13px] font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
             disabled={!isConfigValid || isLoading}
