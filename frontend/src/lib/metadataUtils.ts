@@ -129,7 +129,7 @@ export function extractContestantSpecs(config: EvaluationConfig): ContestantSpec
 
     // Add any extra keys from the contestant object that aren't already covered
     // (ModelEndpoint might have additional properties beyond the typed interface)
-    const raw = contestant as Record<string, unknown>;
+    const raw = contestant as unknown as Record<string, unknown>;
     for (const [key, val] of Object.entries(raw)) {
       if (
         val !== undefined &&
