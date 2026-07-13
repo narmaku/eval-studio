@@ -7,6 +7,7 @@ import {
   extractContestantSpecs,
   getSpecsDiff,
   extractSessionMetadata,
+  extractJudgeMetadata,
 } from './metadataUtils';
 import type { EvaluationConfig } from '@/types';
 
@@ -217,6 +218,29 @@ describe('extractContestantSpecs', () => {
     expect(extractContestantSpecs(config)).toEqual([]);
   });
 
+  it('skips nested object values to avoid [object Object]', () => {
+    const config: EvaluationConfig = {
+      model_endpoint: { name: 'Test', default_model: 'test' },
+      judge_config: {},
+      contestants: [
+        {
+          name: 'OpenAI',
+          default_model: 'gpt-4o',
+          provider_id: 'openai',
+          // Simulate nested object properties that could leak through
+          extra_config: { nested: true },
+          list_prop: [1, 2, 3],
+        } as unknown as import('@/types').ModelEndpoint,
+      ],
+    };
+    const specs = extractContestantSpecs(config);
+    // Nested objects/arrays should be excluded
+    expect(specs[0].fields).not.toHaveProperty('extra_config');
+    expect(specs[0].fields).not.toHaveProperty('list_prop');
+    // Primitives should still be included
+    expect(specs[0].fields.provider).toBe('openai');
+  });
+
   it('filters sensitive keys from contestant specs', () => {
     const config: EvaluationConfig = {
       model_endpoint: { name: 'Test', default_model: 'test' },
@@ -321,5 +345,69 @@ describe('extractSessionMetadata', () => {
     const result = extractSessionMetadata(config);
     expect(result).not.toHaveProperty('api_base');
     expect(result).not.toHaveProperty('system_prompt');
+  });
+
+  it('extracts tool_server_ids as comma-separated tools field', () => {
+    const config = {
+      provider_id: 'openai',
+      default_model: 'gpt-4o',
+      tool_server_ids: ['filesystem', 'web-search'],
+    };
+    const result = extractSessionMetadata(config);
+    expect(result.tools).toBe('filesystem, web-search');
+  });
+
+  it('omits tools when tool_server_ids is empty', () => {
+    const config = {
+      provider_id: 'openai',
+      default_model: 'gpt-4o',
+      tool_server_ids: [],
+    };
+    const result = extractSessionMetadata(config);
+    expect(result).not.toHaveProperty('tools');
+  });
+});
+
+// --- extractJudgeMetadata ---
+
+describe('extractJudgeMetadata', () => {
+  it('extracts judge provider and model', () => {
+    const config = {
+      provider_id: 'anthropic',
+      model: 'claude-3-opus',
+    };
+    const result = extractJudgeMetadata(config);
+    expect(result).toEqual({
+      'judge provider': 'anthropic',
+      'judge model': 'claude-3-opus',
+    });
+  });
+
+  it('extracts rubric_name preferring it over rubric_id', () => {
+    const config = {
+      provider_id: 'openai',
+      model: 'gpt-4o',
+      rubric_id: 'rubric-123',
+      rubric_name: 'Code Quality',
+    };
+    const result = extractJudgeMetadata(config);
+    expect(result.rubric).toBe('Code Quality');
+  });
+
+  it('falls back to rubric_id when rubric_name is absent', () => {
+    const config = {
+      provider_id: 'openai',
+      rubric_id: 'rubric-123',
+    };
+    const result = extractJudgeMetadata(config);
+    expect(result.rubric).toBe('rubric-123');
+  });
+
+  it('handles null judge config', () => {
+    expect(extractJudgeMetadata(null)).toEqual({});
+  });
+
+  it('handles empty judge config', () => {
+    expect(extractJudgeMetadata({})).toEqual({});
   });
 });

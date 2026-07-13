@@ -136,6 +136,8 @@ export function extractContestantSpecs(config: EvaluationConfig): ContestantSpec
         val !== null &&
         !['name', 'default_model', 'provider_id', 'tags'].includes(key)
       ) {
+        // Skip non-primitive values (objects/arrays) to avoid "[object Object]" in badges
+        if (typeof val === 'object') continue;
         fields[key] = String(val);
       }
     }
@@ -203,6 +205,30 @@ export function extractSessionMetadata(
   if (agentConfig.default_model) meta.model = String(agentConfig.default_model);
   if (agentConfig.harness_id) meta.harness = String(agentConfig.harness_id);
   if (agentConfig.evaluator_id) meta.evaluator = String(agentConfig.evaluator_id);
+
+  // Tool servers (array of IDs)
+  const toolServers = agentConfig.tool_server_ids;
+  if (Array.isArray(toolServers) && toolServers.length > 0) {
+    meta.tools = toolServers.map(String).join(', ');
+  }
+
+  return meta;
+}
+
+/**
+ * Extract metadata from a session's judge_config_snapshot for display as badges.
+ */
+export function extractJudgeMetadata(
+  judgeConfig: Record<string, unknown> | null | undefined,
+): Record<string, string> {
+  if (!judgeConfig) return {};
+
+  const meta: Record<string, string> = {};
+
+  if (judgeConfig.provider_id) meta['judge provider'] = String(judgeConfig.provider_id);
+  if (judgeConfig.model) meta['judge model'] = String(judgeConfig.model);
+  if (judgeConfig.rubric_id) meta.rubric = String(judgeConfig.rubric_id);
+  if (judgeConfig.rubric_name) meta.rubric = String(judgeConfig.rubric_name);
 
   return meta;
 }
