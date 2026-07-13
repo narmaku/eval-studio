@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
@@ -46,10 +46,14 @@ export function ArenaResultsCard({
   const [activeTab, setActiveTab] = useState<ArenaTab>('leaderboard');
   const { contestants } = leaderboard;
 
-  const chartData = contestants.map((c) => ({
-    name: c.contestant_model,
-    score: c.average_score,
-  }));
+  const chartData = useMemo(
+    () =>
+      contestants.map((c) => ({
+        name: c.contestant_model,
+        score: c.average_score,
+      })),
+    [contestants],
+  );
 
   return (
     <Card className={className}>
