@@ -107,6 +107,8 @@ export default function ResultDetail() {
         aggregateMetrics={aggregateMetrics}
         evaluationName={evaluation?.name}
         evaluationMode={evaluation?.mode}
+        evaluationConfig={evaluation?.config}
+        evaluationMetadata={evaluation?.metadata}
         datasetItems={datasetItems}
         arenaLeaderboard={arenaLeaderboard}
         pagination={pagination}

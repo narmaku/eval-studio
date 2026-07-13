@@ -49,7 +49,15 @@ import { ResultEditSheet } from './ResultEditSheet';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { useResultStore } from '@/stores/resultStore';
 import { exportResultsPdf, type PdfExportData } from '@/lib/exportPdf';
-import type { Result, AggregateMetrics, DatasetItem, ArenaLeaderboardResponse } from '@/types';
+import { extractConfigMetadata, mergeMetadata, filterSensitiveKeys } from '@/lib/metadataUtils';
+import { MetadataBadges } from '@/components/ui/MetadataBadges';
+import type {
+  Result,
+  AggregateMetrics,
+  DatasetItem,
+  ArenaLeaderboardResponse,
+  EvaluationConfig,
+} from '@/types';
 
 interface PaginationInfo {
   total: number;
@@ -63,6 +71,8 @@ interface ResultDetailViewProps {
   aggregateMetrics?: AggregateMetrics | null;
   evaluationName?: string;
   evaluationMode?: string;
+  evaluationConfig?: EvaluationConfig;
+  evaluationMetadata?: Record<string, string> | null;
   datasetItems?: DatasetItem[];
   arenaLeaderboard?: ArenaLeaderboardResponse | null;
   pagination?: PaginationInfo | null;
@@ -336,6 +346,8 @@ export function ResultDetailView({
   aggregateMetrics,
   evaluationName,
   evaluationMode,
+  evaluationConfig,
+  evaluationMetadata,
   datasetItems,
   arenaLeaderboard,
   pagination,
@@ -344,6 +356,14 @@ export function ResultDetailView({
   onFetchAllForExport,
 }: ResultDetailViewProps) {
   const metrics = aggregateMetrics ?? EMPTY_METRICS;
+
+  const detailMetadata = useMemo(() => {
+    const configMeta = evaluationConfig
+      ? filterSensitiveKeys(extractConfigMetadata(evaluationConfig))
+      : {};
+    return mergeMetadata(configMeta, evaluationMetadata);
+  }, [evaluationConfig, evaluationMetadata]);
+
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
   const [isExporting, setIsExporting] = useState(false);
@@ -556,7 +576,7 @@ export function ResultDetailView({
       ) : (
         <>
           <div className="rounded-[14px] border border-border bg-card p-5">
-            <div className="mb-5 flex items-center gap-3">
+            <div className="mb-2 flex items-center gap-3">
               <h2 className="text-[22px] font-semibold tracking-[-0.02em]">
                 {evaluationName ?? 'Evaluation Result'}
               </h2>
@@ -571,6 +591,9 @@ export function ResultDetailView({
                 </span>
               )}
             </div>
+            {Object.keys(detailMetadata).length > 0 && (
+              <MetadataBadges metadata={detailMetadata} maxInline={20} className="mb-5" />
+            )}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div>
                 <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
