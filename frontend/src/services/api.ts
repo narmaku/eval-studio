@@ -106,7 +106,7 @@ async function request<T>(
 
 export const api = {
   // --- Health ---
-  getHealth: () => request<{ status: string }>('/api/v1/health'),
+  getHealth: () => request<{ status: string; version: string }>('/api/v1/health'),
 
   // --- Evaluations ---
   listEvaluations: (params?: {
