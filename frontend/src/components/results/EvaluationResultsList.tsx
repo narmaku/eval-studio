@@ -42,7 +42,9 @@ import {
   formatMonoDate,
 } from '@/lib/designUtils';
 import { cn } from '@/lib/utils';
-import type { Evaluation, EvaluationMode, EvaluationStatus } from '@/types';
+import { extractConfigMetadata, mergeMetadata, filterSensitiveKeys } from '@/lib/metadataUtils';
+import { MetadataBadges } from '@/components/ui/MetadataBadges';
+import type { Evaluation, EvaluationConfig, EvaluationMode, EvaluationStatus } from '@/types';
 
 export interface EvaluationResultRow {
   evaluationId: string;
@@ -55,6 +57,8 @@ export interface EvaluationResultRow {
   meanScore: number;
   createdAt: string;
   datasetId: string | null;
+  config?: EvaluationConfig;
+  metadata?: Record<string, string> | null;
 }
 
 /**
@@ -193,11 +197,20 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
             <ArrowUpDown className="h-4 w-4" />
           </button>
         ),
-        cell: ({ row }) => (
-          <span className="font-medium" title={row.original.name}>
-            {row.original.name}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const configMeta = row.original.config
+            ? filterSensitiveKeys(extractConfigMetadata(row.original.config))
+            : {};
+          const merged = mergeMetadata(configMeta, row.original.metadata);
+          return (
+            <div className="space-y-1">
+              <span className="font-medium" title={row.original.name}>
+                {row.original.name}
+              </span>
+              <MetadataBadges metadata={merged} maxInline={3} compact />
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'mode',
