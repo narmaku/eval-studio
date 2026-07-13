@@ -40,10 +40,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ChunkDisplay } from '@/components/evaluation/ChunkDisplay';
-import { ArenaLeaderboard } from '@/components/evaluation/ArenaLeaderboard';
+import { ArenaResultsCard } from '@/components/evaluation/ArenaResultsCard';
+import { ContestantSpecsCard } from '@/components/evaluation/ContestantSpecsCard';
 import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { PassFailChart } from './PassFailChart';
-import { ContestantScoreChart } from './ContestantScoreChart';
 import { RadarComparisonChart } from './RadarComparisonChart';
 import { ResultEditSheet } from './ResultEditSheet';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
@@ -559,8 +559,8 @@ export function ResultDetailView({
       {evaluationMode === 'arena' && arenaLeaderboard ? (
         <>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <ArenaLeaderboard leaderboard={arenaLeaderboard} />
-            <ContestantScoreChart contestants={arenaLeaderboard.contestants} />
+            <ArenaResultsCard leaderboard={arenaLeaderboard} />
+            {evaluationConfig && <ContestantSpecsCard config={evaluationConfig} />}
           </div>
           {arenaLeaderboard.contestants.some(
             (c) => c.average_breakdown && Object.keys(c.average_breakdown).length >= 2,
