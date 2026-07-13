@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Check, Download, Eye, Loader2, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -244,6 +244,7 @@ export function ArtifactsList({ evaluationId }: ArtifactsListProps): React.JSX.E
   const [previewArtifact, setPreviewArtifact] = useState<Artifact | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -294,22 +295,24 @@ export function ArtifactsList({ evaluationId }: ArtifactsListProps): React.JSX.E
     window.open(url, '_blank');
   };
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     if (!previewContent) return;
     try {
       await navigator.clipboard.writeText(previewContent);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard API may not be available in all contexts
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch (err: unknown) {
+      console.warn('Clipboard write failed:', err instanceof Error ? err.message : err);
     }
-  };
+  }, [previewContent]);
 
-  const closePreview = () => {
+  const closePreview = useCallback(() => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     setPreviewArtifact(null);
     setPreviewContent(null);
     setCopied(false);
-  };
+  }, []);
 
   // Don't render anything if loading, no artifacts, or error
   if (isLoading) {
