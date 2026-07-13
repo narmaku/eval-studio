@@ -136,9 +136,11 @@ describe('ArtifactsList', () => {
       expect(mockPreviewArtifact).toHaveBeenCalledWith('art-1');
     });
 
+    // JSON is now rendered with syntax highlighting — individual tokens appear in separate spans
     await waitFor(() => {
-      expect(screen.getByText('{"key": "value"}')).toBeInTheDocument();
+      expect(screen.getByText('"key"')).toBeInTheDocument();
     });
+    expect(screen.getByText('"value"')).toBeInTheDocument();
   });
 
   it('calls download URL when download button is clicked', async () => {

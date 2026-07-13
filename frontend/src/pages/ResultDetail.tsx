@@ -101,7 +101,7 @@ export default function ResultDetail() {
   }
 
   return (
-    <>
+    <div className="space-y-6">
       <ResultDetailView
         results={results}
         aggregateMetrics={aggregateMetrics}
@@ -115,6 +115,6 @@ export default function ResultDetail() {
         onFetchAllForExport={handleFetchAllForExport}
       />
       {resultId && <ArtifactsList evaluationId={resultId} />}
-    </>
+    </div>
   );
 }
