@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Download, Eye, Loader2, FileText, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,19 +53,19 @@ function parseCsv(content: string): string[][] {
 
 function JsonValue({ value, indent = 0 }: { value: unknown; indent?: number }) {
   if (value === null) {
-    return <span className="text-orange-500 dark:text-orange-400">null</span>;
+    return <span className="text-[var(--warn)]">null</span>;
   }
 
   if (typeof value === 'boolean') {
-    return <span className="text-orange-500 dark:text-orange-400">{String(value)}</span>;
+    return <span className="text-[var(--warn)]">{String(value)}</span>;
   }
 
   if (typeof value === 'number') {
-    return <span className="text-blue-600 dark:text-blue-400">{String(value)}</span>;
+    return <span className="text-[var(--accent-2)]">{String(value)}</span>;
   }
 
   if (typeof value === 'string') {
-    return <span className="text-green-600 dark:text-green-400">&quot;{value}&quot;</span>;
+    return <span className="text-[var(--pass)]">&quot;{value}&quot;</span>;
   }
 
   if (Array.isArray(value)) {
@@ -105,7 +106,7 @@ function JsonValue({ value, indent = 0 }: { value: unknown; indent?: number }) {
         {entries.map(([key, val], i) => (
           <span key={key}>
             {padding}
-            <span className="text-violet-600 dark:text-violet-400">&quot;{key}&quot;</span>
+            <span className="text-[var(--accent)]">&quot;{key}&quot;</span>
             {': '}
             <JsonValue value={val} indent={nextIndent} />
             {i < entries.length - 1 ? ',' : ''}
@@ -133,7 +134,7 @@ function JsonPreview({ content }: { content: string }) {
   }
 
   return (
-    <pre className="text-xs font-mono bg-zinc-950 dark:bg-zinc-950 text-zinc-200 p-4 rounded-md overflow-x-auto whitespace-pre">
+    <pre className="text-xs font-mono bg-muted/50 p-4 rounded-md overflow-x-auto whitespace-pre text-foreground">
       <JsonValue value={parsed} />
     </pre>
   );
@@ -178,8 +179,8 @@ function CsvPreview({ content }: { content: string }) {
 
 function MarkdownPreview({ content }: { content: string }) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none">
-      <ReactMarkdown>{content}</ReactMarkdown>
+    <div className="prose prose-sm dark:prose-invert max-w-none prose-table:text-xs prose-th:text-left prose-td:py-1 prose-th:py-1">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );
 }
@@ -370,7 +371,7 @@ export function ArtifactsList({ evaluationId }: ArtifactsListProps) {
       </Card>
 
       <Dialog open={previewArtifact !== null} onOpenChange={(open) => !open && closePreview()}>
-        <DialogContent className="max-w-5xl max-h-[85vh]">
+        <DialogContent className="max-w-5xl sm:max-w-5xl max-h-[85vh]">
           <DialogHeader>
             <div className="flex items-center gap-3">
               <DialogTitle className="font-mono text-sm">{previewArtifact?.filename}</DialogTitle>
