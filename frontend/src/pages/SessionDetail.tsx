@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
@@ -7,6 +7,7 @@ import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { SessionEditSheet } from '@/components/sessions/SessionEditSheet';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
+import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { api } from '@/services/api';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
 import { ArrowLeft, Loader2, Pencil, Trash2 } from 'lucide-react';
@@ -17,6 +18,7 @@ import {
   getStatusPillClasses,
   formatMonoTimestamp,
 } from '@/lib/designUtils';
+import { extractSessionMetadata, extractJudgeMetadata } from '@/lib/metadataUtils';
 import type { Session, Message, ToolCall, SessionScore, JudgeReference } from '@/types';
 
 function extractFromTranscript(transcript: Record<string, unknown>[]): {
@@ -162,6 +164,16 @@ export default function SessionDetail() {
     }
   };
 
+  const agentMeta = useMemo(
+    () => extractSessionMetadata(session?.agent_config),
+    [session?.agent_config],
+  );
+  const judgeMeta = useMemo(
+    () => extractJudgeMetadata(session?.judge_config_snapshot),
+    [session?.judge_config_snapshot],
+  );
+  const configMetadata = useMemo(() => ({ ...agentMeta, ...judgeMeta }), [agentMeta, judgeMeta]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -180,6 +192,9 @@ export default function SessionDetail() {
       </div>
     );
   }
+
+  const hasConfigMeta = Object.keys(configMetadata).length > 0;
+  const hasTags = session.tags && session.tags.length > 0;
 
   const isEnded = session.status !== 'active';
   const hasScores = scores.length > 0;
@@ -226,10 +241,10 @@ export default function SessionDetail() {
             </div>
             <p className="mt-1 font-mono text-[11px] text-text-2">
               {messages.length} messages
-              {session.tags && session.tags.length > 0 && (
+              {hasTags && (
                 <>
                   {' · '}
-                  {session.tags.map((tag) => (
+                  {session.tags!.map((tag) => (
                     <span
                       key={tag}
                       className="mr-1 rounded-[5px] bg-surface-3 px-1.5 py-0.5 text-[10px] text-text-3"
@@ -242,6 +257,11 @@ export default function SessionDetail() {
               {' · '}
               {formatMonoTimestamp(session.started_at ?? session.created_at)}
             </p>
+            {hasConfigMeta && (
+              <div className="mt-2">
+                <MetadataBadges metadata={configMetadata} maxInline={6} />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
