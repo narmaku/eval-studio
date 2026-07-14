@@ -2,22 +2,15 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
-import { ToolDetailPanel } from '@/components/chat/ToolDetailPanel';
+import { ToolSidePanel } from '@/components/chat/ToolSidePanel';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { SessionEditSheet } from '@/components/sessions/SessionEditSheet';
+import { SessionInfoCard } from '@/components/sessions/SessionInfoCard';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
-import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { api } from '@/services/api';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
 import { ArrowLeft, Loader2, Pencil, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import {
-  getModeBadgeClasses,
-  getModeLabel,
-  getStatusPillClasses,
-  formatMonoTimestamp,
-} from '@/lib/designUtils';
 import { extractSessionMetadata, extractJudgeMetadata } from '@/lib/metadataUtils';
 import type { Session, Message, ToolCall, SessionScore, JudgeReference } from '@/types';
 
@@ -193,15 +186,13 @@ export default function SessionDetail() {
     );
   }
 
-  const hasConfigMeta = Object.keys(configMetadata).length > 0;
-  const hasTags = session.tags && session.tags.length > 0;
-
   const isEnded = session.status !== 'active';
   const hasScores = scores.length > 0;
   const isSessionScoring = session.status === 'scoring';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Header: breadcrumb + title + action buttons */}
       <div>
         <Link
           to="/sessions"
@@ -211,56 +202,15 @@ export default function SessionDetail() {
           All sessions
         </Link>
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-[25px] font-semibold tracking-[-0.02em]">
-                {session.name ?? `Session ${session.id.slice(0, 8)}`}
-              </h1>
-              <span
-                className={cn(
-                  'rounded-[6px] px-2 py-0.5 text-[10px] font-semibold uppercase',
-                  getModeBadgeClasses(session.mode),
-                )}
-              >
-                {getModeLabel(session.mode)}
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[25px] font-semibold tracking-[-0.02em]">
+              {session.name ?? `Session ${session.id.slice(0, 8)}`}
+            </h1>
+            {isSessionScoring && (
+              <span className="inline-flex items-center rounded-full bg-warn-bg px-2.5 py-0.5 text-[10.5px] font-medium text-warn">
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Scoring...
               </span>
-              <span
-                className={cn(
-                  'rounded-full px-2.5 py-0.5 text-[10.5px] font-medium capitalize',
-                  getStatusPillClasses(session.status),
-                )}
-              >
-                {session.status}
-              </span>
-              {isSessionScoring && (
-                <span className="inline-flex items-center rounded-full bg-warn-bg px-2.5 py-0.5 text-[10.5px] font-medium text-warn">
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                  Scoring...
-                </span>
-              )}
-            </div>
-            <p className="mt-1 font-mono text-[11px] text-text-2">
-              {messages.length} messages
-              {hasTags && (
-                <>
-                  {' · '}
-                  {session.tags!.map((tag) => (
-                    <span
-                      key={tag}
-                      className="mr-1 rounded-[5px] bg-surface-3 px-1.5 py-0.5 text-[10px] text-text-3"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </>
-              )}
-              {' · '}
-              {formatMonoTimestamp(session.started_at ?? session.created_at)}
-            </p>
-            {hasConfigMeta && (
-              <div className="mt-2">
-                <MetadataBadges metadata={configMetadata} maxInline={6} />
-              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -298,6 +248,7 @@ export default function SessionDetail() {
         </div>
       </div>
 
+      {/* Optional: Judge config panel */}
       {showScoreConfig && (
         <div className="rounded-[14px] border border-border bg-card p-5 shadow-sm space-y-4">
           <h3 className="text-[10.5px] font-semibold tracking-[0.06em] uppercase text-text-3">
@@ -322,8 +273,23 @@ export default function SessionDetail() {
         </div>
       )}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:h-[calc(100vh-280px)] lg:min-h-[500px]">
-        <div className="min-w-0 min-h-0 h-[500px] lg:h-auto lg:w-[70%]">
+      {/* Row 1: Session Details + Scores */}
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <div className="lg:flex-1 min-w-0">
+          <SessionInfoCard
+            session={session}
+            messageCount={messages.length}
+            metadata={configMetadata}
+          />
+        </div>
+        <div className="lg:w-[400px] shrink-0">
+          <ScoringPanel scores={scores} isSessionEnded={isEnded} />
+        </div>
+      </div>
+
+      {/* Row 2: Conversation + Tool Inspector */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:h-[calc(100vh-480px)] lg:min-h-[400px]">
+        <div className="min-w-0 min-h-0 h-[500px] lg:h-auto lg:flex-1">
           <ConversationPanel
             messages={messages}
             isProcessing={false}
@@ -334,19 +300,11 @@ export default function SessionDetail() {
             selectedToolId={selectedToolId ?? undefined}
           />
         </div>
-
-        <div className="flex flex-col gap-4 min-h-0 lg:w-[30%]">
-          <div className="min-h-0 h-[350px] lg:h-auto lg:flex-1">
-            <ToolDetailPanel
-              toolCall={toolCalls.find((tc) => tc.id === selectedToolId) ?? null}
-              allToolCalls={toolCalls}
-              onSelect={handleToolSelect}
-            />
-          </div>
-          <div className="h-[280px] shrink-0">
-            <ScoringPanel scores={scores} isSessionEnded={isEnded} />
-          </div>
-        </div>
+        <ToolSidePanel
+          toolCalls={toolCalls}
+          selectedToolId={selectedToolId}
+          onToolSelect={handleToolSelect}
+        />
       </div>
 
       {/* Edit Sheet */}
