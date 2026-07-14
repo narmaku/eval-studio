@@ -322,9 +322,8 @@ export default function SessionDetail() {
         </div>
       )}
 
-      <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
-        {/* Left column: Conversation (70%) */}
-        <div className="w-[70%] min-w-0 min-h-0">
+      <div className="flex flex-col gap-4 lg:flex-row lg:h-[calc(100vh-280px)] lg:min-h-[500px]">
+        <div className="min-w-0 min-h-0 h-[500px] lg:h-auto lg:w-[70%]">
           <ConversationPanel
             messages={messages}
             isProcessing={false}
@@ -336,9 +335,8 @@ export default function SessionDetail() {
           />
         </div>
 
-        {/* Right column: Tool Inspector + Scores (30%) */}
-        <div className="w-[30%] flex flex-col gap-4 min-h-0">
-          <div className="flex-1 min-h-0">
+        <div className="flex flex-col gap-4 min-h-0 lg:w-[30%]">
+          <div className="min-h-0 h-[350px] lg:h-auto lg:flex-1">
             <ToolDetailPanel
               toolCall={toolCalls.find((tc) => tc.id === selectedToolId) ?? null}
               allToolCalls={toolCalls}
