@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
-import { ToolSidePanel } from '@/components/chat/ToolSidePanel';
+import { ToolDetailPanel } from '@/components/chat/ToolDetailPanel';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
 import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { SessionEditSheet } from '@/components/sessions/SessionEditSheet';
@@ -322,8 +322,9 @@ export default function SessionDetail() {
         </div>
       )}
 
-      <div className="flex gap-4" style={{ height: '600px' }}>
-        <div className="flex-1 min-w-0 min-h-0">
+      <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
+        {/* Left column: Conversation (70%) */}
+        <div className="w-[70%] min-w-0 min-h-0">
           <ConversationPanel
             messages={messages}
             isProcessing={false}
@@ -334,13 +335,19 @@ export default function SessionDetail() {
             selectedToolId={selectedToolId ?? undefined}
           />
         </div>
-        <ToolSidePanel
-          toolCalls={toolCalls}
-          selectedToolId={selectedToolId}
-          onToolSelect={handleToolSelect}
-        />
-        <div className="w-[300px] shrink-0 overflow-y-auto">
-          <ScoringPanel scores={scores} isSessionEnded={isEnded} />
+
+        {/* Right column: Tool Inspector + Scores (30%) */}
+        <div className="w-[30%] flex flex-col gap-4 min-h-0">
+          <div className="flex-1 min-h-0">
+            <ToolDetailPanel
+              toolCall={toolCalls.find((tc) => tc.id === selectedToolId) ?? null}
+              allToolCalls={toolCalls}
+              onSelect={handleToolSelect}
+            />
+          </div>
+          <div className="h-[280px] shrink-0">
+            <ScoringPanel scores={scores} isSessionEnded={isEnded} />
+          </div>
         </div>
       </div>
 
