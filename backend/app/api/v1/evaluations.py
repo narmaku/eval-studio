@@ -443,17 +443,21 @@ async def clone_and_rerun_evaluation(
             "Wait for it to finish or cancel it first."
         )
 
-    # 3. Validate dataset still exists
+    # 3. Validate evaluation mode is runnable
+    if evaluation.mode not in (EvaluationMode.QA, EvaluationMode.RAG, EvaluationMode.ARENA):
+        raise NotImplementedException(f"Evaluation mode '{evaluation.mode}' execution")
+
+    # 4. Validate dataset still exists
     if not evaluation.dataset_id:
         raise ValidationException("Original evaluation has no dataset configured.")
     ds_result = await db.execute(select(Dataset).where(Dataset.id == evaluation.dataset_id))
     if not ds_result.scalar_one_or_none():
         raise NotFoundException("Dataset", evaluation.dataset_id)
 
-    # 4. Build new config (copy original)
+    # 5. Build new config (copy original)
     new_config = dict(evaluation.config or {})
 
-    # 5. Handle failures_only mode
+    # 6. Handle failures_only mode
     if payload.rerun_mode == "failures_only":
         if evaluation.mode == EvaluationMode.ARENA:
             raise ValidationException("Failures-only re-run is not supported for arena evaluations.")
@@ -471,10 +475,10 @@ async def clone_and_rerun_evaluation(
 
         new_config["dataset_item_ids"] = failed_item_ids
 
-    # 6. Build name suffix
+    # 7. Build name suffix
     name_suffix = " (re-run)" if payload.rerun_mode == "full" else " (re-run: failures)"
 
-    # 7. Build lineage metadata
+    # 8. Build lineage metadata
     original_metadata = dict(evaluation.user_metadata or {})
     lineage_metadata = {
         **original_metadata,
@@ -484,7 +488,7 @@ async def clone_and_rerun_evaluation(
         "rerun_mode": payload.rerun_mode,
     }
 
-    # 8. Create the new evaluation
+    # 9. Create the new evaluation
     new_evaluation = Evaluation(
         name=f"{evaluation.name}{name_suffix}",
         description=evaluation.description,
@@ -500,7 +504,7 @@ async def clone_and_rerun_evaluation(
     await db.commit()
     await db.refresh(new_evaluation)
 
-    # 9. Launch background runner
+    # 10. Launch background runner
     async def _clone_rerun_in_background() -> None:
         async with async_session_factory() as bg_session:
             await _run_evaluation(new_evaluation.id, bg_session)
