@@ -167,6 +167,16 @@ async def run_evaluation(evaluation_id: str, db: AsyncSession) -> None:
 
         # 8. Build task specs and fan out
         items = sorted(dataset.items, key=lambda i: i.order_index)
+
+        # Optional: filter to specific dataset items (used by clone-and-rerun failures_only)
+        dataset_item_ids = config.get("dataset_item_ids")
+        if dataset_item_ids:
+            allowed_ids = set(dataset_item_ids)
+            items = [item for item in items if item.id in allowed_ids]
+            if not items:
+                await _fail(evaluation, db, "No matching dataset items found for the provided dataset_item_ids filter.")
+                return
+
         task_specs = runner.tasks(items)
         total = len(task_specs)
 

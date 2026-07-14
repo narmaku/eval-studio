@@ -20,6 +20,7 @@ from app.models.rubric import Rubric
 from app.models.session import Session
 from app.schemas.common import PaginatedResponse
 from app.schemas.evaluation import (
+    CloneAndRerunRequest,
     EvaluationCreate,
     EvaluationMode,
     EvaluationResponse,
@@ -414,6 +415,105 @@ async def run_evaluation(
 
     logger.info("evaluation.run_started", id=evaluation_id, mode=evaluation.mode)
     return EvaluationResponse.model_validate(evaluation)
+
+
+@router.post("/{evaluation_id}/clone-and-rerun", response_model=EvaluationResponse, status_code=201)
+async def clone_and_rerun_evaluation(
+    evaluation_id: str,
+    payload: CloneAndRerunRequest,
+    db: AsyncSession = Depends(get_db),
+) -> EvaluationResponse:
+    """Clone an evaluation and re-run it as a new evaluation with lineage metadata.
+
+    Unlike the destructive ``/rerun`` endpoint, this creates a brand-new
+    evaluation preserving the original.  The new evaluation's metadata
+    contains ``is_rerun``, ``original_run_name``, ``original_run_id``, and
+    ``rerun_mode`` for traceability.
+    """
+    # 1. Fetch original
+    result = await db.execute(select(Evaluation).where(Evaluation.id == evaluation_id))
+    evaluation = result.scalar_one_or_none()
+    if not evaluation:
+        raise NotFoundException("Evaluation", evaluation_id)
+
+    # 2. Only completed or failed evaluations can be cloned
+    if evaluation.status in (EvaluationStatus.RUNNING, EvaluationStatus.PENDING):
+        raise ConflictException(
+            f"Evaluation is '{evaluation.status}' and cannot be cloned for re-run. "
+            "Wait for it to finish or cancel it first."
+        )
+
+    # 3. Validate dataset still exists
+    if not evaluation.dataset_id:
+        raise ValidationException("Original evaluation has no dataset configured.")
+    ds_result = await db.execute(select(Dataset).where(Dataset.id == evaluation.dataset_id))
+    if not ds_result.scalar_one_or_none():
+        raise NotFoundException("Dataset", evaluation.dataset_id)
+
+    # 4. Build new config (copy original)
+    new_config = dict(evaluation.config or {})
+
+    # 5. Handle failures_only mode
+    if payload.rerun_mode == "failures_only":
+        if evaluation.mode == EvaluationMode.ARENA:
+            raise ValidationException("Failures-only re-run is not supported for arena evaluations.")
+
+        failed_results = await db.execute(
+            select(Result.dataset_item_id).where(
+                Result.evaluation_id == evaluation_id,
+                Result.passed == False,  # noqa: E712
+            )
+        )
+        failed_item_ids = [r for r in failed_results.scalars().all() if r is not None]
+
+        if not failed_item_ids:
+            raise ValidationException("No failed items to re-run.")
+
+        new_config["dataset_item_ids"] = failed_item_ids
+
+    # 6. Build name suffix
+    name_suffix = " (re-run)" if payload.rerun_mode == "full" else " (re-run: failures)"
+
+    # 7. Build lineage metadata
+    original_metadata = dict(evaluation.user_metadata or {})
+    lineage_metadata = {
+        **original_metadata,
+        "is_rerun": "true",
+        "original_run_name": evaluation.name,
+        "original_run_id": evaluation.id,
+        "rerun_mode": payload.rerun_mode,
+    }
+
+    # 8. Create the new evaluation
+    new_evaluation = Evaluation(
+        name=f"{evaluation.name}{name_suffix}",
+        description=evaluation.description,
+        mode=evaluation.mode,
+        status=EvaluationStatus.PENDING,
+        dataset_id=evaluation.dataset_id,
+        rubric_id=evaluation.rubric_id,
+        config=new_config,
+        tags=list(evaluation.tags or []),
+        user_metadata=lineage_metadata,
+    )
+    db.add(new_evaluation)
+    await db.commit()
+    await db.refresh(new_evaluation)
+
+    # 9. Launch background runner
+    async def _clone_rerun_in_background() -> None:
+        async with async_session_factory() as bg_session:
+            await _run_evaluation(new_evaluation.id, bg_session)
+
+    _launch_evaluation(new_evaluation.id, _clone_rerun_in_background())
+
+    logger.info(
+        "evaluation.clone_and_rerun_started",
+        original_id=evaluation_id,
+        new_id=new_evaluation.id,
+        rerun_mode=payload.rerun_mode,
+    )
+    return EvaluationResponse.model_validate(new_evaluation)
 
 
 @router.post("/{evaluation_id}/rerun", response_model=EvaluationResponse)
