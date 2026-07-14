@@ -46,6 +46,8 @@ export function extractConfigMetadata(config: EvaluationConfig): Record<string, 
   const meta: Record<string, string> = {};
   const ep = config.model_endpoint;
 
+  if (!ep) return meta;
+
   // Provider: use name unless it duplicates the model, then fall back to provider_id
   if (ep.name && ep.name !== ep.default_model) {
     meta.provider = ep.name;
