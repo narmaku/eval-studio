@@ -1,7 +1,9 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Play, Database, BarChart3, MessageSquare, Settings } from 'lucide-react';
-import { useEvaluationStore } from '@/stores/evaluationStore';
+
+import { useAppVersion } from '@/hooks/useAppVersion';
 import { cn } from '@/lib/utils';
+import { useEvaluationStore } from '@/stores/evaluationStore';
 
 interface NavItem {
   to: string;
@@ -91,7 +93,9 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
   );
 }
 
-export function Sidebar() {
+export function Sidebar(): React.JSX.Element {
+  const version = useAppVersion();
+
   return (
     <aside className="flex h-screen w-[var(--sidebar-width)] shrink-0 flex-col border-r border-border bg-surface-2">
       {/* Brand block */}
@@ -101,7 +105,7 @@ export function Sidebar() {
         </div>
         <div className="flex flex-col">
           <span className="text-sm font-semibold leading-tight">eval-studio</span>
-          <span className="font-mono text-[10.5px] text-text-3">v0.4 · workspace</span>
+          <span className="font-mono text-[10.5px] text-text-3">v{version}</span>
         </div>
       </div>
 
