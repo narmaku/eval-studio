@@ -19,7 +19,7 @@ export function AppShell() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar />
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[1160px] px-8 py-7 pb-16 animate-es-fade">
+          <div className="mx-auto max-w-[1600px] px-6 py-7 pb-16 animate-es-fade">
             <Outlet />
           </div>
         </main>

@@ -49,7 +49,7 @@ export function ScoringPanel({ scores, isSessionEnded }: ScoringPanelProps) {
 
         {scores.length === 0 && isSessionEnded && (
           <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-muted-foreground">Waiting for judge scoring...</p>
+            <p className="text-sm text-muted-foreground">This session has not been scored yet.</p>
           </div>
         )}
 
