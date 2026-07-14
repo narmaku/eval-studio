@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -32,6 +32,15 @@ class EvaluationCreate(BaseModel):
     rubric_id: str | None = Field(default=None, description="ID of the rubric to use for dimension-based scoring.")
     config: dict[str, Any] = Field(default={}, description="Mode-specific configuration.")
     metadata: dict[str, str] | None = Field(default=None, description="User-defined key-value metadata.")
+
+
+class CloneAndRerunRequest(BaseModel):
+    """Schema for cloning an evaluation and re-running it."""
+
+    rerun_mode: Literal["full", "failures_only"] = Field(
+        default="full",
+        description="'full' re-runs all items; 'failures_only' re-runs only failed items.",
+    )
 
 
 class EvaluationUpdate(BaseModel):

@@ -10,7 +10,7 @@ import {
   type ColumnFiltersState,
 } from '@tanstack/react-table';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, Pencil, Star, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Pencil, RotateCcw, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Table,
@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EvaluationEditSheet } from '@/components/evaluation/EvaluationEditSheet';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
+import { RerunDialog } from '@/components/results/RerunDialog';
 import { useResultStore } from '@/stores/resultStore';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import {
@@ -102,6 +103,7 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [editTarget, setEditTarget] = useState<Evaluation | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EvaluationResultRow | null>(null);
+  const [rerunTarget, setRerunTarget] = useState<EvaluationResultRow | null>(null);
 
   const { evaluations, deleteEvaluation, fetchEvaluations } = useEvaluationStore();
 
@@ -207,6 +209,11 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
               <span className="font-medium" title={row.original.name}>
                 {row.original.name}
               </span>
+              {row.original.metadata?.is_rerun === 'true' && (
+                <span className="text-[10px] text-muted-foreground">
+                  Re-run of: {row.original.metadata?.original_run_name}
+                </span>
+              )}
               <MetadataBadges metadata={merged} maxInline={3} compact />
             </div>
           );
@@ -328,6 +335,18 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
         header: '',
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Re-run evaluation"
+              onClick={(e) => {
+                e.stopPropagation();
+                setRerunTarget(row.original);
+              }}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -484,6 +503,20 @@ export function EvaluationResultsList({ rows }: EvaluationResultsListProps) {
         }}
         cascadeInfo="All results and artifacts for this evaluation will also be deleted."
       />
+
+      {rerunTarget && (
+        <RerunDialog
+          open={!!rerunTarget}
+          onOpenChange={(open) => {
+            if (!open) setRerunTarget(null);
+          }}
+          evaluation={rerunTarget}
+          onSuccess={() => {
+            setRerunTarget(null);
+            void fetchEvaluations();
+          }}
+        />
+      )}
     </div>
   );
 }
