@@ -1,9 +1,13 @@
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
 import { cn } from '@/lib/utils';
 import { Bot, User, Monitor, Scale } from 'lucide-react';
 import type { Message } from '@/types';
 
 interface ChatMessageProps {
   message: Message;
+  renderMarkdown?: boolean;
 }
 
 interface SenderStyle {
@@ -53,9 +57,10 @@ const senderConfig: Record<string, SenderStyle> = {
   },
 };
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, renderMarkdown }: ChatMessageProps) {
   const config = senderConfig[message.sender] ?? defaultConfig;
   const Icon = config.icon;
+  const useMarkdown = renderMarkdown && message.sender !== 'user';
 
   const formattedTime = new Date(message.timestamp).toLocaleTimeString([], {
     hour: '2-digit',
@@ -70,9 +75,19 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <span className="text-xs text-muted-foreground">{formattedTime}</span>
       </div>
       <div
-        className={cn('max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap', config.bg)}
+        className={cn(
+          'max-w-[85%] rounded-lg px-3 py-2 text-sm',
+          config.bg,
+          useMarkdown
+            ? 'prose prose-sm dark:prose-invert max-w-none [&_pre]:overflow-x-auto [&_table]:text-xs [&_pre]:text-xs [&_pre]:bg-background/50 [&_pre]:rounded [&_pre]:p-2'
+            : 'whitespace-pre-wrap',
+        )}
       >
-        {message.content}
+        {useMarkdown ? (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+        ) : (
+          message.content
+        )}
       </div>
     </div>
   );

@@ -1,9 +1,11 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
+import { Code, FileText, MessageSquare } from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { ToolCallIndicator } from './ToolCallIndicator';
-import { MessageSquare } from 'lucide-react';
 import type { Message, ToolCall } from '@/types';
 
 interface ConversationPanelProps {
@@ -25,6 +27,7 @@ export function ConversationPanel({
   onToolSelect,
   selectedToolId,
 }: ConversationPanelProps) {
+  const [showFormatted, setShowFormatted] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -67,10 +70,31 @@ export function ConversationPanel({
   return (
     <Card className="flex h-full flex-col overflow-hidden">
       <CardHeader className="border-b">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          <MessageSquare className="h-4 w-4" />
-          Conversation
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <MessageSquare className="h-4 w-4" />
+            Conversation
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-xs text-muted-foreground"
+            onClick={() => setShowFormatted((prev) => !prev)}
+            aria-label={showFormatted ? 'Show raw text' : 'Show formatted text'}
+          >
+            {showFormatted ? (
+              <>
+                <Code className="h-3.5 w-3.5" />
+                Raw
+              </>
+            ) : (
+              <>
+                <FileText className="h-3.5 w-3.5" />
+                Formatted
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto p-4">
         {messages.length === 0 && !isProcessing && (
@@ -85,7 +109,7 @@ export function ConversationPanel({
             const indicatorToolCalls = toolCallsByMessageId.get(message.id);
             return (
               <div key={message.id}>
-                <ChatMessage message={message} />
+                <ChatMessage message={message} renderMarkdown={showFormatted} />
                 {indicatorToolCalls && indicatorToolCalls.length > 0 && onToolSelect && (
                   <div className="mt-2">
                     <ToolCallIndicator
