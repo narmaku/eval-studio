@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Wrench } from 'lucide-react';
 import { ToolDetailPanel } from './ToolDetailPanel';
+import { cn } from '@/lib/utils';
 import type { ToolCall } from '@/types';
 
 interface ToolSidePanelProps {
@@ -20,7 +21,7 @@ export function ToolSidePanel({ toolCalls, selectedToolId, onToolSelect }: ToolS
   }, [selectedToolId, toolCalls]);
 
   return (
-    <div className="relative flex h-full" data-testid="tool-side-panel">
+    <div className="relative flex h-full max-w-[50%]" data-testid="tool-side-panel">
       {/* Toggle button */}
       <div className="flex flex-col items-center pt-2">
         <Button
@@ -44,11 +45,13 @@ export function ToolSidePanel({ toolCalls, selectedToolId, onToolSelect }: ToolS
 
       {/* Panel content */}
       <div
-        className="overflow-hidden transition-all duration-200"
-        style={{ width: isOpen ? '400px' : '0px' }}
+        className={cn(
+          'overflow-hidden transition-all duration-200',
+          isOpen ? 'flex-1 min-w-0' : 'w-0',
+        )}
       >
         {isOpen && (
-          <div className="h-full w-[400px]">
+          <div className="h-full">
             <ToolDetailPanel
               toolCall={selectedToolCall}
               allToolCalls={toolCalls}
