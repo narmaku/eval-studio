@@ -202,4 +202,20 @@ describe('RerunDialog', () => {
       expect(mockedToast.error).toHaveBeenCalledWith('Failed to start re-run: Server error');
     });
   });
+
+  it('closes dialog when Cancel is clicked', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <RerunDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        evaluation={baseEvaluation}
+        onSuccess={onSuccess}
+      />,
+    );
+
+    await user.click(screen.getByText('Cancel'));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
 });

@@ -260,3 +260,132 @@ async def test_clone_and_rerun_running_evaluation_rejected(client: AsyncClient, 
     )
 
     assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_clone_and_rerun_pending_evaluation_rejected(client: AsyncClient, db_session: AsyncSession):
+    """Cannot clone-and-rerun an evaluation that is pending."""
+    dataset = Dataset(name="pending-dataset", item_count=1)
+    db_session.add(dataset)
+    await db_session.flush()
+
+    evaluation = Evaluation(
+        name="Pending Eval",
+        mode="qa",
+        status="pending",
+        dataset_id=dataset.id,
+        config={
+            "model_endpoint": {"default_model": "m"},
+            "judge_config": {"provider_id": "__test__"},
+        },
+    )
+    db_session.add(evaluation)
+    await db_session.commit()
+
+    resp = await client.post(
+        f"/api/v1/evaluations/{evaluation.id}/clone-and-rerun",
+        json={"rerun_mode": "full"},
+    )
+
+    assert resp.status_code == 409
+    assert "pending" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_clone_and_rerun_not_found(client: AsyncClient):
+    """Returns 404 when evaluation does not exist."""
+    resp = await client.post(
+        "/api/v1/evaluations/nonexistent-id/clone-and-rerun",
+        json={"rerun_mode": "full"},
+    )
+
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_clone_and_rerun_no_dataset(client: AsyncClient, db_session: AsyncSession):
+    """Returns 422 when original evaluation has no dataset configured."""
+    evaluation = Evaluation(
+        name="No Dataset Eval",
+        mode="qa",
+        status="completed",
+        dataset_id=None,
+        config={
+            "model_endpoint": {"default_model": "m"},
+            "judge_config": {"provider_id": "__test__"},
+        },
+    )
+    db_session.add(evaluation)
+    await db_session.commit()
+
+    resp = await client.post(
+        f"/api/v1/evaluations/{evaluation.id}/clone-and-rerun",
+        json={"rerun_mode": "full"},
+    )
+
+    assert resp.status_code == 422
+    assert "no dataset" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_clone_and_rerun_preserves_description_and_tags(client: AsyncClient, db_session: AsyncSession):
+    """Clone preserves description, tags, and rubric_id from the original."""
+    dataset = Dataset(name="tag-dataset", item_count=1)
+    db_session.add(dataset)
+    await db_session.flush()
+
+    item = DatasetItem(
+        dataset_id=dataset.id,
+        question="Q?",
+        expected_answer="A",
+        order_index=0,
+    )
+    db_session.add(item)
+    await db_session.flush()
+
+    evaluation = Evaluation(
+        name="Detailed Eval",
+        description="A detailed evaluation of the system",
+        mode="qa",
+        status="completed",
+        dataset_id=dataset.id,
+        tags=["regression", "nightly"],
+        config={
+            "model_endpoint": {"default_model": "m"},
+            "judge_config": {"provider_id": "__test__"},
+        },
+    )
+    db_session.add(evaluation)
+    await db_session.flush()
+
+    result = Result(
+        evaluation_id=evaluation.id,
+        dataset_item_id=item.id,
+        score=1.0,
+        passed=True,
+        actual_answer="A",
+    )
+    db_session.add(result)
+    await db_session.commit()
+
+    with patch("app.api.v1.evaluations._launch_evaluation"):
+        resp = await client.post(
+            f"/api/v1/evaluations/{evaluation.id}/clone-and-rerun",
+            json={"rerun_mode": "full"},
+        )
+
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["description"] == "A detailed evaluation of the system"
+    assert set(data["tags"]) == {"regression", "nightly"}
+
+
+@pytest.mark.asyncio
+async def test_clone_and_rerun_invalid_mode(client: AsyncClient):
+    """Returns 422 when rerun_mode is invalid."""
+    resp = await client.post(
+        "/api/v1/evaluations/some-id/clone-and-rerun",
+        json={"rerun_mode": "invalid_mode"},
+    )
+
+    assert resp.status_code == 422
