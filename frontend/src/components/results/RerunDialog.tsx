@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Loader2, AlertTriangle } from 'lucide-react';
 
@@ -11,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useEvaluationStore } from '@/stores/evaluationStore';
 import { api } from '@/services/api';
 import type { EvaluationMode, EvaluationStatus } from '@/types';
 
@@ -36,6 +38,9 @@ export function RerunDialog({
   evaluation,
   onSuccess,
 }: RerunDialogProps): React.JSX.Element {
+  const navigate = useNavigate();
+  const { setCurrentEvaluation, persistRunningEvaluation, connectToEvaluation } =
+    useEvaluationStore();
   const [selectedOption, setSelectedOption] = useState<RerunOption>('full');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -44,15 +49,31 @@ export function RerunDialog({
   const isArena = evaluation.mode === 'arena';
   const failuresDisabled = isArena || failedCount === 0;
 
+  const modeRoutes: Record<string, string> = {
+    qa: '/evaluate/qa',
+    agent: '/evaluate/agent',
+    rag: '/evaluate/rag',
+    arena: '/evaluate/arena',
+  };
+
+  const trackAndNavigate = (eval_: { id: string; name: string; mode: EvaluationMode }): void => {
+    setCurrentEvaluation(eval_ as Parameters<typeof setCurrentEvaluation>[0]);
+    persistRunningEvaluation({ id: eval_.id, name: eval_.name, mode: eval_.mode });
+    connectToEvaluation(eval_.id);
+    navigate(modeRoutes[eval_.mode] ?? '/evaluate');
+  };
+
   const handleConfirm = async (): Promise<void> => {
     setIsSubmitting(true);
     try {
       if (selectedOption === 'in_place') {
-        await api.rerunEvaluation(evaluation.evaluationId);
+        const result = await api.rerunEvaluation(evaluation.evaluationId);
         toast.success(`Re-run started in place: "${evaluation.name}"`);
+        trackAndNavigate({ id: result.id, name: result.name, mode: result.mode });
       } else {
         const result = await api.cloneAndRerunEvaluation(evaluation.evaluationId, selectedOption);
         toast.success(`Re-run started: "${result.name}"`);
+        trackAndNavigate({ id: result.id, name: result.name, mode: result.mode });
       }
       onOpenChange(false);
       onSuccess?.();

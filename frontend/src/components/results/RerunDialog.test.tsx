@@ -3,6 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RerunDialog } from './RerunDialog';
 
+const mockNavigate = vi.fn();
+
+// Mock react-router-dom
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}));
+
 // Mock the API
 vi.mock('@/services/api', () => ({
   api: {
@@ -17,6 +24,19 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+const mockSetCurrentEvaluation = vi.fn();
+const mockPersistRunningEvaluation = vi.fn();
+const mockConnectToEvaluation = vi.fn();
+
+// Mock evaluation store
+vi.mock('@/stores/evaluationStore', () => ({
+  useEvaluationStore: () => ({
+    setCurrentEvaluation: mockSetCurrentEvaluation,
+    persistRunningEvaluation: mockPersistRunningEvaluation,
+    connectToEvaluation: mockConnectToEvaluation,
+  }),
 }));
 
 import { api } from '@/services/api';
@@ -40,6 +60,10 @@ describe('RerunDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNavigate.mockReset();
+    mockSetCurrentEvaluation.mockReset();
+    mockPersistRunningEvaluation.mockReset();
+    mockConnectToEvaluation.mockReset();
     mockedApi.cloneAndRerunEvaluation.mockResolvedValue({
       id: 'new-eval',
       name: 'Test Evaluation (re-run)',
@@ -139,6 +163,8 @@ describe('RerunDialog', () => {
       expect(mockedApi.cloneAndRerunEvaluation).toHaveBeenCalledWith('eval-123', 'full');
     });
     expect(mockedToast.success).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith('/evaluate/qa');
+    expect(mockConnectToEvaluation).toHaveBeenCalledWith('new-eval');
     expect(onSuccess).toHaveBeenCalled();
   });
 
