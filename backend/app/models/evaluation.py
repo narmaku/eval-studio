@@ -17,6 +17,7 @@ class Evaluation(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     config: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     tags: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    user_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True, default=dict)
     dataset_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("datasets.id", ondelete="RESTRICT"), nullable=True
     )

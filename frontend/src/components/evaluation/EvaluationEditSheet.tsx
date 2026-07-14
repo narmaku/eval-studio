@@ -13,7 +13,12 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { TagEditor } from '@/components/ui/tag-editor';
+import { MetadataEditor } from '@/components/ui/MetadataEditor';
 import { useEvaluationStore } from '@/stores/evaluationStore';
+import {
+  recordToMetadataEntries,
+  metadataEntriesToRecord,
+} from '@/components/evaluation/runDetailsUtils';
 import type { Evaluation } from '@/types';
 
 interface EvaluationEditSheetProps {
@@ -32,13 +37,21 @@ function EvaluationEditForm({
   const [name, setName] = useState(evaluation.name);
   const [description, setDescription] = useState(evaluation.description ?? '');
   const [tags, setTags] = useState<string[]>(evaluation.tags ?? []);
+  const [metadataEntries, setMetadataEntries] = useState(
+    recordToMetadataEntries(evaluation.metadata),
+  );
   const [isSaving, setIsSaving] = useState(false);
   const updateEvaluation = useEvaluationStore((s) => s.updateEvaluation);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await updateEvaluation(evaluation.id, { name, description, tags });
+      await updateEvaluation(evaluation.id, {
+        name,
+        description,
+        tags,
+        metadata: metadataEntriesToRecord(metadataEntries) ?? {},
+      });
       toast.success('Evaluation updated');
       onSaved();
     } catch (err) {
@@ -67,6 +80,11 @@ function EvaluationEditForm({
         <Label>Tags</Label>
         <TagEditor tags={tags} onChange={setTags} />
       </div>
+      <MetadataEditor
+        entries={metadataEntries}
+        onChange={setMetadataEntries}
+        emptyText="No metadata entries."
+      />
       <Button onClick={() => void handleSave()} disabled={isSaving || !name.trim()}>
         {isSaving ? 'Saving...' : 'Save Changes'}
       </Button>
@@ -87,7 +105,9 @@ export function EvaluationEditSheet({ open, onOpenChange, evaluation }: Evaluati
       <SheetContent side="right" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Edit Evaluation</SheetTitle>
-          <SheetDescription>Update evaluation name, description, and tags.</SheetDescription>
+          <SheetDescription>
+            Update evaluation name, description, tags, and metadata.
+          </SheetDescription>
         </SheetHeader>
         {open && (
           <EvaluationEditForm

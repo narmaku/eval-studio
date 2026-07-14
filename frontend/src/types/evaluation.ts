@@ -18,6 +18,7 @@ export interface Evaluation {
   average_score: number | null;
   pass_rate: number | null;
   tags?: string[];
+  metadata?: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +27,7 @@ export interface UpdateEvaluationRequest {
   name?: string;
   description?: string;
   tags?: string[];
+  metadata?: Record<string, string>;
 }
 
 export interface RAGEndpointSettings {
@@ -109,10 +111,12 @@ export interface JudgeReference {
 
 export interface CreateEvaluationRequest {
   name: string;
+  description?: string;
   mode: EvaluationMode;
   dataset_id?: string;
   rubric_id?: string;
   config: EvaluationConfig;
+  metadata?: Record<string, string>;
 }
 
 export type LogLevel = 'info' | 'warning' | 'error';

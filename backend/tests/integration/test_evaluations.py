@@ -359,3 +359,102 @@ async def test_delete_rubric_nullifies_evaluation_fk(client, db_session):
     result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
     evaluation = result.scalar_one()
     assert evaluation.rubric_id is None
+
+
+# ── Metadata field tests ────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_create_evaluation_with_metadata(client, db_session):
+    """POST /evaluations with description and metadata persists both."""
+    payload = {
+        "name": "Metadata Eval",
+        "mode": "qa",
+        "description": "Test description",
+        "metadata": {"provider": "openai", "model": "gpt-4o", "temperature": "0.7"},
+    }
+    response = await client.post("/api/v1/evaluations", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["description"] == "Test description"
+    assert data["metadata"] == {"provider": "openai", "model": "gpt-4o", "temperature": "0.7"}
+
+    # Verify in DB via model attribute
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == data["id"]))
+    evaluation = result.scalar_one()
+    assert evaluation.user_metadata == {"provider": "openai", "model": "gpt-4o", "temperature": "0.7"}
+
+
+@pytest.mark.asyncio
+async def test_create_evaluation_without_metadata(client):
+    """POST /evaluations without metadata returns null metadata."""
+    payload = {"name": "No Metadata", "mode": "qa"}
+    response = await client.post("/api/v1/evaluations", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["metadata"] is None
+
+
+@pytest.mark.asyncio
+async def test_update_evaluation_metadata(client, db_session):
+    """PUT /evaluations/{id} can update metadata."""
+    create_resp = await client.post(
+        "/api/v1/evaluations",
+        json={"name": "Update Meta", "mode": "qa", "metadata": {"key1": "val1"}},
+    )
+    eval_id = create_resp.json()["id"]
+
+    update_resp = await client.put(
+        f"/api/v1/evaluations/{eval_id}",
+        json={"metadata": {"key1": "updated", "key2": "new"}},
+    )
+    assert update_resp.status_code == 200
+    data = update_resp.json()
+    assert data["metadata"] == {"key1": "updated", "key2": "new"}
+
+    # Verify DB
+    result = await db_session.execute(select(Evaluation).where(Evaluation.id == eval_id))
+    evaluation = result.scalar_one()
+    assert evaluation.user_metadata == {"key1": "updated", "key2": "new"}
+
+
+@pytest.mark.asyncio
+async def test_metadata_in_list_response(client):
+    """GET /evaluations list includes metadata field."""
+    await client.post(
+        "/api/v1/evaluations",
+        json={"name": "List Meta", "mode": "qa", "metadata": {"env": "staging"}},
+    )
+    list_resp = await client.get("/api/v1/evaluations")
+    items = list_resp.json()["items"]
+    meta_item = next((i for i in items if i["name"] == "List Meta"), None)
+    assert meta_item is not None
+    assert meta_item["metadata"] == {"env": "staging"}
+
+
+@pytest.mark.asyncio
+async def test_metadata_empty_dict_allowed(client):
+    """POST /evaluations with empty metadata dict is accepted."""
+    payload = {"name": "Empty Meta", "mode": "qa", "metadata": {}}
+    response = await client.post("/api/v1/evaluations", json=payload)
+    assert response.status_code == 201
+    assert response.json()["metadata"] == {}
+
+
+@pytest.mark.asyncio
+async def test_metadata_backward_compatible(client, db_session):
+    """Evaluations created without metadata column still work."""
+    # Directly create an evaluation in DB without metadata
+    evaluation = Evaluation(
+        name="Legacy Eval",
+        mode="qa",
+        status="pending",
+    )
+    db_session.add(evaluation)
+    await db_session.commit()
+
+    get_resp = await client.get(f"/api/v1/evaluations/{evaluation.id}")
+    assert get_resp.status_code == 200
+    data = get_resp.json()
+    # Metadata should be None or empty for legacy rows
+    assert data["metadata"] is None or data["metadata"] == {}

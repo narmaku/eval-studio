@@ -26,10 +26,12 @@ class EvaluationCreate(BaseModel):
     """Schema for creating an evaluation."""
 
     name: str = Field(description="Human-readable evaluation name.")
+    description: str | None = Field(default=None, description="Optional description of the evaluation.")
     mode: EvaluationMode = Field(description="Evaluation mode: qa, rag, agent, or arena.")
     dataset_id: str | None = Field(default=None, description="ID of the dataset to evaluate against.")
     rubric_id: str | None = Field(default=None, description="ID of the rubric to use for dimension-based scoring.")
     config: dict[str, Any] = Field(default={}, description="Mode-specific configuration.")
+    metadata: dict[str, str] | None = Field(default=None, description="User-defined key-value metadata.")
 
 
 class EvaluationUpdate(BaseModel):
@@ -38,6 +40,7 @@ class EvaluationUpdate(BaseModel):
     name: str | None = Field(default=None, description="Human-readable evaluation name.")
     description: str | None = Field(default=None, description="Optional description of the evaluation.")
     tags: list[str] | None = Field(default=None, description="Tags for categorization.")
+    metadata: dict[str, str] | None = Field(default=None, description="User-defined key-value metadata.")
 
 
 class EvaluationResponse(BaseModel):
@@ -53,6 +56,11 @@ class EvaluationResponse(BaseModel):
     rubric_id: str | None = Field(default=None, description="ID of the rubric used for dimension-based scoring.")
     config: dict[str, Any] = Field(description="Mode-specific configuration.")
     tags: list[str] = Field(default=[], description="Tags for categorization.")
+    metadata: dict[str, str] | None = Field(
+        default=None,
+        description="User-defined key-value metadata.",
+        validation_alias="user_metadata",
+    )
     result_count: int | None = Field(default=None, description="Number of results (populated on detail endpoint).")
     average_score: float | None = Field(default=None, description="Average score across results.")
     pass_rate: float | None = Field(default=None, description="Fraction of results that passed.")

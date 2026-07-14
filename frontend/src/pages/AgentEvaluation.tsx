@@ -12,6 +12,7 @@ import { JudgeConfigPanel } from '@/components/evaluation/JudgeConfigPanel';
 import { ConversationPanel } from '@/components/chat/ConversationPanel';
 import { ToolSidePanel } from '@/components/chat/ToolSidePanel';
 import { ScoringPanel } from '@/components/chat/ScoringPanel';
+import { RunDetailsPanel } from '@/components/evaluation/RunDetailsPanel';
 import { useEvaluationStore } from '@/stores/evaluationStore';
 import { useEvaluatorStore } from '@/stores/evaluatorStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -83,6 +84,7 @@ export default function AgentEvaluation() {
   const [selectedHarnessId, setSelectedHarnessId] = useState<string | undefined>();
   const [selectedHarnessType, setSelectedHarnessType] = useState<string>('builtin');
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
+  const [runTitle, setRunTitle] = useState('');
 
   const { isLoading: evalLoading, setLoading: setEvalLoading } = useEvaluationStore();
   const { selectedEvaluatorId } = useEvaluatorStore();
@@ -174,9 +176,10 @@ export default function AgentEvaluation() {
     try {
       setEvalLoading(true);
 
-      const sessionName = isSubprocessHarness
+      const autoName = isSubprocessHarness
         ? `Agent Chat - ${selectedHarnessId}`
         : `Agent Chat - ${modelEndpoint?.name}`;
+      const sessionName = runTitle.trim() || autoName;
 
       await createSession({
         name: sessionName,
@@ -231,6 +234,7 @@ export default function AgentEvaluation() {
     setEvalLoading,
     createSession,
     connectWebSocket,
+    runTitle,
   ]);
 
   const handleEndSession = useCallback(async () => {
@@ -275,6 +279,7 @@ export default function AgentEvaluation() {
     setSelectedHarnessId(undefined);
     setSelectedHarnessType('builtin');
     setSelectedToolId(null);
+    setRunTitle('');
     useEvaluatorStore.getState().resetSelection();
   }, [resetSession]);
 
@@ -377,6 +382,7 @@ export default function AgentEvaluation() {
               <JudgeConfigPanel value={judgeConfig} onChange={setJudgeConfig} />
             </div>
           </div>
+          <RunDetailsPanel title={runTitle} onTitleChange={setRunTitle} />
           <button
             className="flex w-full items-center justify-center gap-2 rounded-[9px] bg-primary px-4 py-3 text-[13px] font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
             disabled={!isConfigValid || evalLoading}
