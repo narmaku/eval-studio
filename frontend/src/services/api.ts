@@ -134,6 +134,11 @@ export const api = {
     request<Evaluation>(`/api/v1/evaluations/${id}/run`, { method: 'POST' }),
   rerunEvaluation: (id: string) =>
     request<Evaluation>(`/api/v1/evaluations/${id}/rerun`, { method: 'POST' }),
+  cloneAndRerunEvaluation: (id: string, rerunMode: 'full' | 'failures_only') =>
+    request<Evaluation>(`/api/v1/evaluations/${id}/clone-and-rerun`, {
+      method: 'POST',
+      body: JSON.stringify({ rerun_mode: rerunMode }),
+    }),
   cancelEvaluation: (id: string) =>
     request<Evaluation>(`/api/v1/evaluations/${id}/cancel`, { method: 'POST' }),
 
