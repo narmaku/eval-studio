@@ -21,6 +21,8 @@ import {
   getScoreColorClass,
   formatMonoTimestamp,
 } from '@/lib/designUtils';
+import { extractSessionMetadata } from '@/lib/metadataUtils';
+import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import type { Session } from '@/types';
 
 function formatDuration(startedAt: string | null, endedAt: string | null): string {
@@ -96,6 +98,7 @@ export default function Sessions() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Mode</TableHead>
+              <TableHead>Config</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Messages</TableHead>
               <TableHead>Duration</TableHead>
@@ -123,6 +126,13 @@ export default function Sessions() {
                   >
                     {getModeLabel(session.mode)}
                   </span>
+                </TableCell>
+                <TableCell>
+                  <MetadataBadges
+                    metadata={extractSessionMetadata(session.agent_config)}
+                    maxInline={3}
+                    compact
+                  />
                 </TableCell>
                 <TableCell>
                   <span
