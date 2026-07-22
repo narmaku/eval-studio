@@ -105,6 +105,7 @@ export default function ResultDetail() {
       <ResultDetailView
         results={results}
         aggregateMetrics={aggregateMetrics}
+        evaluation={evaluation}
         evaluationName={evaluation?.name}
         evaluationMode={evaluation?.mode}
         evaluationConfig={evaluation?.config}

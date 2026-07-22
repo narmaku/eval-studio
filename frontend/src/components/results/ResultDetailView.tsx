@@ -23,7 +23,7 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { getScoreColorClass, getModeBadgeClasses, getModeLabel } from '@/lib/designUtils';
+import { getScoreColorClass } from '@/lib/designUtils';
 import {
   Select,
   SelectContent,
@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/table';
 import { ChunkDisplay } from '@/components/evaluation/ChunkDisplay';
 import { ArenaResultsCard } from '@/components/evaluation/ArenaResultsCard';
-import { ContestantSpecsCard } from '@/components/evaluation/ContestantSpecsCard';
+import { EvaluationInfoCard } from './EvaluationInfoCard';
 import { ScoreDistributionChart } from './ScoreDistributionChart';
 import { PassFailChart } from './PassFailChart';
 import { RadarComparisonChart } from './RadarComparisonChart';
@@ -49,13 +49,12 @@ import { ResultEditSheet } from './ResultEditSheet';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { useResultStore } from '@/stores/resultStore';
 import { exportResultsPdf, type PdfExportData } from '@/lib/exportPdf';
-import { extractConfigMetadata, mergeMetadata, filterSensitiveKeys } from '@/lib/metadataUtils';
-import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import type {
   Result,
   AggregateMetrics,
   DatasetItem,
   ArenaLeaderboardResponse,
+  Evaluation,
   EvaluationConfig,
 } from '@/types';
 
@@ -69,6 +68,7 @@ interface PaginationInfo {
 interface ResultDetailViewProps {
   results: Result[];
   aggregateMetrics?: AggregateMetrics | null;
+  evaluation?: Evaluation;
   evaluationName?: string;
   evaluationMode?: string;
   evaluationConfig?: EvaluationConfig;
@@ -344,10 +344,11 @@ function ExpandedDetail({
 export function ResultDetailView({
   results,
   aggregateMetrics,
+  evaluation,
   evaluationName,
   evaluationMode,
-  evaluationConfig,
-  evaluationMetadata,
+  evaluationConfig: _evaluationConfig,
+  evaluationMetadata: _evaluationMetadata,
   datasetItems,
   arenaLeaderboard,
   pagination,
@@ -356,13 +357,6 @@ export function ResultDetailView({
   onFetchAllForExport,
 }: ResultDetailViewProps) {
   const metrics = aggregateMetrics ?? EMPTY_METRICS;
-
-  const detailMetadata = useMemo(() => {
-    const configMeta = evaluationConfig
-      ? filterSensitiveKeys(extractConfigMetadata(evaluationConfig))
-      : {};
-    return mergeMetadata(configMeta, evaluationMetadata);
-  }, [evaluationConfig, evaluationMetadata]);
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
@@ -555,12 +549,12 @@ export function ResultDetailView({
         </button>
       </div>
 
-      {/* Summary Header — arena gets leaderboard + charts, others get aggregate metrics */}
+      {/* Summary Header — arena gets leaderboard + info, others get aggregate metrics + info */}
       {evaluationMode === 'arena' && arenaLeaderboard ? (
         <>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ArenaResultsCard leaderboard={arenaLeaderboard} />
-            {evaluationConfig && <ContestantSpecsCard config={evaluationConfig} />}
+            {evaluation && <EvaluationInfoCard evaluation={evaluation} />}
           </div>
           {arenaLeaderboard.contestants.some(
             (c) => c.average_breakdown && Object.keys(c.average_breakdown).length >= 2,
@@ -575,64 +569,62 @@ export function ResultDetailView({
         </>
       ) : (
         <>
-          <div className="rounded-[14px] border border-border bg-card p-5">
-            <div className="mb-2 flex items-center gap-3">
-              <h2 className="text-[22px] font-semibold tracking-[-0.02em]">
-                {evaluationName ?? 'Evaluation Result'}
-              </h2>
-              {evaluationMode && (
-                <span
-                  className={cn(
-                    'rounded-[6px] px-2 py-0.5 text-[10px] font-semibold uppercase',
-                    getModeBadgeClasses(evaluationMode),
-                  )}
-                >
-                  {getModeLabel(evaluationMode)}
-                </span>
-              )}
+          <div className="flex flex-col gap-6 lg:flex-row">
+            {/* Left: Scores */}
+            <div className="lg:flex-1">
+              <div className="rounded-[14px] border border-border bg-card p-5">
+                <div className="mb-2 flex items-center gap-3">
+                  <h2 className="text-[22px] font-semibold tracking-[-0.02em]">
+                    {evaluationName ?? 'Evaluation Result'}
+                  </h2>
+                </div>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                      Total Items
+                    </p>
+                    <p className="text-[27px] font-semibold tabular-nums">
+                      {metrics.total_items || results.length}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                      Pass Rate
+                    </p>
+                    <p
+                      className={cn(
+                        'text-[27px] font-semibold tabular-nums',
+                        getScoreColorClass(metrics.pass_rate),
+                      )}
+                    >
+                      {(metrics.pass_rate * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                      Mean Score
+                    </p>
+                    <p className="text-[27px] font-semibold tabular-nums">
+                      {metrics.mean_score.toFixed(3)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
+                      Median Score
+                    </p>
+                    <p className="text-[27px] font-semibold tabular-nums">
+                      {metrics.median_score.toFixed(3)}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
-            {Object.keys(detailMetadata).length > 0 && (
-              <MetadataBadges metadata={detailMetadata} maxInline={20} className="mb-5" />
+            {/* Right: Evaluation details */}
+            {evaluation && (
+              <div className="lg:w-[340px]">
+                <EvaluationInfoCard evaluation={evaluation} />
+              </div>
             )}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
-                  Total Items
-                </p>
-                <p className="text-[27px] font-semibold tabular-nums">
-                  {metrics.total_items || results.length}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
-                  Pass Rate
-                </p>
-                <p
-                  className={cn(
-                    'text-[27px] font-semibold tabular-nums',
-                    getScoreColorClass(metrics.pass_rate),
-                  )}
-                >
-                  {(metrics.pass_rate * 100).toFixed(1)}%
-                </p>
-              </div>
-              <div>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
-                  Mean Score
-                </p>
-                <p className="text-[27px] font-semibold tabular-nums">
-                  {metrics.mean_score.toFixed(3)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-text-3">
-                  Median Score
-                </p>
-                <p className="text-[27px] font-semibold tabular-nums">
-                  {metrics.median_score.toFixed(3)}
-                </p>
-              </div>
-            </div>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2" ref={chartsRef}>
             <div className="rounded-[14px] border border-border bg-card p-5" data-chart>

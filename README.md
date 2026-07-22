@@ -28,37 +28,20 @@ Whether you're iterating on a chatbot's response quality, validating a RAG pipel
 
 ## Screenshots
 
-### Choose your evaluation mode
+![Dashboard](docs/images/dashboard.png)
 
-![Evaluation mode selector](docs/images/evaluate-modes.png)
-
-### Configure and launch a Q&A evaluation
-
-![Q&A evaluation setup](docs/images/qa-evaluation-setup.png)
-
-### Watch evaluation progress in real time
-
-![Live evaluation logs](docs/images/evaluation-running.png)
-
-### Review results with score distributions and per-item drill-down
-
-![Q&A results dashboard](docs/images/qa-results.png)
-
-### Compare models head-to-head in Arena mode
-
-![Arena results](docs/images/arena-results.png)
-
-### Browse agent chat sessions
-
-![Sessions list](docs/images/sessions.png)
-
-### Import datasets from any format
-
-![Dataset import dialog](docs/images/dataset-import.png)
-
-### Manage providers, evaluators, and rubrics
-
-![Settings and providers](docs/images/settings-providers.png)
+<table>
+  <tr>
+    <td align="center"><a href="docs/images/evaluate-modes.png"><img src="docs/images/evaluate-modes.png" width="280"></a><br><b>Evaluation modes</b></td>
+    <td align="center"><a href="docs/images/qa-evaluation-setup.png"><img src="docs/images/qa-evaluation-setup.png" width="280"></a><br><b>Q&A setup</b></td>
+    <td align="center"><a href="docs/images/evaluation-running.png"><img src="docs/images/evaluation-running.png" width="280"></a><br><b>Live progress</b></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/images/qa-results.png"><img src="docs/images/qa-results.png" width="280"></a><br><b>Q&A results</b></td>
+    <td align="center"><a href="docs/images/arena-results.png"><img src="docs/images/arena-results.png" width="280"></a><br><b>Arena leaderboard</b></td>
+    <td align="center"><a href="docs/images/session-detail.png"><img src="docs/images/session-detail.png" width="280"></a><br><b>Agent session</b></td>
+  </tr>
+</table>
 
 ## Tech Stack
 
